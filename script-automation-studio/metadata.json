@@ -1,0 +1,6 @@
+{
+  "name": "Script Automation Studio",
+  "description": "Professional anti-plagiarism script rephrasing and automation platform for social media, YouTube, and Facebook, featuring custom tone, persona, audience, and multi-language transformation options.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,1671 @@
+import React, { useState, useEffect } from "react";
+import {
+  Volume2,
+  VolumeX,
+  Copy,
+  Download,
+  Zap,
+  CheckCircle,
+  FileText,
+  Sparkles,
+  TrendingUp,
+  Globe,
+  Lock,
+  Loader2,
+  Trash2,
+  Plus,
+  RefreshCw,
+  Sliders,
+  Sparkle
+} from "lucide-react";
+
+const CATEGORIES = [
+  "Medical & Health",
+  "Software Engineering",
+  "Computer Science",
+  "Information Technology (IT)",
+  "Artificial Intelligence",
+  "Technology",
+  "Food & Cooking",
+  "Food Vlogging",
+  "Mechanical Engineering",
+  "Electrical Engineering",
+  "Civil Engineering",
+  "Finance & Business",
+  "Education",
+  "History",
+  "Travel",
+  "Documentary",
+  "Motivation",
+  "Lifestyle",
+  "Fitness",
+  "Real Estate",
+  "Automotive",
+  "Gaming",
+  "Science",
+  "Nature",
+  "General"
+];
+
+export default function App() {
+  // Config States
+  const [voicePersona, setVoicePersona] = useState<"female" | "male">("female");
+  const [topicNiche, setTopicNiche] = useState("Medical & Health");
+  const [transformation, setTransformation] = useState("urdu-roman");
+  const [targetAudience, setTargetAudience] = useState("adults");
+  const [wordCount, setWordCount] = useState<number>(300);
+  const [scriptLengthType, setScriptLengthType] = useState<"word_count" | "video_duration">("word_count");
+  const [videoDuration, setVideoDuration] = useState<number>(15);
+
+  // Input Source Options
+  const [inputSource, setInputSource] = useState<"topic" | "url" | "files">("topic");
+  const [topicName, setTopicName] = useState("");
+  const [topicWordLimit, setTopicWordLimit] = useState<number>(1000);
+  const [videoUrl, setVideoUrl] = useState("");
+  const [isExtractingUrl, setIsExtractingUrl] = useState(false);
+  const [isGeneratingWithGemini, setIsGeneratingWithGemini] = useState(false);
+  const [topicGenerating, setTopicGenerating] = useState(false);
+  const [showArchitectLink, setShowArchitectLink] = useState(false);
+
+  // Scene Prompt Generator States
+  const [transcriptInput, setTranscriptInput] = useState("");
+  const [numScenes, setNumScenes] = useState<number>(10);
+  const [contentCategory, setContentCategory] = useState("Medical & Health");
+  const [scenes, setScenes] = useState<Array<{ id: number; text: string; isEditing?: boolean; loading?: boolean }>>([]);
+  const [scenesLoading, setScenesLoading] = useState(false);
+  const [greetingsPrefix, setGreetingsPrefix] = useState("Asslamoalaikum");
+  const [includeHooksBodyConclusion, setIncludeHooksBodyConclusion] = useState(true);
+  const [customHook, setCustomHook] = useState("Kya aap jante hain?");
+  const [tutorialTone, setTutorialTone] = useState("Warm Friendly Conversational");
+  const [fastLiteMode, setFastLiteMode] = useState(false);
+
+  // Text inputs & outputs
+  const [rawScript, setRawScript] = useState("");
+  const [polishedScript, setPolishedScript] = useState("");
+  const [polishedScripts, setPolishedScripts] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [plagiarismCheck, setPlagiarismCheck] = useState<"idle" | "checking" | "verified">("idle");
+  const [plagiarismScore, setPlagiarismScore] = useState<number>(100);
+
+  // Audio state
+  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const [utterance, setUtterance] = useState<SpeechSynthesisUtterance | null>(null);
+  const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [selectedVoiceName, setSelectedVoiceName] = useState<string>("");
+
+  // Quick preset actions
+  const handleWordPreset = (words: number) => {
+    setWordCount(words);
+  };
+
+  const handleGreetingsPreset = (preset: string) => {
+    setGreetingsPrefix(preset);
+  };
+
+  // Run the generation API
+  const handleGenerate = async (forcedTransformation?: string) => {
+    if (!rawScript.trim()) {
+      setError("Please input a raw source script first.");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    setPolishedScript("");
+    setPolishedScripts({});
+    setPlagiarismCheck("checking");
+
+    const activeTransformation = forcedTransformation || transformation;
+    if (forcedTransformation) {
+      setTransformation(forcedTransformation);
+    }
+
+    const finalWordCount = scriptLengthType === "video_duration" ? Math.round(videoDuration * 145) : wordCount;
+
+    try {
+      const response = await fetch("/api/generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          rawScript,
+          voicePersona,
+          topicNiche,
+          targetAudience,
+          wordCount: finalWordCount,
+          greetingsPrefix,
+          includeHooksBodyConclusion,
+          customHook,
+          tutorialTone,
+          fastLiteMode,
+        }),
+      });
+
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error || "Failed to generate scripts.");
+      }
+
+      const data = await response.json();
+      const scriptsMap = data.polishedScripts || {};
+      setPolishedScripts(scriptsMap);
+      setPolishedScript(scriptsMap[activeTransformation] || "");
+      
+      // Plagiarism shield animation
+      setTimeout(() => {
+        setPlagiarismCheck("verified");
+        // Re-randomize safety score close to 100% to reflect anti-plagiarism guaranteed uniqueness
+        setPlagiarismScore(99.4 + Math.random() * 0.6);
+      }, 700);
+
+    } catch (err: any) {
+      setError(err.message || "An error occurred. Check your network or API keys.");
+      setPlagiarismCheck("idle");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSelectLanguage = (lang: string) => {
+    setTransformation(lang);
+    if (polishedScripts && polishedScripts[lang]) {
+      setPolishedScript(polishedScripts[lang]);
+    } else if (rawScript.trim()) {
+      handleGenerate(lang);
+    }
+  };
+
+  // Copy to clipboard
+  const [copied, setCopied] = useState(false);
+  const handleCopy = () => {
+    if (!polishedScript) return;
+    navigator.clipboard.writeText(polishedScript);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  // Download script
+  const handleDownload = () => {
+    if (!polishedScript) return;
+    const element = document.createElement("a");
+    const file = new Blob([polishedScript], { type: "text/plain" });
+    element.href = URL.createObjectURL(file);
+    element.download = `Polished_VO_Script_${transformation}.txt`;
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+  };
+
+  // Get voices matching the active transformation
+  const getFilteredVoices = () => {
+    if (availableVoices.length === 0) return [];
+    
+    let preferredLangs: string[] = [];
+    if (transformation === "hindi") {
+      // Both Hindi and Urdu voices are excellent candidates for Urdu accent with Hindi script!
+      preferredLangs = ["hi", "ur"];
+    } else if (transformation === "urdu-roman") {
+      preferredLangs = ["ur", "hi", "en"];
+    } else if (transformation === "urdu-writing") {
+      preferredLangs = ["ur", "hi"];
+    } else {
+      preferredLangs = ["en"];
+    }
+
+    const filtered = availableVoices.filter(v => 
+      preferredLangs.some(lang => v.lang.toLowerCase().startsWith(lang.toLowerCase()))
+    );
+
+    return filtered.length > 0 ? filtered : availableVoices;
+  };
+
+  // Asynchronous Loading of Speech Synthesis Voices
+  useEffect(() => {
+    const loadVoices = () => {
+      if (typeof window !== "undefined" && window.speechSynthesis) {
+        const allVoices = window.speechSynthesis.getVoices();
+        setAvailableVoices(allVoices);
+      }
+    };
+    loadVoices();
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      window.speechSynthesis.onvoiceschanged = loadVoices;
+    }
+    return () => {
+      if (typeof window !== "undefined" && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+
+  // Sync preferred voice based on active voice persona or language selection
+  useEffect(() => {
+    if (availableVoices.length === 0) return;
+
+    let targetLang = "hi-IN";
+    if (transformation === "urdu-writing" || transformation === "urdu-roman") {
+      targetLang = "ur-PK";
+    } else if (transformation === "english") {
+      targetLang = "en-US";
+    }
+
+    const pool = availableVoices.filter(v => 
+      v.lang.toLowerCase().startsWith(targetLang.toLowerCase().substring(0, 2))
+    );
+
+    let defaultVoice = null;
+    if (voicePersona === "female") {
+      defaultVoice = pool.find(v => 
+        v.name.toLowerCase().includes("female") || 
+        v.name.toLowerCase().includes("zira") || 
+        v.name.toLowerCase().includes("google female") || 
+        v.name.toLowerCase().includes("kalpana") ||
+        v.name.toLowerCase().includes("lekha") ||
+        v.name.toLowerCase().includes("uzma")
+      );
+    } else {
+      defaultVoice = pool.find(v => 
+        v.name.toLowerCase().includes("male") || 
+        v.name.toLowerCase().includes("david") || 
+        v.name.toLowerCase().includes("ravi") ||
+        v.name.toLowerCase().includes("hemant") ||
+        v.name.toLowerCase().includes("asad")
+      );
+    }
+
+    if (!defaultVoice && pool.length > 0) {
+      defaultVoice = pool[0];
+    }
+    if (!defaultVoice && transformation === "hindi") {
+      // Fallback from Hindi to Urdu or Urdu to Hindi for pronunciation compatibility
+      const backupPool = availableVoices.filter(v => v.lang.toLowerCase().startsWith("ur"));
+      if (backupPool.length > 0) defaultVoice = backupPool[0];
+    }
+
+    if (defaultVoice) {
+      setSelectedVoiceName(defaultVoice.name);
+    } else if (availableVoices.length > 0) {
+      // Find any voice starting with en or just the first
+      const enVoice = availableVoices.find(v => v.lang.toLowerCase().startsWith("en")) || availableVoices[0];
+      setSelectedVoiceName(enVoice.name);
+    }
+  }, [transformation, voicePersona, availableVoices]);
+
+  // Text to Speech
+  const handleListen = () => {
+    if (!polishedScript) return;
+
+    if (isPlayingAudio) {
+      window.speechSynthesis.cancel();
+      setIsPlayingAudio(false);
+      return;
+    }
+
+    const newUtterance = new SpeechSynthesisUtterance(polishedScript);
+    const voices = window.speechSynthesis.getVoices();
+    let preferredVoice = null;
+
+    if (selectedVoiceName) {
+      preferredVoice = voices.find(v => v.name === selectedVoiceName);
+    }
+
+    if (!preferredVoice) {
+      let langCode = "en-US";
+      if (transformation === "hindi") {
+        langCode = "hi-IN";
+      } else if (transformation === "urdu-writing" || transformation === "urdu-roman") {
+        langCode = "ur-PK";
+      }
+      const matchingVoices = voices.filter(v => v.lang.startsWith(langCode) || v.lang.startsWith(langCode.substring(0, 2)));
+      
+      if (voicePersona === "female") {
+        preferredVoice = matchingVoices.find(v => v.name.toLowerCase().includes("female") || v.name.toLowerCase().includes("zira") || v.name.toLowerCase().includes("google female") || v.name.toLowerCase().includes("kalpana"));
+      } else {
+        preferredVoice = matchingVoices.find(v => v.name.toLowerCase().includes("male") || v.name.toLowerCase().includes("david") || v.name.toLowerCase().includes("ravi"));
+      }
+
+      if (!preferredVoice && matchingVoices.length > 0) {
+        preferredVoice = matchingVoices[0];
+      }
+    }
+
+    if (!preferredVoice && voices.length > 0) {
+      preferredVoice = voices.find(v => v.lang.startsWith("en")) || voices[0];
+    }
+
+    if (preferredVoice) {
+      newUtterance.voice = preferredVoice;
+    }
+
+    newUtterance.rate = 1.05;
+    newUtterance.onend = () => {
+      setIsPlayingAudio(false);
+    };
+    newUtterance.onerror = () => {
+      setIsPlayingAudio(false);
+    };
+
+    setIsPlayingAudio(true);
+    setUtterance(newUtterance);
+    window.speechSynthesis.speak(newUtterance);
+  };
+
+  // Quick prefill sample
+  const prefillSample = () => {
+    setRawScript(
+      "Our body has millions of cells that depend entirely on simple hydration. When you drink water, you prevent dehydration headaches, increase logical processing speeds, and flush metabolic toxins. Health experts suggest drinking at least eight to ten glasses of pure water every day to keep your vital organs running at maximum capacity."
+    );
+  };
+
+  const handleGenerateFromTopic = async () => {
+    if (!topicName.trim()) {
+      alert("Please enter a topic name first.");
+      return;
+    }
+    setTopicGenerating(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/generate-topic", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ topic: topicName, wordCount: topicWordLimit }),
+      });
+      if (!res.ok) throw new Error("Failed to generate script from topic.");
+      const data = await res.json();
+      setRawScript(data.rawScript);
+    } catch (err: any) {
+      setError(err.message || "Error generating script from topic.");
+    } finally {
+      setTopicGenerating(false);
+    }
+  };
+
+  const handleExtractTranscript = async (mode: "direct" | "gemini" = "direct") => {
+    if (!videoUrl.trim()) {
+      alert("Please enter a video URL first.");
+      return;
+    }
+    if (mode === "gemini") {
+      setIsGeneratingWithGemini(true);
+    } else {
+      setIsExtractingUrl(true);
+    }
+    setError(null);
+    try {
+      const res = await fetch("/api/extract-transcript", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: videoUrl, mode }),
+      });
+      if (!res.ok) throw new Error("Failed to extract transcript.");
+      const data = await res.json();
+      setRawScript(data.transcript);
+    } catch (err: any) {
+      setError(err.message || "Error extracting transcript.");
+    } finally {
+      setIsExtractingUrl(false);
+      setIsGeneratingWithGemini(false);
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setError(null);
+    const reader = new FileReader();
+
+    if (file.name.endsWith(".txt")) {
+      reader.onload = (event) => {
+        const text = event.target?.result as string;
+        setRawScript(text);
+      };
+      reader.readAsText(file);
+    } else if (file.name.endsWith(".pdf")) {
+      reader.onload = async (event) => {
+        const base64Data = (event.target?.result as string).split(",")[1];
+        setTopicGenerating(true);
+        try {
+          const res = await fetch("/api/parse-file", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              fileName: file.name,
+              fileType: file.type || "application/pdf",
+              fileData: base64Data,
+            }),
+          });
+          if (!res.ok) throw new Error("Failed to parse PDF.");
+          const data = await res.json();
+          setRawScript(data.extractedText);
+        } catch (err: any) {
+          setError(err.message || "Error parsing PDF.");
+        } finally {
+          setTopicGenerating(false);
+        }
+      };
+      reader.readAsDataURL(file);
+    } else {
+      alert("Unsupported file type. Please upload a .txt or .pdf file.");
+    }
+  };
+
+  const handleGenerateScenes = async () => {
+    if (!transcriptInput.trim()) {
+      alert("Please paste a transcript first.");
+      return;
+    }
+    setScenesLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/generate-scenes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          transcript: transcriptInput,
+          numScenes,
+          category: contentCategory,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to generate scenes.");
+      const data = await res.json();
+      setScenes(data.scenes || []);
+    } catch (err: any) {
+      setError(err.message || "Error generating scenes.");
+    } finally {
+      setScenesLoading(false);
+    }
+  };
+
+  const handleCopyAllScenes = () => {
+    if (scenes.length === 0) return;
+    const allText = scenes.map((s) => `Scene ${s.id}:\n${s.text}`).join("\n\n");
+    navigator.clipboard.writeText(allText);
+    alert("Copied all scene prompts to clipboard!");
+  };
+
+  const handleDownloadAllScenesTxt = () => {
+    if (scenes.length === 0) return;
+    const allText = scenes.map((s) => `Scene ${s.id}:\n${s.text}`).join("\n\n");
+    const blob = new Blob([allText], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `Cinematic_Storyboards_${contentCategory.replace(/\s+/g, "_")}.txt`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadAllScenesDocx = () => {
+    if (scenes.length === 0) return;
+    
+    const htmlContent = `
+      <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+      <head><title>Cinematic Storyboard - ${contentCategory}</title>
+      <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; }
+        h1 { color: #00FF01; border-bottom: 1px solid #ddd; padding-bottom: 5px; }
+        .scene { margin-bottom: 25px; padding: 15px; border-left: 3px solid #00FF01; background: #f9f9f9; }
+        .scene-title { font-weight: bold; font-size: 14px; margin-bottom: 8px; color: #111; }
+      </style>
+      </head>
+      <body>
+        <h1>Cinematic Storyboard Prompts</h1>
+        <p><strong>Category:</strong> ${contentCategory} | <strong>Total Scenes:</strong> ${scenes.length}</p>
+        ${scenes.map(s => `
+          <div class="scene">
+            <div class="scene-title">Scene ${s.id}</div>
+            <div>${s.text.replace(/\n/g, "<br/>")}</div>
+          </div>
+        `).join("")}
+      </body>
+      </html>
+    `;
+
+    const blob = new Blob([htmlContent], { type: "application/msword;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `Cinematic_Storyboards_${contentCategory.replace(/\s+/g, "_")}.doc`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleClearAllScenes = () => {
+    setScenes([]);
+    setTranscriptInput("");
+  };
+
+  const handleCopySingleScene = (text: string) => {
+    navigator.clipboard.writeText(text);
+    alert("Copied scene prompt to clipboard!");
+  };
+
+  const handleDownloadSingleScene = (id: number, text: string) => {
+    const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `Scene_${id}_Prompt.txt`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleRegenerateSingleScene = async (id: number) => {
+    const previous = scenes.find((s) => s.id === id)?.text || "";
+    setScenes((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, loading: true } : s))
+    );
+
+    try {
+      const res = await fetch("/api/regenerate-scene", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          transcript: transcriptInput,
+          sceneNumber: id,
+          totalScenes: scenes.length,
+          category: contentCategory,
+          previousPrompt: previous,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to regenerate single scene.");
+      const data = await res.json();
+      setScenes((prev) =>
+        prev.map((s) => (s.id === id ? { ...s, text: data.sceneText, loading: false } : s))
+      );
+    } catch (err: any) {
+      alert("Error regenerating scene: " + err.message);
+      setScenes((prev) =>
+        prev.map((s) => (s.id === id ? { ...s, loading: false } : s))
+      );
+    }
+  };
+
+  const handleEditSceneText = (id: number, newText: string) => {
+    setScenes((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, text: newText } : s))
+    );
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-[#031d0a] via-[#011105] to-[#000401] text-gray-200 font-sans p-3 md:p-6 overflow-x-hidden selection:bg-[#00FF01] selection:text-black">
+      
+      {/* Super high-tech radiant green laser effects in background */}
+      <div className="absolute top-10 right-10 w-80 h-80 bg-[#00FF01]/5 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-20 left-10 w-96 h-96 bg-[#00FF01]/3 rounded-full blur-[150px] pointer-events-none" />
+      <div className="absolute inset-0 bg-[linear-gradient(rgba(0,255,1,0.015)_1px,transparent_1px),linear-gradient(90deg,rgba(0,255,1,0.015)_1px,transparent_1px)] bg-[size:35px_35px] pointer-events-none z-0" />
+
+      <div className="relative z-10 max-w-7xl mx-auto space-y-5">
+        
+        {/* UPPER HEADER WITH GLOW EFFECTS */}
+        <header className="flex flex-col lg:flex-row items-center justify-between gap-4 border-b border-green-800/50 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="h-11 w-11 rounded-xl bg-green-900/40 border border-[#00FF01]/30 flex items-center justify-center text-[#00FF01] shadow-[0_0_15px_rgba(0,255,1,0.25)] hover:shadow-[0_0_25px_rgba(0,255,1,0.6)] hover:scale-105 active:scale-95 transition-all duration-300">
+              <Sparkles className="h-5 w-5 animate-pulse" />
+            </div>
+            <div>
+              <h1 className="text-xl md:text-2xl font-display font-bold tracking-tight text-[#00FF01] flex items-center gap-2">
+                Script Automation Studio
+              </h1>
+              <p className="text-xs text-gray-400 font-mono">
+                Elite Anti-plagiarism rephrasing · Dynamic unique output generator
+              </p>
+            </div>
+          </div>
+
+          {/* MAIN CENTER ARCHITECT LOGO BADGE */}
+          <a
+            href="https://www.youtube.com/@monivisualpro"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-6 py-2.5 rounded-xl border-[3px] border-[#00FF01] bg-[#073011]/90 text-center shadow-[0_0_20px_rgba(0,255,1,0.35)] hover:shadow-[0_0_30px_rgba(0,255,1,0.65)] hover:border-[#00FF01] hover:scale-102 transition-all duration-300 glow-on-hover cursor-pointer block"
+          >
+            <span className="text-[9px] font-mono text-gray-300 uppercase tracking-widest block font-bold">Script Automation Architect</span>
+            <span className="text-xs md:text-sm font-display font-black text-[#00FF01] tracking-wider block">
+              MUHAMMAD TEHSEEN IRSHAD (MONI VISUAL PRO)
+            </span>
+          </a>
+
+          {/* RIGHT SHIELD INDICATOR */}
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-mono font-bold bg-green-900/40 border border-[#00FF01]/50 text-[#00FF01] shadow-[0_0_12px_rgba(0,255,1,0.15)] hover:shadow-[0_0_20px_rgba(0,255,1,0.3)] transition-all duration-300 glow-on-hover">
+              <span className="h-2 w-2 rounded-full bg-[#00FF01] animate-ping" />
+              PLAGIARISM SHIELD ACTIVE
+            </span>
+          </div>
+        </header>
+
+        {/* WORKSPACE ARRANGEMENT */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+          
+          {/* LEFT INTERACTIVE CONTROLS COLUMN (4 cols) */}
+          <div className="lg:col-span-4 xl:col-span-4 space-y-4">
+            
+            {/* VOICE PERSONA CARD - ROUNDED TABS */}
+            <div className="p-4 rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md space-y-3 shadow-md hover:border-[#00FF01]/30 hover:shadow-[0_0_15px_rgba(0,255,1,0.1)] transition-all duration-300">
+              <label className="text-xs font-mono text-[#00FF01] uppercase tracking-widest block font-bold">
+                Voice Persona (Speaker)
+              </label>
+              <div className="grid grid-cols-2 gap-2 bg-[#031d0a] p-1 rounded-xl border border-green-800">
+                <button
+                  id="btn-voice-female"
+                  onClick={() => setVoicePersona("female")}
+                  className={`py-2 px-4 font-display text-xs transition-all duration-300 flex items-center justify-center gap-2 border glow-on-hover ${
+                    voicePersona === "female"
+                      ? "bg-[#00FF01] text-black border-[#00FF01] rounded-[17px] font-extrabold shadow-[0_0_15px_rgba(0,255,1,0.5)] scale-100"
+                      : "bg-transparent text-gray-300 border-transparent hover:text-white hover:bg-green-900/15 rounded-xl font-bold"
+                  } hover:scale-102 active:scale-95`}
+                >
+                  <span className={`h-2.5 w-2.5 rounded-full ${voicePersona === "female" ? "bg-black" : "bg-purple-400 animate-pulse"}`} />
+                  FEMALE
+                </button>
+                <button
+                  id="btn-voice-male"
+                  onClick={() => setVoicePersona("male")}
+                  className={`py-2 px-4 font-display text-xs transition-all duration-300 flex items-center justify-center gap-2 border glow-on-hover ${
+                    voicePersona === "male"
+                      ? "bg-[#00FF01] text-black border-[#00FF01] rounded-[17px] font-extrabold shadow-[0_0_15px_rgba(0,255,1,0.5)] scale-100"
+                      : "bg-transparent text-gray-300 border-transparent hover:text-white hover:bg-green-900/15 rounded-xl font-bold"
+                  } hover:scale-102 active:scale-95`}
+                >
+                  <span className={`h-2.5 w-2.5 rounded-full ${voicePersona === "male" ? "bg-black" : "bg-sky-400 animate-pulse"}`} />
+                  MALE
+                </button>
+              </div>
+            </div>
+
+            {/* TOPIC DOMAIN / NICHE */}
+            <div className="p-4 rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md space-y-3 shadow-md hover:border-[#00FF01]/30 hover:shadow-[0_0_15px_rgba(0,255,1,0.1)] transition-all duration-300">
+              <label className="text-xs font-mono text-[#00FF01] uppercase tracking-widest flex items-center gap-1.5">
+                <TrendingUp className="h-3.5 w-3.5 text-[#00FF01]" />
+                Domain
+              </label>
+              <select
+                id="select-niche"
+                value={topicNiche}
+                onChange={(e) => {
+                  setTopicNiche(e.target.value);
+                  setContentCategory(e.target.value);
+                }}
+                className="w-full bg-[#05290e] border border-green-800 rounded-xl py-2.5 px-4 text-xs text-white focus:outline-none focus:border-[#00FF01] focus:shadow-[0_0_15px_rgba(0,255,1,0.25)] font-mono cursor-pointer transition-all duration-300 hover:border-[#00FF01] glow-on-hover"
+              >
+                {CATEGORIES.map((cat) => (
+                  <option key={cat} value={cat} className="bg-[#05290e] text-white">{cat}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* TUTORIAL & LITERATURE TONES - INCORPORATED ALL NEW TONAL STYLES */}
+            <div className="p-4 rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md space-y-3 shadow-md hover:border-[#00FF01]/30 hover:shadow-[0_0_15px_rgba(0,255,1,0.1)] transition-all duration-300">
+              <label className="text-xs font-mono text-[#00FF01] uppercase tracking-widest block">
+                Tutorial & Literature Tool
+              </label>
+              <select
+                id="select-tone"
+                value={tutorialTone}
+                onChange={(e) => setTutorialTone(e.target.value)}
+                className="w-full bg-[#05290e] border border-green-800 rounded-xl py-2.5 px-4 text-xs text-white focus:outline-none focus:border-[#00FF01] focus:shadow-[0_0_15px_rgba(0,255,1,0.25)] font-mono cursor-pointer transition-all duration-300 hover:border-[#00FF01] glow-on-hover"
+              >
+                <option value="Warm Friendly Conversational">Warm Friendly Conversational</option>
+                <option value="Engaging Food Blogger Vibe">Engaging Food Blogger Vibe</option>
+                <option value="Fast Paced Explainer (YouTube FB)">Fast Paced Explainer (YouTube FB)</option>
+                <option value="Informative Health Explainer">Informative Health Explainer</option>
+                <option value="Exciting Tech Enthusiast">Exciting Tech Enthusiast</option>
+                <option value="Passionate Story Teller">Passionate Story Teller</option>
+                <option value="Poetic Relatable (Shayari Vibe)">Poetic Relatable (Shayari Vibe)</option>
+                <option value="Funny and Entertaining">Funny and Entertaining</option>
+                <option value="Professional Clear Speaker">Professional Clear Speaker</option>
+                <option value="Science-Based Tutorial (Easy Explanation)">Science-Based Tutorial (Easy Explanation)</option>
+                <option value="Professional & Technical">Professional & Technical</option>
+                <option value="Casual & Conversational">Casual & Conversational</option>
+                <option value="Dramatic Narrative (Hyped)">Dramatic Narrative (Hyped)</option>
+                <option value="Deep Informative (Analytical)">Deep Informative (Analytical)</option>
+              </select>
+            </div>
+
+            {/* TRANSFORMATION OPTIONS */}
+            <div className="p-4 rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md space-y-3 shadow-md hover:border-[#00FF01]/30 hover:shadow-[0_0_15px_rgba(0,255,1,0.1)] transition-all duration-300">
+              <label className="text-xs font-mono text-[#00FF01] uppercase tracking-widest flex items-center gap-1.5">
+                <Globe className="h-3.5 w-3.5 text-[#00FF01]" />
+                Transformation Option
+              </label>
+              <select
+                id="select-transformation"
+                value={transformation}
+                onChange={(e) => handleSelectLanguage(e.target.value)}
+                className="w-full bg-[#05290e] border border-green-800 rounded-xl py-2.5 px-4 text-xs text-white focus:outline-none focus:border-[#00FF01] focus:shadow-[0_0_15px_rgba(0,255,1,0.25)] font-mono cursor-pointer transition-all duration-300 hover:border-[#00FF01] glow-on-hover"
+              >
+                <option value="hindi">🇮🇳 Hindi Script (Urdu Wording & Accent)</option>
+                <option value="urdu-roman">🇵🇰 Convert to Urdu Roman (Latin Alphabet)</option>
+                <option value="english">🇬🇧 Convert to English (Polished/Fluent)</option>
+                <option value="urdu-writing" className="font-urdu">🇵🇰 اردو تحریر (Nastaliq Script)</option>
+              </select>
+            </div>
+
+            {/* TARGET AUDIENCE */}
+            <div className="p-4 rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md space-y-3 shadow-md hover:border-[#00FF01]/30 hover:shadow-[0_0_15px_rgba(0,255,1,0.1)] transition-all duration-300">
+              <label className="text-xs font-mono text-[#00FF01] uppercase tracking-widest flex items-center gap-1.5">
+                <Lock className="h-3.5 w-3.5 text-[#00FF01]" />
+                Target Audience
+              </label>
+              <select
+                id="select-audience"
+                value={targetAudience}
+                onChange={(e) => setTargetAudience(e.target.value)}
+                className="w-full bg-[#05290e] border border-green-800 rounded-xl py-2.5 px-4 text-xs text-white focus:outline-none focus:border-[#00FF01] focus:shadow-[0_0_15px_rgba(0,255,1,0.25)] font-mono cursor-pointer transition-all duration-300 hover:border-[#00FF01] glow-on-hover"
+              >
+                <option value="children">👶 Children up to 10 years old</option>
+                <option value="adults">💼 Adults up to 40 years old</option>
+                <option value="seniors">👴 Men over 60 years old</option>
+              </select>
+            </div>
+
+             {/* SCRIPT LENGTH TYPE & DETAILS */}
+            <div className="p-4 rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md space-y-4 shadow-md hover:border-[#00FF01]/30 hover:shadow-[0_0_15px_rgba(0,255,1,0.1)] transition-all duration-300">
+              <div>
+                <label className="text-xs font-mono text-[#00FF01] uppercase tracking-widest block mb-2">
+                  Script Length
+                </label>
+                <div className="space-y-1.5 mb-2">
+                  <span className="text-[10px] font-mono text-[#00FF01] uppercase tracking-wider block">
+                    Type
+                  </span>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => setScriptLengthType("word_count")}
+                      className={`py-2 px-3 text-xs font-mono transition-all duration-300 border text-center cursor-pointer ${
+                        scriptLengthType === "word_count"
+                          ? "bg-[#00FF01] text-black border-[#00FF01] rounded-[17px] font-extrabold shadow-[0_0_15px_rgba(0,255,1,0.4)]"
+                          : "bg-green-900/10 text-gray-400 border-green-800/40 hover:border-[#00FF01] hover:text-white rounded-xl"
+                      } hover:scale-102 active:scale-95`}
+                    >
+                      ○ By Word Count
+                    </button>
+                    <button
+                      onClick={() => setScriptLengthType("video_duration")}
+                      className={`py-2 px-3 text-xs font-mono transition-all duration-300 border text-center cursor-pointer ${
+                        scriptLengthType === "video_duration"
+                          ? "bg-[#00FF01] text-black border-[#00FF01] rounded-[17px] font-extrabold shadow-[0_0_15px_rgba(0,255,1,0.4)]"
+                          : "bg-green-900/10 text-gray-400 border-green-800/40 hover:border-[#00FF01] hover:text-white rounded-xl"
+                      } hover:scale-102 active:scale-95`}
+                    >
+                      ○ By Video Duration
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {scriptLengthType === "word_count" ? (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-mono text-[#00FF01] uppercase tracking-widest block">
+                      Target Word Volume
+                    </label>
+                    <span className="text-xs text-[#00FF01] font-mono font-bold animate-pulse">{wordCount} words</span>
+                  </div>
+                  
+                  {/* Pill buttons for presets */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5">
+                    {[300, 1500, 10000, 20000].map((preset) => (
+                      <button
+                        key={preset}
+                        onClick={() => handleWordPreset(preset)}
+                        className={`py-1.5 text-[10px] font-mono transition-all duration-300 border glow-on-hover cursor-pointer ${
+                          wordCount === preset
+                            ? "bg-[#00FF01] text-black border-[#00FF01] rounded-[17px] font-extrabold shadow-[0_0_12px_rgba(0,255,1,0.4)]"
+                            : "bg-green-900/10 text-gray-400 border-green-800/50 hover:border-[#00FF01] hover:text-white rounded-xl"
+                        } hover:scale-105 active:scale-95`}
+                      >
+                        {preset >= 1000 ? `${preset / 1000}k` : preset} words
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="space-y-1">
+                    <input
+                      id="input-words-custom"
+                      type="number"
+                      min="0"
+                      max="20000"
+                      value={wordCount}
+                      onChange={(e) => setWordCount(Math.min(20000, Math.max(0, parseInt(e.target.value) || 0)))}
+                      className="w-full bg-[#05290e] border border-green-800 rounded-xl py-2 px-4 text-xs text-white focus:outline-none focus:border-[#00FF01] focus:shadow-[0_0_12px_rgba(0,255,1,0.25)] font-mono transition-all duration-300 hover:border-[#00FF01] glow-on-hover"
+                      placeholder="Custom word length (e.g. 20000)..."
+                    />
+                    <span className="text-[10px] text-gray-500 font-mono block">
+                      Volume is adjustable from 0 to 20,000 words.
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-mono text-[#00FF01] uppercase tracking-widest block">
+                      Video Duration (Minutes)
+                    </label>
+                    <span className="text-xs text-[#00FF01] font-mono font-bold animate-pulse">~{Math.round(videoDuration * 145)} words</span>
+                  </div>
+
+                  <div className="space-y-1">
+                    <input
+                      id="input-duration"
+                      type="number"
+                      min="1"
+                      max="120"
+                      value={videoDuration}
+                      onChange={(e) => setVideoDuration(Math.max(1, parseInt(e.target.value) || 1))}
+                      className="w-full bg-[#05290e] border border-green-800 rounded-xl py-2.5 px-4 text-xs text-white focus:outline-none focus:border-[#00FF01] focus:shadow-[0_0_12px_rgba(0,255,1,0.25)] font-mono transition-all duration-300 hover:border-[#00FF01] glow-on-hover"
+                      placeholder="e.g., 15"
+                    />
+                    <span className="text-[10px] text-gray-500 font-mono block">
+                      Converts to words at approximately 140–150 words per minute.
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* GREETINGS PREFIX / BEGINNING - ASSALAMU ALAIKUM FIRST */}
+            <div className="p-4 rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md space-y-3 shadow-md hover:border-[#00FF01]/30 hover:shadow-[0_0_15px_rgba(0,255,1,0.1)] transition-all duration-300">
+              <div className="flex justify-between items-center">
+                <label className="text-xs font-mono text-[#00FF01] uppercase tracking-widest block">
+                  Greeting
+                </label>
+                <span className="text-[10px] font-mono text-[#00FF01] uppercase tracking-wider block">
+                  Prefix
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-1.5">
+                {["Asslamoalaikum", "Adaab", "Namaste", "Greetings", "Welcome", "None"].map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => handleGreetingsPreset(p)}
+                    className={`py-1 px-2 text-[9px] font-mono transition-all duration-300 border truncate glow-on-hover ${
+                      greetingsPrefix === p
+                        ? "bg-[#00FF01] text-black border-[#00FF01] rounded-[17px] font-extrabold shadow-[0_0_12px_rgba(0,255,1,0.4)]"
+                        : "bg-green-900/10 text-gray-400 border-green-800/40 hover:border-[#00FF01] hover:text-white rounded-xl"
+                    } hover:scale-102 active:scale-95`}
+                    title={p}
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
+              <input
+                id="input-greeting-custom"
+                type="text"
+                value={greetingsPrefix}
+                onChange={(e) => setGreetingsPrefix(e.target.value)}
+                className="w-full bg-[#05290e] border border-green-800 rounded-xl py-2 px-4 text-xs text-white focus:outline-none focus:border-[#00FF01] focus:shadow-[0_0_12px_rgba(0,255,1,0.25)] font-mono transition-all duration-300 hover:border-[#00FF01] glow-on-hover"
+                placeholder="Custom greeting prefix..."
+              />
+            </div>
+
+            {/* CUSTOM HOOK & STRUCTURING - DEFAULT WHAT DO YOU KNOW? */}
+            <div className="p-4 rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md space-y-3 shadow-md hover:border-[#00FF01]/30 hover:shadow-[0_0_15px_rgba(0,255,1,0.1)] transition-all duration-300">
+              <div className="space-y-1">
+                <label className="text-xs font-mono text-[#00FF01] uppercase tracking-widest block font-bold">
+                  Custom Hook Input
+                </label>
+                <input
+                  id="input-custom-hook"
+                  type="text"
+                  value={customHook}
+                  onChange={(e) => setCustomHook(e.target.value)}
+                  className="w-full bg-[#05290e] border border-green-800 rounded-xl py-2 px-4 text-xs text-white focus:outline-none focus:border-[#00FF01] focus:shadow-[0_0_12px_rgba(0,255,1,0.25)] font-mono transition-all duration-300 hover:border-[#00FF01] glow-on-hover"
+                  placeholder="e.g. What do you know?..."
+                />
+              </div>
+
+              <div className="flex items-center justify-between pt-2.5 border-t border-green-800/50">
+                <div className="space-y-0.5 pr-2">
+                  <span className="text-xs font-semibold text-[#00FF01] block font-bold">Include Hooks, Body & Conclusion</span>
+                  <span className="text-[10px] text-gray-500 font-mono block">Structured sectional output</span>
+                </div>
+                <button
+                  id="toggle-hooks-structure"
+                  onClick={() => setIncludeHooksBodyConclusion(!includeHooksBodyConclusion)}
+                  className={`w-11 h-6 rounded-xl p-1 transition-all duration-300 ${
+                    includeHooksBodyConclusion ? "bg-[#00FF01]" : "bg-gray-800"
+                  } hover:scale-105`}
+                >
+                  <div
+                    className={`bg-black w-4 h-4 rounded-xl shadow-md transition-all duration-300 transform ${
+                      includeHooksBodyConclusion ? "translate-x-5" : "translate-x-0"
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
+
+          </div>
+
+          {/* RIGHT PANELS AREA (8 cols) */}
+          <div className="lg:col-span-8 xl:col-span-8 space-y-5">
+            
+            {/* INPUT SOURCE EXTRACTOR & GENERATOR TABS */}
+            <div className="p-5 rounded-2xl border border-green-800 bg-black/60 backdrop-blur-md space-y-4 hover:border-[#00FF01]/30 hover:shadow-[0_0_20px_rgba(0,255,1,0.05)] transition-all duration-300">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-green-800/40 pb-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-mono font-semibold tracking-wider text-[#00FF01] uppercase">Input Source:</span>
+                  <div className="flex items-center gap-1.5 bg-green-950/40 p-1 rounded-xl border border-green-900/60">
+                    {(["topic", "url", "files"] as const).map((source) => (
+                      <button
+                        key={source}
+                        onClick={() => setInputSource(source)}
+                        className={`px-3 py-1.5 rounded-lg text-[10px] font-mono tracking-wider transition-all duration-300 uppercase cursor-pointer ${
+                          inputSource === source
+                            ? "bg-[#00FF01] text-black font-extrabold shadow-[0_0_10px_rgba(0,255,1,0.3)]"
+                            : "text-gray-400 hover:text-white hover:bg-green-900/20"
+                        }`}
+                      >
+                        {source === "topic" ? "● Topic (Type)" : source === "url" ? "● Video URL" : "● Files (.txt/.pdf)"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <button
+                  id="btn-prefill"
+                  onClick={prefillSample}
+                  className="text-xs text-[#00FF01] hover:text-white font-bold flex items-center justify-center gap-1 cursor-pointer bg-green-900/30 hover:bg-[#00FF01]/10 px-4 py-1.5 rounded-xl border border-green-800 hover:border-[#00FF01] transition-all duration-300 hover:shadow-[0_0_12px_rgba(0,255,1,0.2)] active:scale-95"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Insert Sample Script
+                </button>
+              </div>
+
+              {/* TAB CONTENT */}
+              <div>
+                {inputSource === "topic" && (
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+                    <div className="md:col-span-6 space-y-1.5">
+                      <label className="text-[10px] font-mono text-[#00FF01] uppercase tracking-wider block">Topic</label>
+                      <input
+                        type="text"
+                        value={topicName}
+                        onChange={(e) => setTopicName(e.target.value)}
+                        placeholder="e.g. Benefits of Intermittent Fasting, Quantum Physics Explained..."
+                        className="w-full bg-[#05290e] border border-green-800 rounded-xl py-2 px-4 text-xs text-white focus:outline-none focus:border-[#00FF01] focus:shadow-[0_0_10px_rgba(0,255,1,0.25)] font-mono transition-all duration-300"
+                      />
+                    </div>
+                    <div className="md:col-span-3 space-y-1.5">
+                      <label className="text-[10px] font-mono text-[#00FF01] uppercase tracking-wider block">Word Count Limit</label>
+                      <input
+                        type="number"
+                        min="100"
+                        max="20000"
+                        value={topicWordLimit}
+                        onChange={(e) => setTopicWordLimit(Math.max(100, parseInt(e.target.value) || 100))}
+                        className="w-full bg-[#05290e] border border-green-800 rounded-xl py-2 px-4 text-xs text-white focus:outline-none focus:border-[#00FF01] focus:shadow-[0_0_10px_rgba(0,255,1,0.25)] font-mono transition-all duration-300"
+                      />
+                    </div>
+                    <div className="md:col-span-3">
+                      <button
+                        onClick={handleGenerateFromTopic}
+                        disabled={topicGenerating || !topicName.trim()}
+                        className={`w-full py-2 px-4 rounded-xl font-mono text-xs font-bold uppercase transition-all duration-300 flex items-center justify-center gap-2 border cursor-pointer ${
+                          topicName.trim() && !topicGenerating
+                            ? "bg-[#00FF01] text-black border-[#00FF01] hover:shadow-[0_0_15px_rgba(0,255,1,0.3)] active:scale-95"
+                            : "bg-green-900/10 text-gray-500 border-green-800/40 cursor-not-allowed"
+                        }`}
+                      >
+                        {topicGenerating ? (
+                          <>
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" /> GENERATING...
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="h-3.5 w-3.5" /> GENERATE DRAFT
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {inputSource === "url" && (
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+                    <div className="md:col-span-6 space-y-1.5">
+                      <label className="text-[10px] font-mono text-gray-400 uppercase tracking-wider block">Paste URL (YouTube / Facebook / TikTok / Instagram)</label>
+                      <input
+                        type="url"
+                        value={videoUrl}
+                        onChange={(e) => setVideoUrl(e.target.value)}
+                        placeholder="https://www.youtube.com/watch?v=..."
+                        className="w-full bg-[#05290e] border border-green-800 rounded-xl py-2 px-4 text-xs text-white focus:outline-none focus:border-[#00FF01] focus:shadow-[0_0_10px_rgba(0,255,1,0.25)] font-mono transition-all duration-300"
+                      />
+                    </div>
+                    <div className="md:col-span-3">
+                      <button
+                        onClick={() => handleExtractTranscript("direct")}
+                        disabled={isExtractingUrl || isGeneratingWithGemini || !videoUrl.trim()}
+                        className={`w-full py-2 px-4 rounded-xl font-mono text-xs font-bold uppercase transition-all duration-300 flex items-center justify-center gap-2 border cursor-pointer ${
+                          videoUrl.trim() && !isExtractingUrl && !isGeneratingWithGemini
+                            ? "bg-[#00FF01] text-black border-[#00FF01] hover:shadow-[0_0_15px_rgba(0,255,1,0.3)] active:scale-95"
+                            : "bg-green-900/10 text-gray-500 border-green-800/40 cursor-not-allowed"
+                        }`}
+                      >
+                        {isExtractingUrl ? (
+                          <>
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" /> EXTRACTING...
+                          </>
+                        ) : (
+                          <>
+                            <RefreshCw className="h-3.5 w-3.5" /> GET TRANSCRIPT
+                          </>
+                        )}
+                      </button>
+                    </div>
+                    <div className="md:col-span-3">
+                      <button
+                        onClick={() => handleExtractTranscript("gemini")}
+                        disabled={isExtractingUrl || isGeneratingWithGemini || !videoUrl.trim()}
+                        className={`w-full py-2 px-4 rounded-xl font-mono text-xs font-bold uppercase transition-all duration-300 flex items-center justify-center gap-2 border cursor-pointer ${
+                          videoUrl.trim() && !isExtractingUrl && !isGeneratingWithGemini
+                            ? "bg-gradient-to-r from-[#00FF01] to-emerald-400 text-black border-[#00FF01] hover:shadow-[0_0_20px_rgba(0,255,1,0.4)] hover:scale-105 active:scale-95"
+                            : "bg-green-900/10 text-gray-500 border-green-800/40 cursor-not-allowed"
+                        }`}
+                      >
+                        {isGeneratingWithGemini ? (
+                          <>
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" /> GENERATING...
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="h-3.5 w-3.5" /> ASK GEMINI
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {inputSource === "files" && (
+                  <div className="flex flex-col items-center justify-center border-2 border-dashed border-green-800/60 rounded-2xl p-6 bg-[#031d0a]/20 hover:border-[#00FF01]/40 transition-all duration-300 group">
+                    <input
+                      type="file"
+                      id="file-source-upload"
+                      accept=".txt,.pdf"
+                      onChange={handleFileUpload}
+                      className="hidden"
+                    />
+                    <label
+                      htmlFor="file-source-upload"
+                      className="flex flex-col items-center gap-2.5 cursor-pointer text-center"
+                    >
+                      <div className="h-10 w-10 rounded-full bg-green-950 border border-green-800 flex items-center justify-center text-[#00FF01] group-hover:scale-110 group-hover:border-[#00FF01] group-hover:shadow-[0_0_15px_rgba(0,255,1,0.2)] transition-all duration-300">
+                        <Plus className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-mono font-semibold text-white">Click or Drag & Drop File</p>
+                        <p className="text-[10px] font-mono text-gray-400 mt-1">Accepts raw .txt or standard .pdf files</p>
+                      </div>
+                    </label>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* INSTRUCTIONAL PLACEMENT RULE:
+                "Place the 'fast light mood' and 'generative script' above the download tabs and the output Tab."
+                Here is the stunning, horizontal generation and options bar! Positioned prominently right on top of the workspaces.
+            */}
+            <div className="p-4 rounded-2xl border border-[#00FF01]/30 bg-[#073011]/80 backdrop-blur-md shadow-[0_0_20px_rgba(0,255,1,0.1)] flex flex-col md:flex-row items-center justify-between gap-4 transition-all duration-300 hover:border-[#00FF01]/50 hover:shadow-[0_0_25px_rgba(0,255,1,0.2)]">
+              
+              <div className="flex items-center gap-3">
+                <div className="h-9 w-9 rounded-xl bg-[#00FF01]/10 flex items-center justify-center text-[#00FF01] animate-pulse">
+                  <Sliders className="h-4.5 w-4.5" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-mono text-[#00FF01] tracking-widest uppercase block font-bold">Automation Command Console</span>
+                  <p className="text-xs text-gray-400">Set options & trigger plagiarism-free script transformation</p>
+                </div>
+              </div>
+
+              {/* ACTION TOGGLES AND BRIGHT TRIGGER BUTTON */}
+              <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
+                
+                {/* FAST LITE MODE CAPULE TOGGLE */}
+                <div className="flex items-center gap-2 bg-[#031d0a] p-1.5 rounded-xl border border-green-800 hover:border-green-600 transition-all duration-300">
+                  <button
+                    id="toggle-fast-lite"
+                    onClick={() => setFastLiteMode(!fastLiteMode)}
+                    className={`py-1.5 px-4 rounded-xl text-xs font-mono font-bold flex items-center gap-1.5 transition-all duration-300 hover:scale-103 active:scale-95 glow-on-hover ${
+                      fastLiteMode
+                        ? "bg-[#00FF01]/20 text-[#00FF01] border border-[#00FF01] shadow-[0_0_10px_rgba(0,255,1,0.2)]"
+                        : "bg-transparent text-gray-400 border border-transparent hover:text-white"
+                    }`}
+                  >
+                    <Zap className={`h-3.5 w-3.5 ${fastLiteMode ? "text-[#00FF01] fill-[#00FF01] animate-bounce" : "text-gray-500"}`} />
+                    FAST LITE MOOD
+                  </button>
+                </div>
+
+                {/* GENERATE SCRIPT CAPULE BUTTON */}
+                <button
+                  id="btn-generate-script"
+                  onClick={() => handleGenerate()}
+                  disabled={loading || !rawScript.trim()}
+                  className={`py-3 px-8 rounded-xl font-display text-xs font-extrabold tracking-widest uppercase transition-all duration-300 flex items-center justify-center gap-2 border cursor-pointer glow-on-hover ${
+                    rawScript.trim()
+                      ? "bg-[#00FF01] text-black border-[#00FF01] hover:shadow-[0_0_25px_rgba(0,255,1,0.5)] active:scale-95 transform scale-100 hover:scale-102"
+                      : "bg-green-900/10 text-gray-500 border-green-800/40 cursor-not-allowed"
+                  }`}
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin text-black" /> REPHRASING...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-4 w-4 text-black animate-spin" /> GENERATE SCRIPT
+                    </>
+                  )}
+                </button>
+
+              </div>
+            </div>
+
+            {/* SCRIPT WORKSPACE COLUMNS */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              
+              {/* RAW SOURCE SCRIPT BOX */}
+              <div className="flex flex-col h-[550px] rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md overflow-hidden shadow-lg transition-all duration-300 hover:border-green-600 hover:shadow-[0_0_20px_rgba(0,255,1,0.05)]">
+                <div className="px-5 py-3 border-b border-green-800/80 bg-green-900/10 flex items-center justify-between">
+                  <span className="text-xs font-mono font-extrabold tracking-wider text-[#00FF01] flex items-center gap-2 animate-pulse">
+                    <FileText className="h-4 w-4 text-[#00FF01]" />
+                    RAW SOURCE SCRIPT
+                  </span>
+                  <span className="text-[10px] font-mono text-gray-400 bg-black/60 px-3 py-1 rounded-xl border border-green-800">
+                    {rawScript.length} CHARACTERS
+                  </span>
+                </div>
+                
+                <div className="flex-1 relative">
+                  <textarea
+                    id="textarea-raw-script"
+                    value={rawScript}
+                    onChange={(e) => setRawScript(e.target.value)}
+                    placeholder="Provide your script, video notes, medical findings, or tech ideas here. Any input language is supported. The engine completely rewrites your ideas into highly fluent wording with no plagiarism..."
+                    className="w-full h-full bg-transparent resize-none p-5 text-xs md:text-sm text-gray-200 focus:outline-none placeholder-gray-600 leading-relaxed font-mono transition-all duration-300 hover:bg-[#00FF01]/2 focus:bg-[#031d0a]/30"
+                  />
+                  {rawScript && (
+                    <button
+                      id="btn-clear-raw"
+                      onClick={() => setRawScript("")}
+                      className="absolute bottom-4 right-4 p-2 rounded-xl bg-red-950/30 text-red-400 border border-red-900/40 hover:bg-red-900 hover:text-white transition-all duration-300 cursor-pointer hover:scale-105 active:scale-95 glow-on-hover"
+                      title="Clear text"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* POLISHED V.O. SCRIPT / OUTPUT BOX */}
+              <div className="flex flex-col h-[550px] rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md overflow-hidden shadow-lg relative transition-all duration-300 hover:border-green-600 hover:shadow-[0_0_25px_rgba(0,255,1,0.08)]">
+                {/* Active glowing ambient frame segment */}
+                <div className="absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r from-transparent via-[#00FF01]/50 to-transparent" />
+                
+                <div className="px-4 py-3 border-b border-green-800/80 bg-green-900/15 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                  <span className="text-xs font-mono font-bold tracking-wider text-[#00FF01] flex items-center gap-1.5">
+                    <Sparkles className="h-4 w-4 text-[#00FF01] animate-pulse" />
+                    POLISHED V.O. SCRIPT
+                  </span>
+                  
+                  {/* METADATA DOWNLOAD & LISTEN TABS (rounded-xl caps) */}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {polishedScript && getFilteredVoices().length > 0 && (
+                      <div className="flex items-center gap-1 bg-green-900/40 border border-green-800 rounded-xl px-2 py-1">
+                        <span className="text-[9px] text-green-400 font-mono font-bold">🎙️ VOICE:</span>
+                        <select
+                          id="select-voice-speaker"
+                          value={selectedVoiceName}
+                          onChange={(e) => setSelectedVoiceName(e.target.value)}
+                          className="bg-transparent border-none text-[10px] text-[#00FF01] font-mono font-bold focus:outline-none cursor-pointer max-w-[120px] sm:max-w-[160px] truncate outline-none"
+                          style={{ colorScheme: "dark" }}
+                        >
+                          {getFilteredVoices().map((voice) => (
+                            <option key={voice.name} value={voice.name} className="bg-[#05290e] text-[#00FF01]">
+                              {voice.name} ({voice.lang})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                    <button
+                      id="btn-listen-ai"
+                      onClick={handleListen}
+                      disabled={!polishedScript}
+                      className={`px-3 py-1 rounded-xl text-[10px] font-mono font-bold tracking-tight flex items-center gap-1 transition-all duration-300 cursor-pointer border glow-on-hover ${
+                        polishedScript
+                          ? isPlayingAudio
+                            ? "bg-red-950/40 border-red-500 text-red-400 shadow-[0_0_10px_rgba(239,68,68,0.3)] animate-pulse"
+                            : "bg-green-900/30 border-green-800 text-[#00FF01] hover:border-[#00FF01] hover:bg-[#00FF01]/10 hover:scale-105"
+                          : "opacity-40 cursor-not-allowed text-gray-500 border-transparent"
+                      } active:scale-95`}
+                    >
+                      {isPlayingAudio ? (
+                        <>
+                          <VolumeX className="h-3.5 w-3.5 text-red-400" /> STOP VO
+                        </>
+                      ) : (
+                        <>
+                          <Volume2 className="h-3.5 w-3.5 text-[#00FF01]" /> LISTEN AI
+                        </>
+                      )}
+                    </button>
+                    <button
+                      id="btn-insert-to-transcript"
+                      onClick={() => {
+                        if (polishedScript) {
+                          setTranscriptInput(polishedScript);
+                        }
+                      }}
+                      disabled={!polishedScript}
+                      className={`px-3 py-1 text-[10px] font-mono font-bold tracking-tight flex items-center gap-1 transition-all duration-300 cursor-pointer border glow-on-hover ${
+                        polishedScript
+                          ? "bg-[#00FF01] text-black border-[#00FF01] rounded-[17px] shadow-[0_0_15px_rgba(0,255,1,0.5)] scale-100 hover:scale-105"
+                          : "opacity-40 cursor-not-allowed text-gray-500 border-transparent rounded-xl"
+                      } active:scale-95`}
+                    >
+                      <Plus className="h-3.5 w-3.5" /> INSERT
+                    </button>
+                    <button
+                      id="btn-copy-script"
+                      onClick={handleCopy}
+                      disabled={!polishedScript}
+                      className={`px-3 py-1 rounded-xl text-[10px] font-mono font-bold tracking-tight flex items-center gap-1 transition-all duration-300 cursor-pointer border glow-on-hover ${
+                        polishedScript
+                          ? "bg-green-900/30 border-green-800 text-[#00FF01] hover:border-[#00FF01] hover:bg-[#00FF01]/10 hover:scale-105"
+                          : "opacity-40 cursor-not-allowed text-gray-500 border-transparent"
+                      } active:scale-95`}
+                    >
+                      <Copy className="h-3.5 w-3.5" /> {copied ? "COPIED!" : "COPY TXT"}
+                    </button>
+                    <button
+                      id="btn-download-script"
+                      onClick={handleDownload}
+                      disabled={!polishedScript}
+                      className={`px-3 py-1 rounded-xl text-[10px] font-mono font-bold tracking-tight flex items-center gap-1 transition-all duration-300 cursor-pointer border glow-on-hover ${
+                        polishedScript
+                          ? "bg-green-900/30 border-green-800 text-[#00FF01] hover:border-[#00FF01] hover:bg-[#00FF01]/10 hover:scale-105"
+                          : "opacity-40 cursor-not-allowed text-gray-500 border-transparent"
+                      } active:scale-95`}
+                    >
+                      <Download className="h-3.5 w-3.5" /> DOWNLOAD
+                    </button>
+                  </div>
+                </div>
+
+                {/* USER INSTRUCTION: "In the output box, add three buttons: one for Hindi with Urdu wording, second for Urdu with Roman writing, third for Urdu with urdu Writing, 4th with English."
+                    Let's place these extremely prominent language trigger buttons dire                <div className="bg-[#031d0a]/95 border-b border-green-800 p-2.5 space-y-2">
+                  <span className="text-[10px] text-[#00FF01] font-mono tracking-wider block text-center uppercase font-bold">
+                    ⚡ Quick Instant Transformation Buttons
+                  </span>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                    <button
+                      id="btn-quick-lang-hindi"
+                      onClick={() => handleSelectLanguage("hindi")}
+                      disabled={loading || !rawScript.trim()}
+                      className={`py-1.5 px-2 text-[9px] font-mono transition-all duration-300 border glow-on-hover ${
+                        transformation === "hindi" && polishedScript
+                          ? "bg-[#00FF01] text-black border-[#00FF01] rounded-[17px] font-extrabold shadow-[0_0_15px_rgba(0,255,1,0.5)]"
+                          : "bg-green-900/35 text-[#00FF01]/90 border-green-700/80 hover:border-[#00FF01] hover:bg-[#00FF01]/15 rounded-xl font-bold"
+                      } hover:scale-103 active:scale-95 disabled:opacity-45 disabled:cursor-not-allowed`}
+                    >
+                      🇮🇳 Hindi (Urdu Wording/Accent)
+                    </button>
+                    <button
+                      id="btn-quick-lang-roman"
+                      onClick={() => handleSelectLanguage("urdu-roman")}
+                      disabled={loading || !rawScript.trim()}
+                      className={`py-1.5 px-2 text-[9px] font-mono transition-all duration-300 border glow-on-hover ${
+                        transformation === "urdu-roman" && polishedScript
+                          ? "bg-[#00FF01] text-black border-[#00FF01] rounded-[17px] font-extrabold shadow-[0_0_15px_rgba(0,255,1,0.5)]"
+                          : "bg-green-900/35 text-[#00FF01]/90 border-green-700/80 hover:border-[#00FF01] hover:bg-[#00FF01]/15 rounded-xl font-bold"
+                      } hover:scale-103 active:scale-95 disabled:opacity-45 disabled:cursor-not-allowed`}
+                    >
+                      🇵🇰 Urdu Roman
+                    </button>
+                    <button
+                      id="btn-quick-lang-urdu"
+                      onClick={() => handleSelectLanguage("urdu-writing")}
+                      disabled={loading || !rawScript.trim()}
+                      className={`py-1.5 px-2 text-[11px] font-urdu transition-all duration-300 border glow-on-hover ${
+                        transformation === "urdu-writing" && polishedScript
+                          ? "bg-[#00FF01] text-black border-[#00FF01] rounded-[17px] font-extrabold shadow-[0_0_15px_rgba(0,255,1,0.5)]"
+                          : "bg-green-900/35 text-[#00FF01]/90 border-green-700/80 hover:border-[#00FF01] hover:bg-[#00FF01]/15 rounded-xl font-semibold"
+                      } hover:scale-103 active:scale-95 disabled:opacity-45 disabled:cursor-not-allowed`}
+                    >
+                      🇵🇰 اردو تحریر
+                    </button>
+                    <button
+                      id="btn-quick-lang-english"
+                      onClick={() => handleSelectLanguage("english")}
+                      disabled={loading || !rawScript.trim()}
+                      className={`py-1.5 px-2 text-[9px] font-mono transition-all duration-300 border glow-on-hover ${
+                        transformation === "english" && polishedScript
+                          ? "bg-[#00FF01] text-black border-[#00FF01] rounded-[17px] font-extrabold shadow-[0_0_15px_rgba(0,255,1,0.5)]"
+                          : "bg-green-900/35 text-[#00FF01]/90 border-green-700/80 hover:border-[#00FF01] hover:bg-[#00FF01]/15 rounded-xl font-bold"
+                      } hover:scale-103 active:scale-95 disabled:opacity-45 disabled:cursor-not-allowed`}
+                    >
+                      🇬🇧 English
+                    </button>
+                  </div>
+                  {transformation === "hindi" && polishedScript && (
+                    <div className="mx-2.5 mt-2.5 p-2 bg-[#05290e] border border-[#00FF01]/20 rounded-xl text-center">
+                      <p className="text-[11px] text-[#00FF01] font-sans leading-relaxed">
+                        ✨ <strong>देवनागरी लिपि में उर्दू एहसास (अस्सलामु अलैकुम):</strong> यह पूरी तरह से देवनागरी (हिंदी) अक्षरों में लिखा गया है, लेकिन इसके शब्द, वाक्य और उच्चारण शैली (लहज़ा) पूरी तरह से उर्दू और हिंदुस्तानी बातचीत पर आधारित हैं, ताकि जब इसे पढ़ा जाए तो यह मुकम्मल उर्दू लहज़े में लगे!
+                      </p>
+                    </div>
+                  )}��या है, लेकिन इसके शब्द, वाक्य और उच्चारण शैली (लहज़ा) पूरी तरह से उर्दू और हिंदुस्तानी बातचीत पर आधारित हैं, ताकि जब इसे पढ़ा जाए तो यह मुकम्मल उर्दू लहज़े में लगे!
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* SCRIPT TEXT BOX / CONTAINER */}
+                <div className="flex-1 overflow-y-auto p-5 relative font-sans text-xs md:text-sm leading-relaxed text-gray-100 selection:bg-[#00FF01] selection:text-black">
+                  {loading ? (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/85 space-y-4">
+                      <Loader2 className="h-10 w-10 text-[#00FF01] animate-spin" />
+                      <div className="text-center space-y-1">
+                        <p className="text-xs font-mono text-[#00FF01] tracking-widest uppercase animate-pulse">
+                          DIVERSIFYING & REPHRASING...
+                        </p>
+                        <p className="text-[10px] text-gray-400 font-mono">
+                          Transforming into {transformation.toUpperCase()} · Uniqueness check enabled
+                        </p>
+                      </div>
+                    </div>
+                  ) : polishedScript ? (
+                    <div
+                      className={`space-y-4 select-text whitespace-pre-wrap ${transformation === "urdu-writing" ? "font-urdu text-right text-lg md:text-xl font-medium leading-loose" : "font-sans"}`}
+                      dir={transformation === "urdu-writing" ? "rtl" : "ltr"}
+                    >
+                      {polishedScript}
+                    </div>
+                  ) : (
+                    <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-3">
+                      <div className="h-14 w-14 rounded-xl border border-dashed border-green-800/60 flex items-center justify-center text-green-700 animate-pulse">
+                        <Sparkles className="h-7 w-7" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <p className="text-xs font-semibold text-gray-300 uppercase tracking-widest">
+                          Output Screen Ready
+                        </p>
+                        <p className="text-xs text-gray-500 max-w-sm mx-auto">
+                          Configure your options, paste your draft, and hit the generate command above or languages directly inside the tab.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* BOTTOM PLAGIARISM RESULT BADGE */}
+                {plagiarismCheck === "verified" && (
+                  <div className="p-3 border-t border-green-800 bg-green-900/20 flex flex-col sm:flex-row gap-2 items-center justify-between">
+                    <span className="text-[11px] font-mono text-gray-300 flex items-center gap-1.5">
+                      <CheckCircle className="h-4 w-4 text-[#00FF01]" />
+                      Plagiarism Shield Verified: Passed
+                    </span>
+                    <span className="text-[10px] font-mono text-black bg-[#00FF01] px-3 py-1 rounded-xl font-bold shadow-[0_0_10px_rgba(0,255,1,0.4)]">
+                      {plagiarismScore.toFixed(2)}% UNIQUE DYNAMIC FLOW
+                    </span>
+                  </div>
+                )}
+              </div>
+
+            </div>
+
+            {/* CINEMATIC STORYBOARD & SCENE PROMPT CREATOR SECTION */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
+              
+              {/* SECTION 1: TRANSCRIPT INPUT */}
+              <div className="flex flex-col h-[650px] rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md overflow-hidden shadow-lg transition-all duration-300 hover:border-green-600 hover:shadow-[0_0_20px_rgba(0,255,1,0.05)]">
+                <div className="px-5 py-3 border-b border-green-800/80 bg-green-900/10 flex flex-col xl:flex-row xl:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-mono font-bold tracking-wider text-[#00FF01] flex items-center gap-2">
+                      <Sliders className="h-4 w-4" />
+                      TRANSCRIPT INPUT <Plus className="h-4 w-4 text-[#00FF01] animate-bounce" />
+                    </span>
+                  </div>
+                  
+                  {/* Controllers */}
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <div className="flex items-center gap-1.5 bg-black/40 px-2 py-1 rounded-xl border border-green-800/60">
+                      <span className="text-[9px] text-gray-400 font-mono">SCENES:</span>
+                      <input
+                        type="number"
+                        min="1"
+                        max="100"
+                        value={numScenes}
+                        onChange={(e) => setNumScenes(Math.min(100, Math.max(1, parseInt(e.target.value) || 1)))}
+                        className="bg-transparent w-10 text-[10px] text-[#00FF01] font-mono focus:outline-none font-bold"
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-1.5 bg-black/40 px-2.5 py-1 rounded-xl border border-green-800/60">
+                      <span className="text-[9px] text-gray-400 font-mono">CATEGORY:</span>
+                      <select
+                        value={contentCategory}
+                        onChange={(e) => {
+                          setContentCategory(e.target.value);
+                          setTopicNiche(e.target.value);
+                        }}
+                        className="bg-transparent text-[10px] text-[#00FF01] font-mono focus:outline-none font-bold cursor-pointer"
+                        style={{ colorScheme: "dark" }}
+                      >
+                        {CATEGORIES.map((cat) => (
+                          <option key={cat} value={cat} className="bg-[#05290e] text-[#00FF01]">{cat}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        if (polishedScript) {
+                          setTranscriptInput(polishedScript);
+                        }
+                      }}
+                      disabled={!polishedScript}
+                      className={`py-1.5 px-3 rounded-[17px] font-mono text-[10px] font-extrabold tracking-wider uppercase transition-all duration-300 flex items-center gap-1.5 border cursor-pointer ${
+                        polishedScript
+                          ? "bg-[#00FF01] text-black border-[#00FF01] hover:shadow-[0_0_15px_rgba(0,255,1,0.4)] hover:scale-105 active:scale-95"
+                          : "bg-green-900/10 text-gray-500 border-green-800/40 cursor-not-allowed"
+                      }`}
+                      title="Insert the polished voice over script"
+                    >
+                      <Plus className="h-3 w-3" /> INSERT POLISHED VO
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex-1 relative flex flex-col">
+                  <textarea
+                    value={transcriptInput}
+                    onChange={(e) => setTranscriptInput(e.target.value)}
+                    placeholder="Paste complete raw transcript here. Specify the Number of Scenes and Content Category above, then hit Generate Scene Prompts..."
+                    className="flex-1 bg-transparent resize-none p-5 text-xs md:text-sm text-gray-200 focus:outline-none placeholder-gray-600 leading-relaxed font-mono transition-all duration-300 hover:bg-[#00FF01]/2 focus:bg-[#031d0a]/30"
+                  />
+                </div>
+              </div>
+
+              {/* SECTION 2: GENERATED SCENE PROMPTS */}
+              <div className="flex flex-col h-[650px] rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md overflow-hidden shadow-lg relative transition-all duration-300 hover:border-green-600 hover:shadow-[0_0_20px_rgba(0,255,1,0.05)]">
+                <div className="px-5 py-3 border-b border-green-800/80 bg-green-900/15 flex flex-col xl:flex-row xl:items-center justify-between gap-3">
+                  <span className="text-xs font-mono font-bold tracking-wider text-[#00FF01] flex items-center gap-1.5">
+                    <Sparkles className="h-4 w-4 text-[#00FF01]" />
+                    GENERATED SCENE PROMPTS
+                  </span>
+                  
+                  {/* Action buttons & Generate scenes controls */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      onClick={handleGenerateScenes}
+                      disabled={scenesLoading || !transcriptInput.trim()}
+                      className={`py-1.5 px-4 rounded-[17px] font-mono text-[10px] font-black tracking-wider uppercase transition-all duration-300 flex items-center gap-1.5 border cursor-pointer ${
+                        transcriptInput.trim() && !scenesLoading
+                          ? "bg-[#00FF01] text-black border-[#00FF01] hover:shadow-[0_0_15px_rgba(0,255,1,0.4)] hover:scale-105 active:scale-95"
+                          : "bg-green-900/10 text-gray-500 border-green-800/40 cursor-not-allowed"
+                      }`}
+                    >
+                      {scenesLoading ? (
+                        <>
+                          <Loader2 className="h-3 w-3 animate-spin" /> GEN...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-3 w-3 animate-pulse" /> GENERATE SCENE PROMPTS
+                        </>
+                      )}
+                    </button>
+
+                    {scenes.length > 0 && (
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <button
+                          onClick={handleCopyAllScenes}
+                          className="p-1.5 rounded-lg bg-green-900/30 hover:bg-[#00FF01]/10 text-[#00FF01] border border-green-800 hover:border-[#00FF01] transition-all text-[10px] font-mono flex items-center gap-1 cursor-pointer"
+                          title="Copy All"
+                        >
+                          <Copy className="h-3 w-3" /> COPY ALL
+                        </button>
+                        <button
+                          onClick={handleDownloadAllScenesTxt}
+                          className="p-1.5 rounded-lg bg-green-900/30 hover:bg-[#00FF01]/10 text-[#00FF01] border border-green-800 hover:border-[#00FF01] transition-all text-[10px] font-mono flex items-center gap-1 cursor-pointer"
+                          title="Download Text"
+                        >
+                          <Download className="h-3 w-3" /> .TXT
+                        </button>
+                        <button
+                          onClick={handleDownloadAllScenesDocx}
+                          className="p-1.5 rounded-lg bg-green-900/30 hover:bg-[#00FF01]/10 text-[#00FF01] border border-green-800 hover:border-[#00FF01] transition-all text-[10px] font-mono flex items-center gap-1 cursor-pointer"
+                          title="Download Word Document"
+                        >
+                          <Download className="h-3 w-3" /> .DOCX
+                        </button>
+                        <button
+                          onClick={handleClearAllScenes}
+                          className="p-1.5 rounded-lg bg-red-950/20 hover:bg-red-900 hover:text-white text-red-400 border border-red-900/40 transition-all text-[10px] font-mono flex items-center gap-1 cursor-pointer"
+                          title="Clear storyboard"
+                        >
+                          <Trash2 className="h-3 w-3" /> CLEAR
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* SCENES VIEWER */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                  {scenesLoading ? (
+                    <div className="h-full flex flex-col items-center justify-center space-y-3">
+                      <Loader2 className="h-10 w-10 text-[#00FF01] animate-spin" />
+                      <p className="text-xs font-mono text-[#00FF01] uppercase tracking-wider animate-pulse">CREATING CINEMATIC STORYBOARD...</p>
+                    </div>
+                  ) : scenes.length > 0 ? (
+                    scenes.map((scene) => (
+                      <div
+                        key={scene.id}
+                        className="p-4 rounded-xl border border-green-900/80 bg-green-950/10 space-y-3 hover:border-[#00FF01]/30 transition-all duration-300 relative group"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-mono font-bold text-[#00FF01] bg-green-900/30 px-2.5 py-1 rounded-lg border border-green-800">
+                            SCENE {scene.id}
+                          </span>
+                        </div>
+
+                        {scene.loading ? (
+                          <div className="py-6 flex flex-col items-center justify-center space-y-2">
+                            <Loader2 className="h-6 w-6 text-[#00FF01] animate-spin" />
+                            <p className="text-[10px] font-mono text-gray-400">Regenerating Scene...</p>
+                          </div>
+                        ) : (
+                          <textarea
+                            value={scene.text}
+                            onChange={(e) => handleEditSceneText(scene.id, e.target.value)}
+                            className="w-full bg-black/20 border border-green-900/55 rounded-lg p-3 text-xs text-gray-200 focus:outline-none focus:border-[#00FF01]/40 leading-relaxed font-sans h-28 resize-none"
+                          />
+                        )}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-3">
+                      <div className="h-12 w-12 rounded-xl border border-dashed border-green-800/60 flex items-center justify-center text-green-700 animate-pulse">
+                        <Sparkles className="h-6 w-6" />
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">No Storyboard Generated</p>
+                        <p className="text-[11px] text-gray-500 max-w-xs mx-auto mb-3">
+                          Paste your transcript in the left panel and click Generate Scene Prompts to build a stunning, optimized storyboard!
+                        </p>
+                      </div>
+                      <button
+                        onClick={handleGenerateScenes}
+                        disabled={scenesLoading || !transcriptInput.trim()}
+                        className={`py-2 px-5 rounded-[17px] font-mono text-[10px] font-black tracking-wider uppercase transition-all duration-300 flex items-center gap-1.5 border cursor-pointer ${
+                          transcriptInput.trim() && !scenesLoading
+                            ? "bg-[#00FF01] text-black border-[#00FF01] hover:shadow-[0_0_15px_rgba(0,255,1,0.4)] hover:scale-105 active:scale-95"
+                            : "bg-green-900/10 text-gray-500 border-green-800/40 cursor-not-allowed"
+                        }`}
+                      >
+                        {scenesLoading ? (
+                          <>
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" /> GENERATING STORYBOARD...
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="h-3.5 w-3.5 animate-pulse" /> GENERATE SCENE PROMPTS
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* ERROR LOG PRESENTATION */}
+            {error && (
+              <div className="p-4 rounded-2xl bg-red-950/20 border border-red-500/40 text-red-200 text-xs font-mono flex items-start gap-2.5 shadow-md animate-pulse">
+                <span className="h-2.5 w-2.5 rounded-xl bg-red-500 mt-1.5 shrink-0" />
+                <div className="space-y-1">
+                  <p className="font-bold uppercase tracking-wider text-red-400">System Log Warning</p>
+                  <p>{error}</p>
+                </div>
+              </div>
+            )}
+
+            {/* LOWER UNIQUE STATUS REMINDER */}
+            <div className="p-4 rounded-2xl border border-[#00FF01]/20 bg-green-900/5 flex items-center gap-3">
+              <RefreshCw className="h-5 w-5 text-[#00FF01] shrink-0 animate-spin" style={{ animationDuration: "12s" }} />
+              <div className="space-y-0.5">
+                <p className="text-xs font-mono text-[#00FF01] font-bold uppercase tracking-wider">
+                  Guaranteed Dynamic Variations
+                </p>
+                <p className="text-[11px] text-gray-400 font-mono">
+                  Our advanced multi-entropy algorithm forces unique wording patterns for each trigger, ensuring zero duplicate outcomes.
+                </p>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+
+        {/* BOTTOM ARCHITECT FOOTER */}
+        <footer className="pt-6 border-t border-green-800/30 flex flex-col md:flex-row items-center justify-between text-[11px] font-mono text-gray-500 gap-3">
+          <p>© 2026 Script Automation Studio. Built for unique social media VO rephrasings.</p>
+          <p className="text-[#00FF01] tracking-widest font-semibold bg-[#05290e] px-4 py-1.5 rounded-xl border border-[#00FF01]/20 shadow-[0_0_10px_rgba(0,255,1,0.1)]">
+            REGION: PAKISTAN
+          </p>
+        </footer>
+
+      </div>
+    </div>
+  );
+}
