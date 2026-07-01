@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "motion/react";
 import {
   Volume2,
   VolumeX,
@@ -94,6 +95,59 @@ export default function App() {
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [selectedVoiceName, setSelectedVoiceName] = useState<string>("");
 
+  // YouTube CTR SM States
+  const [toggleTitle, setToggleTitle] = useState(true);
+  const [toggleDescription, setToggleDescription] = useState(true);
+  const [toggleTimestamps, setToggleTimestamps] = useState(true);
+  const [toggleHashtags, setToggleHashtags] = useState(true);
+  const [toggleTags, setToggleTags] = useState(true);
+  const [ytVideoDuration, setYtVideoDuration] = useState("10:00");
+
+  // Thumbnail Director States
+  const [thumbBgColor, setThumbBgColor] = useState("Dark Green & Black");
+  const [thumbHeadline, setThumbHeadline] = useState("");
+  const [thumbSmallTagline, setThumbSmallTagline] = useState("");
+  const [thumbTextColor, setThumbTextColor] = useState("Neon Green (#00FF01) & White");
+
+  // YouTube CTR SM Workspace States
+  const [videoTranscriptInput, setVideoTranscriptInput] = useState("");
+  const [ctrOutput, setCtrOutput] = useState<{
+    titles?: string[];
+    description?: string;
+    timestamps?: Array<{ time: string; label: string }>;
+    hashtags?: string[];
+    tags?: string[];
+  } | null>(null);
+  const [ctrLoading, setCtrLoading] = useState(false);
+  const [ctrRegeneratingField, setCtrRegeneratingField] = useState<string | null>(null);
+
+  // Thumbnail Workspace States
+  const [thumbnailTranscriptInput, setThumbnailTranscriptInput] = useState("");
+  const [thumbnailOutput, setThumbnailOutput] = useState<{
+    thumbnailPrompt: string;
+    headlineUrdu: string;
+    smallTaglineUrdu: string;
+  } | null>(null);
+  const [thumbnailLoading, setThumbnailLoading] = useState(false);
+
+  // Toast Popup States
+  const [popupMessage, setPopupMessage] = useState<string | null>(null);
+  const [popupType, setPopupType] = useState<"copy" | "download">("copy");
+
+  const showToast = (message: string, type: "copy" | "download") => {
+    setPopupMessage(message);
+    setPopupType(type);
+  };
+
+  useEffect(() => {
+    if (popupMessage) {
+      const timer = setTimeout(() => {
+        setPopupMessage(null);
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [popupMessage]);
+
   // Quick preset actions
   const handleWordPreset = (words: number) => {
     setWordCount(words);
@@ -183,6 +237,7 @@ export default function App() {
     if (!polishedScript) return;
     navigator.clipboard.writeText(polishedScript);
     setCopied(true);
+    showToast("Polished script copied to clipboard!", "copy");
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -196,6 +251,175 @@ export default function App() {
     document.body.appendChild(element);
     element.click();
     document.body.removeChild(element);
+    showToast(`Downloading Polished_VO_Script_${transformation}.txt`, "download");
+  };
+
+  // YouTube CTR & Social Growth functions
+  const handleCopyText = (text: string, fieldName: string) => {
+    navigator.clipboard.writeText(text);
+    showToast(`${fieldName} copied to clipboard!`, "copy");
+  };
+
+  const handleDownloadTextFile = (text: string, filename: string) => {
+    const element = document.createElement("a");
+    const file = new Blob([text], { type: "text/plain" });
+    element.href = URL.createObjectURL(file);
+    element.download = filename;
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+    showToast(`Downloading ${filename}`, "download");
+  };
+
+  const handleGenerateCtr = async () => {
+    if (!videoTranscriptInput.trim()) return;
+    setCtrLoading(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/generate-ctr", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          transcript: videoTranscriptInput,
+          toggleTitle,
+          toggleDescription,
+          toggleTimestamps,
+          toggleHashtags,
+          toggleTags,
+          videoDuration: ytVideoDuration,
+        }),
+      });
+
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error || "Failed to generate metadata.");
+      }
+
+      const data = await response.json();
+      setCtrOutput(data);
+    } catch (err: any) {
+      setError(err.message || "An error occurred generating CTR metadata.");
+    } finally {
+      setCtrLoading(false);
+    }
+  };
+
+  const handleRegenerateCtrField = async (field: "titles" | "description" | "timestamps" | "hashtags" | "tags") => {
+    if (!videoTranscriptInput.trim()) return;
+    setCtrRegeneratingField(field);
+    setError(null);
+    try {
+      const response = await fetch("/api/regenerate-ctr-field", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          transcript: videoTranscriptInput,
+          field,
+          videoDuration: ytVideoDuration,
+        }),
+      });
+
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error || `Failed to regenerate ${field}.`);
+      }
+
+      const data = await response.json();
+      setCtrOutput((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          [field]: data[field],
+        };
+      });
+    } catch (err: any) {
+      setError(err.message || `An error occurred regenerating ${field}.`);
+    } finally {
+      setCtrRegeneratingField(null);
+    }
+  };
+
+  const handleGenerateThumbnailPrompt = async () => {
+    if (!thumbnailTranscriptInput.trim()) return;
+    setThumbnailLoading(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/generate-thumbnail-prompt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          transcript: thumbnailTranscriptInput,
+          bgColor: thumbBgColor,
+          headline: thumbHeadline,
+          smallTagline: thumbSmallTagline,
+          textColor: thumbTextColor,
+          niche: topicNiche,
+        }),
+      });
+
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error || "Failed to generate thumbnail prompt.");
+      }
+
+      const data = await response.json();
+      setThumbnailOutput(data);
+    } catch (err: any) {
+      setError(err.message || "An error occurred generating thumbnail prompt.");
+    } finally {
+      setThumbnailLoading(false);
+    }
+  };
+
+  const formatCtrOutputText = (data: any) => {
+    if (!data) return "";
+    let txt = "";
+    if (data.titles && data.titles.length > 0) {
+      txt += "=== YOUTUBE HIGH-CTR TITLES ===\n";
+      data.titles.forEach((t: string, i: number) => {
+        txt += `${i + 1}. ${t}\n`;
+      });
+      txt += "\n";
+    }
+    if (data.description) {
+      txt += "=== SEO OPTIMIZED DESCRIPTION ===\n";
+      txt += data.description + "\n\n";
+    }
+    if (data.timestamps && data.timestamps.length > 0) {
+      txt += "=== VIDEO TIMESTAMPS ===\n";
+      data.timestamps.forEach((ts: any) => {
+        txt += `${ts.time} - ${ts.label}\n`;
+      });
+      txt += "\n";
+    }
+    if (data.hashtags && data.hashtags.length > 0) {
+      txt += "=== HASHTAGS ===\n";
+      txt += data.hashtags.join(" ") + "\n\n";
+    }
+    if (data.tags && data.tags.length > 0) {
+      txt += "=== SEO TAGS ===\n";
+      txt += data.tags.join(", ") + "\n\n";
+    }
+    return txt.trim();
+  };
+
+  const formatThumbnailOutputText = (data: any) => {
+    if (!data) return "";
+    let txt = "";
+    txt += "=== CINEMATIC THUMBNAIL PROMPT ===\n";
+    txt += data.thumbnailPrompt + "\n\n";
+    txt += "=== MAIN URDU HEADLINE ===\n";
+    txt += data.headlineUrdu + "\n\n";
+    txt += "=== SMALL TAGLINE ===\n";
+    txt += data.smallTaglineUrdu + "\n";
+    return txt.trim();
+  };
+
+  const scrollToSection = (id: string) => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
   };
 
   // Get voices matching the active transformation
@@ -939,6 +1163,217 @@ export default function App() {
                   />
                 </button>
               </div>
+
+              {/* Added line at the bottom of the "Custom Hook Input" */}
+              <div className="border-t border-green-800/40 pt-1 mt-2" />
+            </div>
+
+            {/* Added line right under the Custom Hook Input div */}
+            <div className="border-b border-green-800/30 my-4" />
+
+            {/* MOVED: YouTube and social media growth strategist */}
+            <div className="p-4 rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md space-y-4 shadow-md hover:border-[#00FF01]/30 hover:shadow-[0_0_15px_rgba(0,255,1,0.1)] transition-all duration-300">
+              <div className="border-b border-green-800/50 pb-2 flex items-center justify-between">
+                <span className="text-xs font-mono text-[#00FF01] uppercase tracking-wider block font-bold">
+                  YouTube and social media growth strategist
+                </span>
+                <Sparkle className="h-4 w-4 text-[#00FF01] animate-spin" style={{ animationDuration: '8s' }} />
+              </div>
+
+              <p className="text-[10px] text-gray-400 font-mono leading-relaxed">
+                Toggle metadata elements to include in the CTR generation stream. Click elements to scroll to their output blocks.
+              </p>
+
+              <div className="space-y-2.5">
+                {/* Toggle Title */}
+                <div className="flex items-center justify-between">
+                  <button
+                    onClick={() => scrollToSection("ctr-section-title")}
+                    className="text-xs font-semibold text-gray-300 hover:text-[#00FF01] cursor-pointer transition-colors flex items-center gap-1.5 font-sans"
+                  >
+                    <span className="h-1 w-1 bg-[#00FF01] rounded-full" />
+                    Title Option
+                  </button>
+                  <button
+                    onClick={() => setToggleTitle(!toggleTitle)}
+                    className={`w-10 h-5.5 rounded-xl p-0.5 transition-all duration-300 ${toggleTitle ? "bg-[#00FF01]" : "bg-gray-800"}`}
+                  >
+                    <div className={`bg-black w-4.5 h-4.5 rounded-xl shadow-md transition-all duration-300 transform ${toggleTitle ? "translate-x-4.5" : "translate-x-0"}`} />
+                  </button>
+                </div>
+
+                {/* Toggle Description */}
+                <div className="flex items-center justify-between">
+                  <button
+                    onClick={() => scrollToSection("ctr-section-description")}
+                    className="text-xs font-semibold text-gray-300 hover:text-[#00FF01] cursor-pointer transition-colors flex items-center gap-1.5 font-sans"
+                  >
+                    <span className="h-1 w-1 bg-[#00FF01] rounded-full" />
+                    SEO Description
+                  </button>
+                  <button
+                    onClick={() => setToggleDescription(!toggleDescription)}
+                    className={`w-10 h-5.5 rounded-xl p-0.5 transition-all duration-300 ${toggleDescription ? "bg-[#00FF01]" : "bg-gray-800"}`}
+                  >
+                    <div className={`bg-black w-4.5 h-4.5 rounded-xl shadow-md transition-all duration-300 transform ${toggleDescription ? "translate-x-4.5" : "translate-x-0"}`} />
+                  </button>
+                </div>
+
+                {/* Toggle Timestamps */}
+                <div className="flex items-center justify-between">
+                  <button
+                    onClick={() => scrollToSection("ctr-section-timestamps")}
+                    className="text-xs font-semibold text-gray-300 hover:text-[#00FF01] cursor-pointer transition-colors flex items-center gap-1.5 font-sans"
+                  >
+                    <span className="h-1 w-1 bg-[#00FF01] rounded-full" />
+                    Chronological Timestamps
+                  </button>
+                  <button
+                    onClick={() => setToggleTimestamps(!toggleTimestamps)}
+                    className={`w-10 h-5.5 rounded-xl p-0.5 transition-all duration-300 ${toggleTimestamps ? "bg-[#00FF01]" : "bg-gray-800"}`}
+                  >
+                    <div className={`bg-black w-4.5 h-4.5 rounded-xl shadow-md transition-all duration-300 transform ${toggleTimestamps ? "translate-x-4.5" : "translate-x-0"}`} />
+                  </button>
+                </div>
+
+                {/* Video Duration Input for Timestamps */}
+                {toggleTimestamps && (
+                  <div className="pl-4 py-1 border-l border-green-800/50 space-y-1">
+                    <label className="text-[9px] font-mono text-gray-400 block">TIME ESTIMATOR (DURATION):</label>
+                    <input
+                      type="text"
+                      value={ytVideoDuration}
+                      onChange={(e) => setYtVideoDuration(e.target.value)}
+                      placeholder="e.g. 10:00 or 15:30"
+                      className="w-full bg-[#05290e] border border-green-800 rounded-lg py-1 px-2.5 text-xs text-white focus:outline-none focus:border-[#00FF01] font-mono"
+                    />
+                  </div>
+                )}
+
+                {/* Toggle Hashtags */}
+                <div className="flex items-center justify-between">
+                  <button
+                    onClick={() => scrollToSection("ctr-section-hashtags")}
+                    className="text-xs font-semibold text-gray-300 hover:text-[#00FF01] cursor-pointer transition-colors flex items-center gap-1.5 font-sans"
+                  >
+                    <span className="h-1 w-1 bg-[#00FF01] rounded-full" />
+                    Hashtags
+                  </button>
+                  <button
+                    onClick={() => setToggleHashtags(!toggleHashtags)}
+                    className={`w-10 h-5.5 rounded-xl p-0.5 transition-all duration-300 ${toggleHashtags ? "bg-[#00FF01]" : "bg-gray-800"}`}
+                  >
+                    <div className={`bg-black w-4.5 h-4.5 rounded-xl shadow-md transition-all duration-300 transform ${toggleHashtags ? "translate-x-4.5" : "translate-x-0"}`} />
+                  </button>
+                </div>
+
+                {/* Toggle Tags */}
+                <div className="flex items-center justify-between">
+                  <button
+                    onClick={() => scrollToSection("ctr-section-tags")}
+                    className="text-xs font-semibold text-gray-300 hover:text-[#00FF01] cursor-pointer transition-colors flex items-center gap-1.5 font-sans"
+                  >
+                    <span className="h-1 w-1 bg-[#00FF01] rounded-full" />
+                    SEO Keywords Tags
+                  </button>
+                  <button
+                    onClick={() => setToggleTags(!toggleTags)}
+                    className={`w-10 h-5.5 rounded-xl p-0.5 transition-all duration-300 ${toggleTags ? "bg-[#00FF01]" : "bg-gray-800"}`}
+                  >
+                    <div className={`bg-black w-4.5 h-4.5 rounded-xl shadow-md transition-all duration-300 transform ${toggleTags ? "translate-x-4.5" : "translate-x-0"}`} />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* MOVED: thumbnail director and Tagline */}
+            <div className="p-4 rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md space-y-4 shadow-md hover:border-[#00FF01]/30 hover:shadow-[0_0_15px_rgba(0,255,1,0.1)] transition-all duration-300">
+              <div className="border-b border-green-800/50 pb-2 flex items-center justify-between">
+                <span className="text-xs font-mono text-[#00FF01] uppercase tracking-wider block font-bold">
+                  thumbnail director & Tagline
+                </span>
+                <a
+                  href="https://aistudio.google.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[9px] font-mono text-[#00FF01] bg-green-900/40 px-2 py-0.5 rounded border border-green-800 hover:bg-[#00FF01] hover:text-black hover:scale-105 active:scale-95 transition-all duration-300 block font-bold text-center cursor-pointer shadow-[0_0_8px_rgba(0,255,1,0.15)]"
+                >
+                  Google Flow Nano Banana 2
+                </a>
+              </div>
+
+              {/* Niche dropdown synced with Domain */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-mono text-gray-400 uppercase tracking-widest block">
+                  Target Niche (Synced)
+                </label>
+                <select
+                  value={topicNiche}
+                  onChange={(e) => {
+                    setTopicNiche(e.target.value);
+                    setContentCategory(e.target.value);
+                  }}
+                  className="w-full bg-[#05290e] border border-green-800 rounded-xl py-1.5 px-3 text-xs text-white focus:outline-none focus:border-[#00FF01] font-mono cursor-pointer"
+                >
+                  {CATEGORIES.map((cat) => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Optional Headline input */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-mono text-gray-400 uppercase tracking-widest block">
+                  Prompt text Headline (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={thumbHeadline}
+                  onChange={(e) => setThumbHeadline(e.target.value)}
+                  placeholder="e.g. SECRET REVEALED"
+                  className="w-full bg-[#05290e] border border-green-800 rounded-xl py-1.5 px-3 text-xs text-white focus:outline-none focus:border-[#00FF01] font-mono"
+                />
+              </div>
+
+              {/* Optional Small Tagline input */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-mono text-gray-400 uppercase tracking-widest block">
+                  Prompt Small Tagline (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={thumbSmallTagline}
+                  onChange={(e) => setThumbSmallTagline(e.target.value)}
+                  placeholder="e.g. 99% of people miss this"
+                  className="w-full bg-[#05290e] border border-green-800 rounded-xl py-1.5 px-3 text-xs text-white focus:outline-none focus:border-[#00FF01] font-mono"
+                />
+              </div>
+
+              {/* Optional Text Color Swatches picker */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-mono text-gray-400 uppercase tracking-widest block">
+                  Text Color Options (Optional)
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { name: "Neon Green (#00FF01) & White", label: "Neon Green/White" },
+                    { name: "Golden Yellow (#FFD700) & White", label: "Gold Yellow/White" }
+                  ].map((item) => (
+                    <button
+                      key={item.name}
+                      onClick={() => setThumbTextColor(item.name)}
+                      className={`py-1 px-1.5 text-[9px] font-mono border text-center cursor-pointer transition-all ${
+                        thumbTextColor === item.name
+                          ? "bg-[#00FF01] text-black border-[#00FF01] rounded-[17px] font-extrabold"
+                          : "bg-green-900/10 text-gray-400 border-green-800/40 hover:border-[#00FF01] hover:text-white rounded-xl"
+                      }`}
+                      type="button"
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
 
           </div>
@@ -1173,7 +1608,7 @@ export default function App() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               
               {/* RAW SOURCE SCRIPT BOX */}
-              <div className="flex flex-col h-[550px] rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md overflow-hidden shadow-lg transition-all duration-300 hover:border-green-600 hover:shadow-[0_0_20px_rgba(0,255,1,0.05)]">
+              <div className="flex flex-col h-[360px] rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md overflow-hidden shadow-lg transition-all duration-300 hover:border-green-600 hover:shadow-[0_0_20px_rgba(0,255,1,0.05)]">
                 <div className="px-5 py-3 border-b border-green-800/80 bg-green-900/10 flex items-center justify-between">
                   <span className="text-xs font-mono font-extrabold tracking-wider text-[#00FF01] flex items-center gap-2 animate-pulse">
                     <FileText className="h-4 w-4 text-[#00FF01]" />
@@ -1206,7 +1641,7 @@ export default function App() {
               </div>
 
               {/* POLISHED V.O. SCRIPT / OUTPUT BOX */}
-              <div className="flex flex-col h-[550px] rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md overflow-hidden shadow-lg relative transition-all duration-300 hover:border-green-600 hover:shadow-[0_0_25px_rgba(0,255,1,0.08)]">
+              <div className="flex flex-col h-[360px] rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md overflow-hidden shadow-lg relative transition-all duration-300 hover:border-green-600 hover:shadow-[0_0_25px_rgba(0,255,1,0.08)]">
                 {/* Active glowing ambient frame segment */}
                 <div className="absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r from-transparent via-[#00FF01]/50 to-transparent" />
                 
@@ -1600,34 +2035,452 @@ export default function App() {
                       </div>
                       <div className="space-y-1">
                         <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">No Storyboard Generated</p>
-                        <p className="text-[11px] text-gray-500 max-w-xs mx-auto mb-3">
+                        <p className="text-[11px] text-gray-500 max-w-xs mx-auto">
                           Paste your transcript in the left panel and click Generate Scene Prompts to build a stunning, optimized storyboard!
                         </p>
                       </div>
-                      <button
-                        onClick={handleGenerateScenes}
-                        disabled={scenesLoading || !transcriptInput.trim()}
-                        className={`py-2 px-5 rounded-[17px] font-mono text-[10px] font-black tracking-wider uppercase transition-all duration-300 flex items-center gap-1.5 border cursor-pointer ${
-                          transcriptInput.trim() && !scenesLoading
-                            ? "bg-[#00FF01] text-black border-[#00FF01] hover:shadow-[0_0_15px_rgba(0,255,1,0.4)] hover:scale-105 active:scale-95"
-                            : "bg-green-900/10 text-gray-500 border-green-800/40 cursor-not-allowed"
-                        }`}
-                      >
-                        {scenesLoading ? (
-                          <>
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" /> GENERATING STORYBOARD...
-                          </>
-                        ) : (
-                          <>
-                            <Sparkles className="h-3.5 w-3.5 animate-pulse" /> GENERATE SCENE PROMPTS
-                          </>
-                        )}
-                      </button>
                     </div>
                   )}
                 </div>
               </div>
             </div>
+
+            {/* FULL-WIDTH SECOND WORKSPACE ARRANGEMENT */}
+            <div className="space-y-5 mt-5">
+                
+                {/* WORKSPACE ROW 1: METADATA SUITE */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  
+                  {/* Left Column: Video Transcript Input */}
+                  <div className="flex flex-col h-[360px] rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md overflow-hidden shadow-lg transition-all duration-300 hover:border-green-600">
+                    <div className="px-5 py-3 border-b border-green-800/80 bg-green-900/10 flex items-center justify-between">
+                      <span className="text-xs font-mono font-extrabold tracking-wider text-[#00FF01] flex items-center gap-2">
+                        <FileText className="h-4 w-4" />
+                        Video Transcript Input
+                      </span>
+                      <button
+                        onClick={() => {
+                          if (polishedScript) {
+                            setVideoTranscriptInput(polishedScript);
+                          }
+                        }}
+                        disabled={!polishedScript}
+                        className={`py-1 px-2.5 rounded-[17px] font-mono text-[9px] font-extrabold tracking-tight flex items-center gap-1 border cursor-pointer transition-all ${
+                          polishedScript
+                            ? "bg-[#00FF01] text-black border-[#00FF01] hover:scale-105 active:scale-95 animate-pulse"
+                            : "opacity-40 cursor-not-allowed text-gray-500 border-transparent"
+                        }`}
+                        title="Insert from Polished Script"
+                      >
+                        <Plus className="h-3 w-3" /> INSERT POLISHED VO
+                      </button>
+                    </div>
+
+                    <div className="flex-1 relative">
+                      <textarea
+                        value={videoTranscriptInput}
+                        onChange={(e) => setVideoTranscriptInput(e.target.value)}
+                        placeholder="Paste complete video transcript here to auto-generate fully optimized, high-CTR metadata titles, description, timestamps, hashtags, and tags..."
+                        className="w-full h-full bg-transparent resize-none p-4 text-xs md:text-sm text-gray-200 focus:outline-none placeholder-gray-600 leading-relaxed font-mono focus:bg-[#031d0a]/30"
+                      />
+                      {videoTranscriptInput && (
+                        <button
+                          onClick={() => setVideoTranscriptInput("")}
+                          className="absolute bottom-4 right-4 p-2 rounded-xl bg-red-950/30 text-red-400 border border-red-900/40 hover:bg-red-900 hover:text-white transition-all duration-300 cursor-pointer hover:scale-105"
+                          title="Clear transcript input"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right Column: CTR YT & SM output */}
+                  <div className="flex flex-col h-[360px] rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md overflow-hidden shadow-lg relative transition-all duration-300 hover:border-green-600">
+                    <div className="px-4 py-3 border-b border-green-800/80 bg-green-900/15 flex items-center justify-between">
+                      <span className="text-xs font-mono font-bold tracking-wider text-[#00FF01] flex items-center gap-1.5">
+                        <Sparkles className="h-4 w-4 text-[#00FF01]" />
+                        CTR YT & SM output
+                      </span>
+
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={handleGenerateCtr}
+                          disabled={ctrLoading || !videoTranscriptInput.trim()}
+                          className={`py-1 px-3 rounded-[17px] font-mono text-[9px] font-black tracking-wider uppercase transition-all duration-300 flex items-center gap-1 border cursor-pointer ${
+                            videoTranscriptInput.trim() && !ctrLoading
+                              ? "bg-[#00FF01] text-black border-[#00FF01] hover:scale-105 active:scale-95 shadow-[0_0_12px_rgba(0,255,1,0.3)]"
+                              : "bg-green-900/10 text-gray-500 border-green-800/40 cursor-not-allowed"
+                          }`}
+                        >
+                          {ctrLoading ? "GEN..." : "GEN CTR"}
+                        </button>
+
+                        {ctrOutput && (
+                          <>
+                            <button
+                              onClick={() => handleCopyText(formatCtrOutputText(ctrOutput), "CTR Suite")}
+                              className="p-1 rounded bg-green-900/20 hover:bg-[#00FF01]/10 text-[#00FF01] border border-green-800 text-[9px] font-mono flex items-center gap-1 cursor-pointer transition-all duration-300 hover:scale-110 active:scale-90 shadow-[0_0_8px_rgba(0,255,1,0.15)]"
+                              title="Copy All output text"
+                            >
+                              <Copy className="h-3 w-3" /> COPY ALL
+                            </button>
+                            <button
+                              onClick={() => handleDownloadTextFile(formatCtrOutputText(ctrOutput), "YT_CTR_Metadata_Suite.txt")}
+                              className="p-1 rounded bg-green-900/20 hover:bg-[#00FF01]/10 text-[#00FF01] border border-green-800 text-[9px] font-mono flex items-center gap-1 cursor-pointer transition-all duration-300 hover:scale-110 active:scale-90 shadow-[0_0_8px_rgba(0,255,1,0.15)]"
+                              title="Download All as .txt"
+                            >
+                              <Download className="h-3 w-3" /> .TXT
+                            </button>
+                            <button
+                              onClick={() => setCtrOutput(null)}
+                              className="p-1 rounded bg-red-950/25 hover:bg-red-900 hover:text-white text-red-400 border border-red-900/40 text-[9px] font-mono flex items-center gap-1 cursor-pointer transition-all duration-300 hover:scale-110 active:scale-90"
+                              title="Clear outputs"
+                            >
+                              <Trash2 className="h-3 w-3" /> CLEAR
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                      {ctrLoading ? (
+                        <div className="h-full flex flex-col items-center justify-center space-y-3">
+                          <Loader2 className="h-8 w-8 text-[#00FF01] animate-spin" />
+                          <p className="text-[10px] font-mono text-[#00FF01] uppercase tracking-wider animate-pulse">STRATEGIZING METADATA IN REAL-TIME...</p>
+                        </div>
+                      ) : ctrOutput ? (
+                        <div className="space-y-4 text-xs select-text">
+                          {/* TITLES BLOCK */}
+                          {toggleTitle && ctrOutput.titles && (
+                            <div id="ctr-section-title" className="p-3 rounded-xl border border-green-900/80 bg-green-950/10 space-y-2">
+                              <div className="flex justify-between items-center border-b border-green-900/50 pb-1.5">
+                                <span className="font-mono font-bold text-[#00FF01] tracking-wide">🏆 10 HIGH-CTR TITLES (EN/UR/HI)</span>
+                                <div className="flex items-center gap-1.5">
+                                  <button
+                                    onClick={() => handleCopyText((ctrOutput.titles || []).join("\n"), "Titles")}
+                                    className="p-1 text-[9px] bg-black/40 text-gray-400 hover:text-[#00FF01] rounded border border-green-900 cursor-pointer"
+                                  >
+                                    Copy Keys
+                                  </button>
+                                  <button
+                                    onClick={() => handleRegenerateCtrField("titles")}
+                                    disabled={ctrRegeneratingField !== null}
+                                    className="p-1 text-[9px] bg-black/40 text-[#00FF01] hover:bg-[#00FF01]/10 rounded border border-[#00FF01]/30 cursor-pointer"
+                                  >
+                                    Regenerate
+                                  </button>
+                                </div>
+                              </div>
+                              <ul className="space-y-1.5 font-sans leading-relaxed text-gray-300">
+                                {ctrOutput.titles.map((t, index) => (
+                                  <li key={index} className="pl-4 relative border-b border-green-900/20 pb-1 last:border-b-0">
+                                    <span className="absolute left-0 text-[#00FF01] font-mono font-bold text-[10px]">{index + 1}.</span>
+                                    {t}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+
+                          {/* DESCRIPTION BLOCK */}
+                          {toggleDescription && ctrOutput.description && (
+                            <div id="ctr-section-description" className="p-3 rounded-xl border border-green-900/80 bg-green-950/10 space-y-2">
+                              <div className="flex justify-between items-center border-b border-green-900/50 pb-1.5">
+                                <span className="font-mono font-bold text-[#00FF01] tracking-wide">📝 SEO DESCRIPTION METADATA</span>
+                                <div className="flex items-center gap-1.5">
+                                  <button
+                                    onClick={() => handleCopyText(ctrOutput.description || "", "Description")}
+                                    className="p-1 text-[9px] bg-black/40 text-gray-400 hover:text-[#00FF01] rounded border border-green-900 cursor-pointer"
+                                  >
+                                    Copy Key
+                                  </button>
+                                  <button
+                                    onClick={() => handleRegenerateCtrField("description")}
+                                    disabled={ctrRegeneratingField !== null}
+                                    className="p-1 text-[9px] bg-black/40 text-[#00FF01] hover:bg-[#00FF01]/10 rounded border border-[#00FF01]/30 cursor-pointer"
+                                  >
+                                    Regenerate
+                                  </button>
+                                </div>
+                              </div>
+                              <p className="font-sans text-gray-300 leading-relaxed whitespace-pre-wrap">{ctrOutput.description}</p>
+                            </div>
+                          )}
+
+                          {/* TIMESTAMPS BLOCK */}
+                          {toggleTimestamps && ctrOutput.timestamps && (
+                            <div id="ctr-section-timestamps" className="p-3 rounded-xl border border-green-900/80 bg-green-950/10 space-y-2">
+                              <div className="flex justify-between items-center border-b border-green-900/50 pb-1.5">
+                                <span className="font-mono font-bold text-[#00FF01] tracking-wide">⏱️ AUTOMATED PROPORTIONAL CHAPTERS</span>
+                                <div className="flex items-center gap-1.5">
+                                  <button
+                                    onClick={() => handleCopyText((ctrOutput.timestamps || []).map(ts => `${ts.time} - ${ts.label}`).join("\n"), "Timestamps")}
+                                    className="p-1 text-[9px] bg-black/40 text-gray-400 hover:text-[#00FF01] rounded border border-green-900 cursor-pointer"
+                                  >
+                                    Copy Keys
+                                  </button>
+                                  <button
+                                    onClick={() => handleRegenerateCtrField("timestamps")}
+                                    disabled={ctrRegeneratingField !== null}
+                                    className="p-1 text-[9px] bg-black/40 text-[#00FF01] hover:bg-[#00FF01]/10 rounded border border-[#00FF01]/30 cursor-pointer"
+                                  >
+                                    Regenerate
+                                  </button>
+                                </div>
+                              </div>
+                              <div className="font-mono text-gray-300 space-y-1">
+                                {ctrOutput.timestamps.map((ts, index) => (
+                                  <div key={index} className="flex gap-2">
+                                    <span className="text-[#00FF01] font-bold shrink-0">{ts.time}</span>
+                                    <span className="text-gray-400 shrink-0">-</span>
+                                    <span className="font-sans text-gray-300">{ts.label}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* HASHTAGS BLOCK */}
+                          {toggleHashtags && ctrOutput.hashtags && (
+                            <div id="ctr-section-hashtags" className="p-3 rounded-xl border border-green-900/80 bg-green-950/10 space-y-2">
+                              <div className="flex justify-between items-center border-b border-green-900/50 pb-1.5">
+                                <span className="font-mono font-bold text-[#00FF01] tracking-wide">🏷️ 15 VIRAL HASHTAGS</span>
+                                <div className="flex items-center gap-1.5">
+                                  <button
+                                    onClick={() => handleCopyText((ctrOutput.hashtags || []).join(" "), "Hashtags")}
+                                    className="p-1 text-[9px] bg-black/40 text-gray-400 hover:text-[#00FF01] rounded border border-green-900 cursor-pointer"
+                                  >
+                                    Copy Keys
+                                  </button>
+                                  <button
+                                    onClick={() => handleRegenerateCtrField("hashtags")}
+                                    disabled={ctrRegeneratingField !== null}
+                                    className="p-1 text-[9px] bg-black/40 text-[#00FF01] hover:bg-[#00FF01]/10 rounded border border-[#00FF01]/30 cursor-pointer"
+                                  >
+                                    Regenerate
+                                  </button>
+                                </div>
+                              </div>
+                              <div className="flex flex-wrap gap-1.5 font-mono text-xs">
+                                {ctrOutput.hashtags.map((h, index) => (
+                                  <span key={index} className="px-2 py-0.5 rounded-lg bg-green-900/20 text-[#00FF01] border border-green-900/50">
+                                    {h}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* TAGS BLOCK */}
+                          {toggleTags && ctrOutput.tags && (
+                            <div id="ctr-section-tags" className="p-3 rounded-xl border border-green-900/80 bg-green-950/10 space-y-2">
+                              <div className="flex justify-between items-center border-b border-green-900/50 pb-1.5">
+                                <span className="font-mono font-bold text-[#00FF01] tracking-wide">🎯 15 OPTIMIZED SEO METATAGS</span>
+                                <div className="flex items-center gap-1.5">
+                                  <button
+                                    onClick={() => handleCopyText((ctrOutput.tags || []).join(", "), "Tags")}
+                                    className="p-1 text-[9px] bg-black/40 text-gray-400 hover:text-[#00FF01] rounded border border-green-900 cursor-pointer"
+                                  >
+                                    Copy Keys
+                                  </button>
+                                  <button
+                                    onClick={() => handleRegenerateCtrField("tags")}
+                                    disabled={ctrRegeneratingField !== null}
+                                    className="p-1 text-[9px] bg-black/40 text-[#00FF01] hover:bg-[#00FF01]/10 rounded border border-[#00FF01]/30 cursor-pointer"
+                                  >
+                                    Regenerate
+                                  </button>
+                                </div>
+                              </div>
+                              <p className="font-mono text-gray-300 text-xs leading-relaxed">{ctrOutput.tags.join(", ")}</p>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-3">
+                          <div className="h-10 w-10 rounded-xl border border-dashed border-green-800 flex items-center justify-center text-green-700 animate-pulse">
+                            <TrendingUp className="h-5 w-5" />
+                          </div>
+                          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">Metadata Suite Empty</p>
+                          <p className="text-[10px] text-gray-500 max-w-xs mx-auto">
+                            Paste a transcript to the left, configure elements in the growth strategist sidebar, and hit GEN CTR!
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* WORKSPACE ROW 2: THUMBNAIL SUITE */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  
+                  {/* Left Column: Thumbnail Transcript Input */}
+                  <div className="flex flex-col h-[360px] rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md overflow-hidden shadow-lg transition-all duration-300 hover:border-green-600">
+                    <div className="px-5 py-3 border-b border-green-800/80 bg-green-900/10 flex items-center justify-between">
+                      <span className="text-xs font-mono font-extrabold tracking-wider text-[#00FF01] flex items-center gap-2">
+                        <FileText className="h-4 w-4" />
+                        Thumbnail Transcript Input
+                      </span>
+                      <button
+                        onClick={() => {
+                          if (polishedScript) {
+                            setThumbnailTranscriptInput(polishedScript);
+                          }
+                        }}
+                        disabled={!polishedScript}
+                        className={`py-1 px-2.5 rounded-[17px] font-mono text-[9px] font-extrabold tracking-tight flex items-center gap-1 border cursor-pointer transition-all ${
+                          polishedScript
+                            ? "bg-[#00FF01] text-black border-[#00FF01] hover:scale-105 active:scale-95 animate-pulse"
+                            : "opacity-40 cursor-not-allowed text-gray-500 border-transparent"
+                        }`}
+                        title="Insert from Polished Script"
+                      >
+                        <Plus className="h-3 w-3" /> INSERT POLISHED VO
+                      </button>
+                    </div>
+
+                    <div className="flex-1 relative">
+                      <textarea
+                        value={thumbnailTranscriptInput}
+                        onChange={(e) => setThumbnailTranscriptInput(e.target.value)}
+                        placeholder="Paste voice transcript segment or complete text here. Specify design parameters on the left to direct thumbnail graphic concepts..."
+                        className="w-full h-full bg-transparent resize-none p-4 text-xs md:text-sm text-gray-200 focus:outline-none placeholder-gray-600 leading-relaxed font-mono focus:bg-[#031d0a]/30"
+                      />
+                      {thumbnailTranscriptInput && (
+                        <button
+                          onClick={() => setThumbnailTranscriptInput("")}
+                          className="absolute bottom-4 right-4 p-2 rounded-xl bg-red-950/30 text-red-400 border border-red-900/40 hover:bg-red-900 hover:text-white transition-all duration-300 cursor-pointer hover:scale-105"
+                          title="Clear transcript input"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right Column: YT Thumbnails Prompt output */}
+                  <div className="flex flex-col h-[360px] rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md overflow-hidden shadow-lg relative transition-all duration-300 hover:border-green-600">
+                    <div className="px-4 py-3 border-b border-green-800/80 bg-green-900/15 flex items-center justify-between">
+                      <span className="text-xs font-mono font-bold tracking-wider text-[#00FF01] flex items-center gap-1.5">
+                        <Sparkles className="h-4 w-4 text-[#00FF01]" />
+                        YT Thumbnails Prompt output
+                      </span>
+
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={handleGenerateThumbnailPrompt}
+                          disabled={thumbnailLoading || !thumbnailTranscriptInput.trim()}
+                          className={`py-1 px-3 rounded-[17px] font-mono text-[9px] font-black tracking-wider uppercase transition-all duration-300 flex items-center gap-1 border cursor-pointer ${
+                            thumbnailTranscriptInput.trim() && !thumbnailLoading
+                              ? "bg-[#00FF01] text-black border-[#00FF01] hover:scale-105 active:scale-95 shadow-[0_0_12px_rgba(0,255,1,0.3)]"
+                              : "bg-green-900/10 text-gray-500 border-green-800/40 cursor-not-allowed"
+                          }`}
+                        >
+                          {thumbnailLoading ? "GEN..." : "GEN PROMPT"}
+                        </button>
+
+                        {thumbnailOutput && (
+                          <>
+                            <button
+                              onClick={() => handleCopyText(formatThumbnailOutputText(thumbnailOutput), "Thumbnail Prompts")}
+                              className="p-1 rounded bg-green-900/20 hover:bg-[#00FF01]/10 text-[#00FF01] border border-green-800 text-[9px] font-mono flex items-center gap-1 cursor-pointer transition-all duration-300 hover:scale-110 active:scale-90 shadow-[0_0_8px_rgba(0,255,1,0.15)]"
+                              title="Copy prompt output"
+                            >
+                              <Copy className="h-3 w-3" /> COPY ALL
+                            </button>
+                            <button
+                              onClick={() => handleDownloadTextFile(formatThumbnailOutputText(thumbnailOutput), "YT_Thumbnail_Director_Output.txt")}
+                              className="p-1 rounded bg-green-900/20 hover:bg-[#00FF01]/10 text-[#00FF01] border border-green-800 text-[9px] font-mono flex items-center gap-1 cursor-pointer transition-all duration-300 hover:scale-110 active:scale-90 shadow-[0_0_8px_rgba(0,255,1,0.15)]"
+                              title="Download Prompt text"
+                            >
+                              <Download className="h-3 w-3" /> .TXT
+                            </button>
+                            <button
+                              onClick={() => setThumbnailOutput(null)}
+                              className="p-1 rounded bg-red-950/25 hover:bg-red-900 hover:text-white text-red-400 border border-red-900/40 text-[9px] font-mono flex items-center gap-1 cursor-pointer transition-all duration-300 hover:scale-110 active:scale-90"
+                              title="Clear prompts"
+                            >
+                              <Trash2 className="h-3 w-3" /> CLEAR
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                      {thumbnailLoading ? (
+                        <div className="h-full flex flex-col items-center justify-center space-y-3">
+                          <Loader2 className="h-8 w-8 text-[#00FF01] animate-spin" />
+                          <p className="text-[10px] font-mono text-[#00FF01] uppercase tracking-wider animate-pulse">COMPOSING HIGH-CTR IMAGE METRICS...</p>
+                        </div>
+                      ) : thumbnailOutput ? (
+                        <div className="space-y-4 text-xs select-text">
+                          {/* ENGLISH PROMPT SPECIFICATION */}
+                          <div className="p-3 rounded-xl border border-green-900/80 bg-green-950/10 space-y-2">
+                            <div className="flex justify-between items-center border-b border-green-900/50 pb-1.5">
+                              <span className="font-mono font-bold text-[#00FF01]">🖼️ CINEMATIC VISUAL SPECIFICATION</span>
+                              <button
+                                onClick={() => handleCopyText(thumbnailOutput.thumbnailPrompt, "Visual Prompt")}
+                                className="p-1 text-[9px] bg-black/40 text-gray-400 hover:text-[#00FF01] rounded border border-green-900 cursor-pointer"
+                              >
+                                Copy Specification
+                              </button>
+                            </div>
+                            <p className="font-sans text-gray-300 leading-relaxed text-xs">{thumbnailOutput.thumbnailPrompt}</p>
+                          </div>
+
+                          {/* URDU HEADLINE */}
+                          <div className="p-3 rounded-xl border border-green-900/80 bg-green-950/10 space-y-2">
+                            <div className="flex justify-between items-center border-b border-green-900/50 pb-1.5">
+                              <span className="font-mono font-bold text-[#00FF01]">🇵🇰 URDU OVERLAY HEADLINE</span>
+                              <button
+                                onClick={() => handleCopyText(thumbnailOutput.headlineUrdu, "Urdu Headline")}
+                                className="p-1 text-[9px] bg-black/40 text-gray-400 hover:text-[#00FF01] rounded border border-green-900 cursor-pointer"
+                              >
+                                Copy text
+                              </button>
+                            </div>
+                            <p className="font-urdu text-right text-lg text-white font-bold tracking-wide py-2 leading-relaxed font-semibold" dir="rtl">
+                              {thumbnailOutput.headlineUrdu}
+                            </p>
+                          </div>
+
+                          {/* URDU TAGLINE */}
+                          <div className="p-3 rounded-xl border border-green-900/80 bg-green-950/10 space-y-2">
+                            <div className="flex justify-between items-center border-b border-green-900/50 pb-1.5">
+                              <span className="font-mono font-bold text-[#00FF01]">🇵🇰 URDU OVERLAY TAGLINE</span>
+                              <button
+                                onClick={() => handleCopyText(thumbnailOutput.smallTaglineUrdu, "Urdu Tagline")}
+                                className="p-1 text-[9px] bg-black/40 text-gray-400 hover:text-[#00FF01] rounded border border-green-900 cursor-pointer"
+                              >
+                                Copy text
+                              </button>
+                            </div>
+                            <p className="font-urdu text-right text-base text-gray-300 py-1 leading-relaxed" dir="rtl">
+                              {thumbnailOutput.smallTaglineUrdu}
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-3">
+                          <div className="h-10 w-10 rounded-xl border border-dashed border-green-800 flex items-center justify-center text-green-700 animate-pulse">
+                            <Sparkles className="h-5 w-5" />
+                          </div>
+                          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">Graphics Suite Empty</p>
+                          <p className="text-[10px] text-gray-500 max-w-xs mx-auto">
+                            Paste a transcript to the left, configure design options, and click GEN PROMPT to get viral thumbnail layouts!
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                </div>
+
+              </div>
 
             {/* ERROR LOG PRESENTATION */}
             {error && (
@@ -1666,6 +2519,26 @@ export default function App() {
         </footer>
 
       </div>
+
+      {/* Dynamic Pop-up Toast Feedback */}
+      <AnimatePresence>
+        {popupMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: 50, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+            transition={{ type: "spring", stiffness: 350, damping: 25 }}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2.5 px-5 py-3 rounded-2xl bg-black border border-[#00FF01]/60 text-white shadow-[0_0_25px_rgba(0,255,1,0.25)] backdrop-blur-lg"
+          >
+            {popupType === "copy" ? (
+              <CheckCircle className="h-4 w-4 text-[#00FF01]" />
+            ) : (
+              <Download className="h-4 w-4 text-[#00FF01]" />
+            )}
+            <span className="text-xs font-mono font-bold tracking-tight">{popupMessage}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -123,6 +123,11 @@ Strict rules for formatting and content:
    - Greetings Prefix: "${greetingsPrefix || "None"}"
    - Structure format: ${includeHooksBodyConclusion ? "Structure explicitly into Hook, Body, and Conclusion sections with brief markdown labels (e.g., **[Hook]**, **[Body - Section]**, **[Conclusion]**) so the speaker can easily segment their performance." : "Structure naturally as a single contiguous, smooth-flowing script with elegant paragraph breaks, but without section headers."}
    - Incorporate the custom hook "${customHook || ""}" and greeting "${greetingsPrefix && greetingsPrefix !== "None" ? greetingsPrefix : ""}" beautifully at the very beginning of the script to hook the listener instantly.
+   - At the very end of the Conclusion/outro section (or as the final block of the script output), you MUST always include the following call-to-action subscription text adapted to the selected language:
+     * If the selected transformation option is "urdu-writing": "دوستو اگر ویڈیو پسند آئی ہو تو اسے لائک کریں اور ایسی مزید معلوماتی ویڈیوز کے لیے ہمارے چینل کو سبسکرائب ضرور کریں اور بیل آئیکن دبانا مت بھولیے گا۔"
+     * If the selected transformation option is "hindi": "दोस्तों अगर वीडियो पसंद आई हो तो इसे लाइक करें और ऐसी मज़ीद मालूमती वीडियोज़ के लिए हमारे चैनल को सब्सक्राइब ज़रूर करें और बेल आइकन दबाना मत भूलिए गा।"
+     * If the selected transformation option is "urdu-roman": "Dosto agar video pasand aayi ho to ise like karein aur aisi mazeed malumaati videos ke liye humare channel ko subscribe zaroor karein aur bell icon dabana mat bhooliyega."
+     * If the selected transformation option is "english": "Friends, if you liked this video, please like it, and for more informative videos like this, be sure to subscribe to our channel and don't forget to press the bell icon."
 
 8. ABSOLUTE DIVERSITY REQUIREMENT:
    - Introduce a totally fresh, unique perspective, phrasing style, and layout for this script. Do not reuse similar phrasing patterns or sentence structures from previous generations. Every generation must be highly dynamic and unique.
@@ -415,6 +420,361 @@ Return ONLY the prompt text, with absolutely no commentary, introduction, or JSO
   } catch (error: any) {
     console.error("Error in /api/regenerate-scene:", error);
     res.status(500).json({ error: error.message || "An error occurred regenerating the scene." });
+  }
+});
+
+// YouTube & Social Media Growth Strategist Metadata API
+app.post("/api/generate-ctr", async (req, res) => {
+  try {
+    const {
+      transcript,
+      toggleTitle,
+      toggleDescription,
+      toggleTimestamps,
+      toggleHashtags,
+      toggleTags,
+      videoDuration,
+    } = req.body;
+
+    if (!transcript || !transcript.trim()) {
+      return res.status(400).json({ error: "Transcript is required." });
+    }
+
+    const ai = getAiClient();
+    
+    // Construct dynamic prompt based on toggles
+    const prompt = `
+You are an elite YouTube & Social Media Growth Strategist and Metadata Optimization Expert.
+Analyze the provided video transcript and generate optimized, high-performing metadata to achieve the maximum click-through-rate (CTR) and SEO.
+
+TRANSCRIPT:
+"""
+${transcript}
+"""
+
+Video Duration: ${videoDuration || "10:00"}
+
+Please generate only the requested metadata segments below (if set to true):
+- Generate Title Options (titles): ${toggleTitle ? "YES" : "NO"}
+- Generate SEO Description (description): ${toggleDescription ? "YES" : "NO"}
+- Generate Timestamps (timestamps): ${toggleTimestamps ? "YES" : "NO"}
+- Generate Hashtags (hashtags): ${toggleHashtags ? "YES" : "NO"}
+- Generate SEO Tags (tags): ${toggleTags ? "YES" : "NO"}
+
+Strict Requirements:
+1. "titles": (If YES) Generate exactly 10 high-CTR title options.
+   - Use power words: Secret, Exposed, Why, How, I Tried. Add [Brackets] if relevant.
+   - Keep titles between 50-60 characters, utilizing curiosity gaps and putting high-value keywords first.
+   - Provide titles categorized beautifully by language: English, Urdu, and Hindi. Separated clearly by language, NOT mixed.
+2. "description": (If YES) SEO description of exactly 2 paragraphs.
+   - First line must be a highly engaging hook.
+   - Include high-traffic keywords and a clear Call-To-Action (CTA). No fluff.
+3. "timestamps": (If YES) Chronological list of timestamps outlining the video progression.
+   - Automatically detect topic shifts from the transcript.
+   - Provide between 8 to 12 chronological chapters starting at "00:00".
+   - Estimate the timestamp times proportionally based on the transcript's logical progression and total duration of "${videoDuration || "10:00"}".
+   - Each timestamp must be an object with keys: "time" (e.g., "02:14") and "label" (e.g., "Topic Shift Label").
+4. "hashtags": (If YES) Exactly 15 high-ranking YouTube hashtags, each starting with the '#' symbol.
+5. "tags": (If YES) Exactly 15 highly-optimized SEO tags, returned as an array of comma-separated keyword strings.
+
+All content must be 100% based on the transcript with NO hallucinations or outside filler.
+
+Return your response as a valid JSON object matching this schema:
+{
+  "titles": ["Title 1", "Title 2", ...],
+  "description": "SEO description...",
+  "timestamps": [{"time": "00:00", "label": "Hook title"}, ...],
+  "hashtags": ["#tag1", "#tag2", ...],
+  "tags": ["tag1", "tag2", ...]
+}
+(If a segment was marked NO above, omit its key or return an empty array/empty string).
+`;
+
+    // Set up the schema parameters based on what's toggled
+    const schemaProps: any = {};
+    const schemaRequired: string[] = [];
+
+    if (toggleTitle) {
+      schemaProps.titles = {
+        type: Type.ARRAY,
+        items: { type: Type.STRING }
+      };
+      schemaRequired.push("titles");
+    }
+    if (toggleDescription) {
+      schemaProps.description = { type: Type.STRING };
+      schemaRequired.push("description");
+    }
+    if (toggleTimestamps) {
+      schemaProps.timestamps = {
+        type: Type.ARRAY,
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            time: { type: Type.STRING },
+            label: { type: Type.STRING }
+          },
+          required: ["time", "label"]
+        }
+      };
+      schemaRequired.push("timestamps");
+    }
+    if (toggleHashtags) {
+      schemaProps.hashtags = {
+        type: Type.ARRAY,
+        items: { type: Type.STRING }
+      };
+      schemaRequired.push("hashtags");
+    }
+    if (toggleTags) {
+      schemaProps.tags = {
+        type: Type.ARRAY,
+        items: { type: Type.STRING }
+      };
+      schemaRequired.push("tags");
+    }
+
+    const response = await generateContentWithRetry({
+      model: "gemini-3.5-flash",
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: schemaProps,
+          required: schemaRequired
+        }
+      }
+    });
+
+    let data;
+    try {
+      data = JSON.parse(response.text || "{}");
+    } catch {
+      data = {};
+    }
+
+    res.json(data);
+  } catch (error: any) {
+    console.error("Error in /api/generate-ctr:", error);
+    res.status(500).json({ error: error.message || "An error occurred generating CTR growth assets." });
+  }
+});
+
+// YouTube & Social Media Thumbnail Director API
+app.post("/api/generate-thumbnail-prompt", async (req, res) => {
+  try {
+    const {
+      transcript,
+      bgColor,
+      headline,
+      smallTagline,
+      textColor,
+      niche,
+    } = req.body;
+
+    if (!transcript || !transcript.trim()) {
+      return res.status(400).json({ error: "Transcript is required." });
+    }
+
+    const ai = getAiClient();
+
+    const prompt = `
+You are an expert YouTube Thumbnail Director, Visual Designer, and CTR Optimization expert.
+Create a highly engaging, viral YouTube thumbnail concept and Urdu text overlays based on the provided video transcript.
+
+TRANSCRIPT:
+"""
+${transcript}
+"""
+
+Design parameters to integrate (especially if provided/optional):
+- Background Colors: ${bgColor || "Slate black, dark green gradient"}
+- Thumbnail Text Headline (Reference/Guideline): ${headline || "None specified"}
+- Small Tagline text: ${smallTagline || "None specified"}
+- Text Color overlays: ${textColor || "Neon green (#00FF01) and white"}
+- Niche Theme: ${niche || "General"}
+
+Strict Rules for Thumbnail Prompt Creation:
+1. Describe EXACTLY 1 main subject with an extreme, highly expressive human emotion (surprise, shock, fear, concern, ultimate excitement).
+2. Use extreme high-contrast, cinematic lighting, sharp depth-of-field, and vivid details.
+3. Keep the visual composition bold, simple, mobile-readable, and optimized for maximum YouTube CTR. Avoid text on the thumbnail itself beyond a maximum of 3 bold words.
+4. Integrate the preferred Background Colors and Text Colors in your descriptions.
+5. Provide a highly detailed, professional English prompt ("thumbnailPrompt") optimized for state-of-the-art AI image generators (Imagen 3, DALL-E, Midjourney).
+6. Create a matching, extremely high-impact main headline in Urdu script ("headlineUrdu") (max 3-4 words for high readability).
+7. Create a matching small tagline in Urdu script ("smallTaglineUrdu").
+
+Return your response as a valid JSON object matching this schema:
+{
+  "thumbnailPrompt": "The detailed English visual prompt...",
+  "headlineUrdu": "Bold Urdu Headline...",
+  "smallTaglineUrdu": "Small Urdu Tagline..."
+}
+`;
+
+    const response = await generateContentWithRetry({
+      model: "gemini-3.5-flash",
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            thumbnailPrompt: { type: Type.STRING },
+            headlineUrdu: { type: Type.STRING },
+            smallTaglineUrdu: { type: Type.STRING }
+          },
+          required: ["thumbnailPrompt", "headlineUrdu", "smallTaglineUrdu"]
+        }
+      }
+    });
+
+    let data;
+    try {
+      data = JSON.parse(response.text || "{}");
+    } catch {
+      data = {
+        thumbnailPrompt: "",
+        headlineUrdu: "",
+        smallTaglineUrdu: ""
+      };
+    }
+
+    res.json(data);
+  } catch (error: any) {
+    console.error("Error in /api/generate-thumbnail-prompt:", error);
+    res.status(500).json({ error: error.message || "An error occurred generating thumbnail prompt." });
+  }
+});
+
+// Granular segment/key level regeneration for CTR
+app.post("/api/regenerate-ctr-field", async (req, res) => {
+  try {
+    const { transcript, field, videoDuration } = req.body;
+    if (!transcript || !transcript.trim()) {
+      return res.status(400).json({ error: "Transcript is required." });
+    }
+
+    const ai = getAiClient();
+    let fieldPrompt = "";
+    let responseSchema: any = {};
+
+    if (field === "titles") {
+      fieldPrompt = `Generate exactly 10 high-CTR title options based on this transcript:
+"""
+${transcript}
+"""
+- Use power words: Secret, Exposed, Why, How, I Tried. Add [Brackets] if relevant.
+- Keep titles between 50-60 characters with curiosity gap + keywords first.
+- Provide titles categorized beautifully by language: English, Urdu, and Hindi. Separated clearly by language, not mixed in a single title.
+Return the output in the "titles" array.`;
+      responseSchema = {
+        type: Type.OBJECT,
+        properties: {
+          titles: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING }
+          }
+        },
+        required: ["titles"]
+      };
+    } else if (field === "description") {
+      fieldPrompt = `Generate an SEO description of exactly 2 paragraphs based on this transcript:
+"""
+${transcript}
+"""
+- First line must be an engaging hook.
+- Include high-traffic keywords + clear Call-To-Action (CTA). No fluff.
+Return the output in the "description" key.`;
+      responseSchema = {
+        type: Type.OBJECT,
+        properties: {
+          description: { type: Type.STRING }
+        },
+        required: ["description"]
+      };
+    } else if (field === "timestamps") {
+      fieldPrompt = `Generate video timestamps outlining the video progression based on the provided Video Duration of "${videoDuration || "10:00"}" and this transcript:
+"""
+${transcript}
+"""
+- Automatically detect topic shifts from the transcript.
+- Provide between 8 to 12 chronological chapters starting at "00:00".
+- Estimate the timestamp times proportionally based on the transcript's logical progression and total duration.
+Return the output in the "timestamps" array.`;
+      responseSchema = {
+        type: Type.OBJECT,
+        properties: {
+          timestamps: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                time: { type: Type.STRING },
+                label: { type: Type.STRING }
+              },
+              required: ["time", "label"]
+            }
+          }
+        },
+        required: ["timestamps"]
+      };
+    } else if (field === "hashtags") {
+      fieldPrompt = `Generate exactly 15 high-ranking YouTube hashtags with the '#' symbol based on this transcript:
+"""
+${transcript}
+"""
+Return the output in the "hashtags" array.`;
+      responseSchema = {
+        type: Type.OBJECT,
+        properties: {
+          hashtags: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING }
+          }
+        },
+        required: ["hashtags"]
+      };
+    } else if (field === "tags") {
+      fieldPrompt = `Generate exactly 15 highly-optimized SEO tags as a list of keyword strings based on this transcript:
+"""
+${transcript}
+"""
+Return the output in the "tags" array.`;
+      responseSchema = {
+        type: Type.OBJECT,
+        properties: {
+          tags: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING }
+          }
+        },
+        required: ["tags"]
+      };
+    } else {
+      return res.status(400).json({ error: "Invalid field requested." });
+    }
+
+    const response = await generateContentWithRetry({
+      model: "gemini-3.5-flash",
+      contents: fieldPrompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema
+      }
+    });
+
+    let data;
+    try {
+      data = JSON.parse(response.text || "{}");
+    } catch {
+      data = {};
+    }
+
+    res.json(data);
+  } catch (error: any) {
+    console.error("Error in /api/regenerate-ctr-field:", error);
+    res.status(500).json({ error: error.message || "An error occurred regenerating the field." });
   }
 });
 
