@@ -109,6 +109,27 @@ export default function App() {
   const [thumbSmallTagline, setThumbSmallTagline] = useState("");
   const [thumbTextColor, setThumbTextColor] = useState("Neon Green (#00FF01) & White");
 
+  // Custom Color Picker & Gradient States
+  const [bgType, setBgType] = useState<"preset" | "custom_solid" | "custom_gradient">("preset");
+  const [customBgSolid, setCustomBgSolid] = useState("#000000");
+  const [customBgGrad1, setCustomBgGrad1] = useState("#00FF01");
+  const [customBgGrad2, setCustomBgGrad2] = useState("#000000");
+
+  const [textType, setTextType] = useState<"preset" | "custom">("preset");
+  const [customTextCol1, setCustomTextCol1] = useState("#00FF01");
+  const [customTextCol2, setCustomTextCol2] = useState("#FFFFFF");
+
+  const getActiveBgColor = () => {
+    if (bgType === "preset") return thumbBgColor;
+    if (bgType === "custom_solid") return `Solid background color ${customBgSolid}`;
+    return `Linear gradient background from ${customBgGrad1} to ${customBgGrad2}`;
+  };
+
+  const getActiveTextColor = () => {
+    if (textType === "preset") return thumbTextColor;
+    return `Primary text color ${customTextCol1} with accent text color ${customTextCol2}`;
+  };
+
   // YouTube CTR SM Workspace States
   const [videoTranscriptInput, setVideoTranscriptInput] = useState("");
   const [ctrOutput, setCtrOutput] = useState<{
@@ -349,10 +370,10 @@ export default function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           transcript: thumbnailTranscriptInput,
-          bgColor: thumbBgColor,
+          bgColor: getActiveBgColor(),
           headline: thumbHeadline,
           smallTagline: thumbSmallTagline,
-          textColor: thumbTextColor,
+          textColor: getActiveTextColor(),
           niche: topicNiche,
         }),
       });
@@ -634,23 +655,26 @@ export default function App() {
     }
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handleGenericFileUpload = async (
+    file: File,
+    onSuccess: (text: string) => void,
+    setLoadingState?: (loading: boolean) => void
+  ) => {
     if (!file) return;
-
     setError(null);
     const reader = new FileReader();
 
     if (file.name.endsWith(".txt")) {
       reader.onload = (event) => {
         const text = event.target?.result as string;
-        setRawScript(text);
+        onSuccess(text);
       };
       reader.readAsText(file);
     } else if (file.name.endsWith(".pdf")) {
       reader.onload = async (event) => {
         const base64Data = (event.target?.result as string).split(",")[1];
-        setTopicGenerating(true);
+        if (setLoadingState) setLoadingState(true);
+        else setLoading(true);
         try {
           const res = await fetch("/api/parse-file", {
             method: "POST",
@@ -663,17 +687,42 @@ export default function App() {
           });
           if (!res.ok) throw new Error("Failed to parse PDF.");
           const data = await res.json();
-          setRawScript(data.extractedText);
+          onSuccess(data.extractedText);
         } catch (err: any) {
           setError(err.message || "Error parsing PDF.");
         } finally {
-          setTopicGenerating(false);
+          if (setLoadingState) setLoadingState(false);
+          else setLoading(false);
         }
       };
       reader.readAsDataURL(file);
     } else {
       alert("Unsupported file type. Please upload a .txt or .pdf file.");
     }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    await handleGenericFileUpload(file, setRawScript, setTopicGenerating);
+  };
+
+  const handleTranscriptInputFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    await handleGenericFileUpload(file, setTranscriptInput, setScenesLoading);
+  };
+
+  const handleVideoTranscriptFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    await handleGenericFileUpload(file, setVideoTranscriptInput, setCtrLoading);
+  };
+
+  const handleThumbnailTranscriptFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    await handleGenericFileUpload(file, setThumbnailTranscriptInput, setThumbnailLoading);
   };
 
   const handleGenerateScenes = async () => {
@@ -1293,7 +1342,7 @@ export default function App() {
                   thumbnail director & Tagline
                 </span>
                 <a
-                  href="https://aistudio.google.com"
+                  href="https://labs.google/fx/tools/flow"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-[9px] font-mono text-[#00FF01] bg-green-900/40 px-2 py-0.5 rounded border border-green-800 hover:bg-[#00FF01] hover:text-black hover:scale-105 active:scale-95 transition-all duration-300 block font-bold text-center cursor-pointer shadow-[0_0_8px_rgba(0,255,1,0.15)]"
@@ -1349,30 +1398,184 @@ export default function App() {
                 />
               </div>
 
-              {/* Optional Text Color Swatches picker */}
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-mono text-gray-400 uppercase tracking-widest block">
-                  Text Color Options (Optional)
+              {/* Background Color tab/label */}
+              <div className="space-y-2 border-t border-green-900/40 pt-3">
+                <label className="text-[10px] font-mono text-gray-400 uppercase tracking-widest block font-bold">
+                  🎨 Thumbnail Background Color & Gradient
                 </label>
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { name: "Neon Green (#00FF01) & White", label: "Neon Green/White" },
-                    { name: "Golden Yellow (#FFD700) & White", label: "Gold Yellow/White" }
-                  ].map((item) => (
+                
+                {/* Background Selector Type Tabs */}
+                <div className="grid grid-cols-3 gap-1 bg-[#031d0a] p-1 rounded-xl border border-green-850">
+                  {(["preset", "custom_solid", "custom_gradient"] as const).map((type) => (
                     <button
-                      key={item.name}
-                      onClick={() => setThumbTextColor(item.name)}
-                      className={`py-1 px-1.5 text-[9px] font-mono border text-center cursor-pointer transition-all ${
-                        thumbTextColor === item.name
-                          ? "bg-[#00FF01] text-black border-[#00FF01] rounded-[17px] font-extrabold"
-                          : "bg-green-900/10 text-gray-400 border-green-800/40 hover:border-[#00FF01] hover:text-white rounded-xl"
-                      }`}
+                      key={type}
                       type="button"
+                      onClick={() => setBgType(type)}
+                      className={`py-1 px-1.5 text-[9px] font-mono font-bold transition-all duration-300 rounded-lg cursor-pointer ${
+                        bgType === type
+                          ? "bg-[#00FF01] text-black font-black"
+                          : "text-gray-400 hover:text-white"
+                      }`}
                     >
-                      {item.label}
+                      {type === "preset" ? "PRESET" : type === "custom_solid" ? "SOLID" : "GRADIENT"}
                     </button>
                   ))}
                 </div>
+
+                {/* Render corresponding inputs based on bgType */}
+                {bgType === "preset" && (
+                  <select
+                    value={thumbBgColor}
+                    onChange={(e) => setThumbBgColor(e.target.value)}
+                    className="w-full bg-[#05290e] border border-green-800 rounded-xl py-1.5 px-3 text-xs text-white focus:outline-none focus:border-[#00FF01] font-mono cursor-pointer"
+                  >
+                    <option value="Dark Green & Black">Dark Green & Black</option>
+                    <option value="Neon Green & Deep Charcoal">Neon Green & Deep Charcoal</option>
+                    <option value="Neon Blue & Dark Purple">Neon Blue & Dark Purple</option>
+                    <option value="Sunset Orange & Crimson">Sunset Orange & Crimson</option>
+                    <option value="Neon Red & Charcoal">Neon Red & Charcoal</option>
+                  </select>
+                )}
+
+                {bgType === "custom_solid" && (
+                  <div className="flex items-center gap-3 bg-[#031d0a] p-2 rounded-xl border border-green-800/60">
+                    <div className="relative w-8 h-8 rounded-lg overflow-hidden border border-green-700 shrink-0">
+                      <input
+                        type="color"
+                        value={customBgSolid}
+                        onChange={(e) => setCustomBgSolid(e.target.value)}
+                        className="absolute inset-0 w-full h-full scale-150 cursor-pointer border-0 p-0 bg-transparent"
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <span className="text-[8px] font-mono text-gray-400 uppercase tracking-wider block">Background Color</span>
+                      <span className="text-xs font-mono text-[#00FF01] font-bold">{customBgSolid}</span>
+                    </div>
+                  </div>
+                )}
+
+                {bgType === "custom_gradient" && (
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="flex items-center gap-2 bg-[#031d0a] p-1.5 rounded-xl border border-green-800/60">
+                        <input
+                          type="color"
+                          value={customBgGrad1}
+                          onChange={(e) => setCustomBgGrad1(e.target.value)}
+                          className="w-6 h-6 rounded cursor-pointer p-0 border-0 bg-transparent shrink-0"
+                        />
+                        <div className="overflow-hidden">
+                          <span className="text-[8px] font-mono text-gray-400 block truncate">Color A</span>
+                          <span className="text-[9px] font-mono text-[#00FF01] font-semibold block">{customBgGrad1}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 bg-[#031d0a] p-1.5 rounded-xl border border-green-800/60">
+                        <input
+                          type="color"
+                          value={customBgGrad2}
+                          onChange={(e) => setCustomBgGrad2(e.target.value)}
+                          className="w-6 h-6 rounded cursor-pointer p-0 border-0 bg-transparent shrink-0"
+                        />
+                        <div className="overflow-hidden">
+                          <span className="text-[8px] font-mono text-gray-400 block truncate">Color B</span>
+                          <span className="text-[9px] font-mono text-[#00FF01] font-semibold block">{customBgGrad2}</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Live preview gradient bar */}
+                    <div
+                      className="h-5 rounded-lg border border-green-700/50 shadow-inner"
+                      style={{ background: `linear-gradient(to right, ${customBgGrad1}, ${customBgGrad2})` }}
+                      title="Live Gradient Preview"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Text Color tab/label */}
+              <div className="space-y-2 border-t border-green-900/40 pt-3">
+                <label className="text-[10px] font-mono text-gray-400 uppercase tracking-widest block font-bold">
+                  ✍️ Thumbnail Text Color Overlay
+                </label>
+                
+                {/* Text Selector Type Tabs */}
+                <div className="grid grid-cols-2 gap-1 bg-[#031d0a] p-1 rounded-xl border border-green-850">
+                  {(["preset", "custom"] as const).map((type) => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => setTextType(type)}
+                      className={`py-1 px-1.5 text-[9px] font-mono font-bold transition-all duration-300 rounded-lg cursor-pointer ${
+                        textType === type
+                          ? "bg-[#00FF01] text-black font-black"
+                          : "text-gray-400 hover:text-white"
+                      }`}
+                    >
+                      {type === "preset" ? "PRESETS" : "CUSTOM COLOR"}
+                    </button>
+                  ))}
+                </div>
+
+                {textType === "preset" && (
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { name: "Neon Green (#00FF01) & White", label: "Neon Green/White" },
+                      { name: "Golden Yellow (#FFD700) & White", label: "Gold Yellow/White" }
+                    ].map((item) => (
+                      <button
+                        key={item.name}
+                        onClick={() => setThumbTextColor(item.name)}
+                        className={`py-1 px-1.5 text-[9px] font-mono border text-center cursor-pointer transition-all ${
+                          thumbTextColor === item.name
+                            ? "bg-[#00FF01] text-black border-[#00FF01] rounded-[17px] font-extrabold"
+                            : "bg-green-900/10 text-gray-400 border-green-800/40 hover:border-[#00FF01] hover:text-white rounded-xl"
+                        }`}
+                        type="button"
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {textType === "custom" && (
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="flex items-center gap-2 bg-[#031d0a] p-1.5 rounded-xl border border-green-800/60">
+                        <input
+                          type="color"
+                          value={customTextCol1}
+                          onChange={(e) => setCustomTextCol1(e.target.value)}
+                          className="w-6 h-6 rounded cursor-pointer p-0 border-0 bg-transparent shrink-0"
+                        />
+                        <div className="overflow-hidden">
+                          <span className="text-[8px] font-mono text-gray-400 block truncate">Primary Text</span>
+                          <span className="text-[9px] font-mono text-[#00FF01] font-semibold block">{customTextCol1}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 bg-[#031d0a] p-1.5 rounded-xl border border-[#00FF01]/20">
+                        <input
+                          type="color"
+                          value={customTextCol2}
+                          onChange={(e) => setCustomTextCol2(e.target.value)}
+                          className="w-6 h-6 rounded cursor-pointer p-0 border-0 bg-transparent shrink-0"
+                        />
+                        <div className="overflow-hidden">
+                          <span className="text-[8px] font-mono text-gray-400 block truncate">Accent/Shadow</span>
+                          <span className="text-[9px] font-mono text-[#00FF01] font-semibold block">{customTextCol2}</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Live Preview Text Overlay */}
+                    <div className="py-1 px-3 rounded-lg border border-green-850 bg-black/40 text-center font-bold">
+                      <span style={{ color: customTextCol1 }} className="text-xs">Main Headline</span>
+                      {" "}
+                      <span style={{ color: customTextCol2 }} className="text-[10px]">Tagline</span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1840,19 +2043,6 @@ export default function App() {
                     </div>
                   )}
                 </div>
-
-                {/* BOTTOM PLAGIARISM RESULT BADGE */}
-                {plagiarismCheck === "verified" && (
-                  <div className="p-3 border-t border-green-800 bg-green-900/20 flex flex-col sm:flex-row gap-2 items-center justify-between">
-                    <span className="text-[11px] font-mono text-gray-300 flex items-center gap-1.5">
-                      <CheckCircle className="h-4 w-4 text-[#00FF01]" />
-                      Plagiarism Shield Verified: Passed
-                    </span>
-                    <span className="text-[10px] font-mono text-black bg-[#00FF01] px-3 py-1 rounded-xl font-bold shadow-[0_0_10px_rgba(0,255,1,0.4)]">
-                      {plagiarismScore.toFixed(2)}% UNIQUE DYNAMIC FLOW
-                    </span>
-                  </div>
-                )}
               </div>
 
             </div>
@@ -1861,7 +2051,7 @@ export default function App() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
               
               {/* SECTION 1: TRANSCRIPT INPUT */}
-              <div className="flex flex-col h-[650px] rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md overflow-hidden shadow-lg transition-all duration-300 hover:border-green-600 hover:shadow-[0_0_20px_rgba(0,255,1,0.05)]">
+              <div className="flex flex-col h-[360px] rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md overflow-hidden shadow-lg transition-all duration-300 hover:border-green-600 hover:shadow-[0_0_20px_rgba(0,255,1,0.05)]">
                 <div className="px-5 py-3 border-b border-green-800/80 bg-green-900/10 flex flex-col xl:flex-row xl:items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-mono font-bold tracking-wider text-[#00FF01] flex items-center gap-2">
@@ -1917,6 +2107,16 @@ export default function App() {
                     >
                       <Plus className="h-3 w-3" /> INSERT POLISHED VO
                     </button>
+
+                    <label className="py-1.5 px-3 rounded-[17px] font-mono text-[10px] font-extrabold tracking-wider uppercase transition-all duration-300 flex items-center gap-1.5 border cursor-pointer bg-green-900/30 border-green-800 text-[#00FF01] hover:border-[#00FF01] hover:bg-[#00FF01]/10 hover:scale-105 active:scale-95">
+                      <Plus className="h-3 w-3" /> IMPORT FILE
+                      <input
+                        type="file"
+                        accept=".txt,.pdf"
+                        onChange={handleTranscriptInputFileUpload}
+                        className="hidden"
+                      />
+                    </label>
                   </div>
                 </div>
 
@@ -1931,7 +2131,7 @@ export default function App() {
               </div>
 
               {/* SECTION 2: GENERATED SCENE PROMPTS */}
-              <div className="flex flex-col h-[650px] rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md overflow-hidden shadow-lg relative transition-all duration-300 hover:border-green-600 hover:shadow-[0_0_20px_rgba(0,255,1,0.05)]">
+              <div className="flex flex-col h-[360px] rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md overflow-hidden shadow-lg relative transition-all duration-300 hover:border-green-600 hover:shadow-[0_0_20px_rgba(0,255,1,0.05)]">
                 <div className="px-5 py-3 border-b border-green-800/80 bg-green-900/15 flex flex-col xl:flex-row xl:items-center justify-between gap-3">
                   <span className="text-xs font-mono font-bold tracking-wider text-[#00FF01] flex items-center gap-1.5">
                     <Sparkles className="h-4 w-4 text-[#00FF01]" />
@@ -2058,22 +2258,33 @@ export default function App() {
                         <FileText className="h-4 w-4" />
                         Video Transcript Input
                       </span>
-                      <button
-                        onClick={() => {
-                          if (polishedScript) {
-                            setVideoTranscriptInput(polishedScript);
-                          }
-                        }}
-                        disabled={!polishedScript}
-                        className={`py-1 px-2.5 rounded-[17px] font-mono text-[9px] font-extrabold tracking-tight flex items-center gap-1 border cursor-pointer transition-all ${
-                          polishedScript
-                            ? "bg-[#00FF01] text-black border-[#00FF01] hover:scale-105 active:scale-95 animate-pulse"
-                            : "opacity-40 cursor-not-allowed text-gray-500 border-transparent"
-                        }`}
-                        title="Insert from Polished Script"
-                      >
-                        <Plus className="h-3 w-3" /> INSERT POLISHED VO
-                      </button>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => {
+                            if (polishedScript) {
+                              setVideoTranscriptInput(polishedScript);
+                            }
+                          }}
+                          disabled={!polishedScript}
+                          className={`py-1 px-2.5 rounded-[17px] font-mono text-[9px] font-extrabold tracking-tight flex items-center gap-1 border cursor-pointer transition-all ${
+                            polishedScript
+                              ? "bg-[#00FF01] text-black border-[#00FF01] hover:scale-105 active:scale-95 animate-pulse"
+                              : "opacity-40 cursor-not-allowed text-gray-500 border-transparent"
+                          }`}
+                          title="Insert from Polished Script"
+                        >
+                          <Plus className="h-3 w-3" /> INSERT POLISHED VO
+                        </button>
+                        <label className="py-1 px-2.5 rounded-[17px] font-mono text-[9px] font-extrabold tracking-tight flex items-center gap-1 border cursor-pointer transition-all bg-green-900/30 border-green-800 text-[#00FF01] hover:border-[#00FF01] hover:bg-[#00FF01]/10 hover:scale-105 active:scale-95">
+                          <Plus className="h-3 w-3" /> IMPORT FILE
+                          <input
+                            type="file"
+                            accept=".txt,.pdf"
+                            onChange={handleVideoTranscriptFileUpload}
+                            className="hidden"
+                          />
+                        </label>
+                      </div>
                     </div>
 
                     <div className="flex-1 relative">
@@ -2173,13 +2384,24 @@ export default function App() {
                                   </button>
                                 </div>
                               </div>
-                              <ul className="space-y-1.5 font-sans leading-relaxed text-gray-300">
-                                {ctrOutput.titles.map((t, index) => (
-                                  <li key={index} className="pl-4 relative border-b border-green-900/20 pb-1 last:border-b-0">
-                                    <span className="absolute left-0 text-[#00FF01] font-mono font-bold text-[10px]">{index + 1}.</span>
-                                    {t}
-                                  </li>
-                                ))}
+                              <ul className="space-y-2 text-gray-300">
+                                {ctrOutput.titles.map((t, index) => {
+                                  const isUrdu = /[\u0600-\u06FF]/.test(t);
+                                  return (
+                                    <li
+                                      key={index}
+                                      className={`border-b border-green-900/20 pb-2 last:border-b-0 flex items-start gap-3 ${
+                                        isUrdu ? "font-urdu text-base leading-relaxed text-right" : "font-sans text-xs leading-relaxed text-left"
+                                      }`}
+                                      dir={isUrdu ? "rtl" : "ltr"}
+                                    >
+                                      <span className="text-[#00FF01] font-mono font-bold text-[10px] pt-0.5 shrink-0">
+                                        {index + 1}.
+                                      </span>
+                                      <span className="flex-1 select-text">{t}</span>
+                                    </li>
+                                  );
+                                })}
                               </ul>
                             </div>
                           )}
@@ -2324,22 +2546,33 @@ export default function App() {
                         <FileText className="h-4 w-4" />
                         Thumbnail Transcript Input
                       </span>
-                      <button
-                        onClick={() => {
-                          if (polishedScript) {
-                            setThumbnailTranscriptInput(polishedScript);
-                          }
-                        }}
-                        disabled={!polishedScript}
-                        className={`py-1 px-2.5 rounded-[17px] font-mono text-[9px] font-extrabold tracking-tight flex items-center gap-1 border cursor-pointer transition-all ${
-                          polishedScript
-                            ? "bg-[#00FF01] text-black border-[#00FF01] hover:scale-105 active:scale-95 animate-pulse"
-                            : "opacity-40 cursor-not-allowed text-gray-500 border-transparent"
-                        }`}
-                        title="Insert from Polished Script"
-                      >
-                        <Plus className="h-3 w-3" /> INSERT POLISHED VO
-                      </button>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => {
+                            if (polishedScript) {
+                              setThumbnailTranscriptInput(polishedScript);
+                            }
+                          }}
+                          disabled={!polishedScript}
+                          className={`py-1 px-2.5 rounded-[17px] font-mono text-[9px] font-extrabold tracking-tight flex items-center gap-1 border cursor-pointer transition-all ${
+                            polishedScript
+                              ? "bg-[#00FF01] text-black border-[#00FF01] hover:scale-105 active:scale-95 animate-pulse"
+                              : "opacity-40 cursor-not-allowed text-gray-500 border-transparent"
+                          }`}
+                          title="Insert from Polished Script"
+                        >
+                          <Plus className="h-3 w-3" /> INSERT POLISHED VO
+                        </button>
+                        <label className="py-1 px-2.5 rounded-[17px] font-mono text-[9px] font-extrabold tracking-tight flex items-center gap-1 border cursor-pointer transition-all bg-green-900/30 border-green-800 text-[#00FF01] hover:border-[#00FF01] hover:bg-[#00FF01]/10 hover:scale-105 active:scale-95">
+                          <Plus className="h-3 w-3" /> IMPORT FILE
+                          <input
+                            type="file"
+                            accept=".txt,.pdf"
+                            onChange={handleThumbnailTranscriptFileUpload}
+                            className="hidden"
+                          />
+                        </label>
+                      </div>
                     </div>
 
                     <div className="flex-1 relative">

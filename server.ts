@@ -580,7 +580,7 @@ app.post("/api/generate-thumbnail-prompt", async (req, res) => {
     const ai = getAiClient();
 
     const prompt = `
-You are an expert YouTube Thumbnail Director, Visual Designer, and CTR Optimization expert.
+You are an expert YouTube Thumbnail Director, Visual Designer, and CTR Optimization expert specializing in highly trained "Nano Banana 2" visual image generation prompts.
 Create a highly engaging, viral YouTube thumbnail concept and Urdu text overlays based on the provided video transcript.
 
 TRANSCRIPT:
@@ -588,7 +588,7 @@ TRANSCRIPT:
 ${transcript}
 """
 
-Design parameters to integrate (especially if provided/optional):
+Design parameters to integrate:
 - Background Colors: ${bgColor || "Slate black, dark green gradient"}
 - Thumbnail Text Headline (Reference/Guideline): ${headline || "None specified"}
 - Small Tagline text: ${smallTagline || "None specified"}
@@ -596,17 +596,23 @@ Design parameters to integrate (especially if provided/optional):
 - Niche Theme: ${niche || "General"}
 
 Strict Rules for Thumbnail Prompt Creation:
-1. Describe EXACTLY 1 main subject with an extreme, highly expressive human emotion (surprise, shock, fear, concern, ultimate excitement).
-2. Use extreme high-contrast, cinematic lighting, sharp depth-of-field, and vivid details.
-3. Keep the visual composition bold, simple, mobile-readable, and optimized for maximum YouTube CTR. Avoid text on the thumbnail itself beyond a maximum of 3 bold words.
-4. Integrate the preferred Background Colors and Text Colors in your descriptions.
-5. Provide a highly detailed, professional English prompt ("thumbnailPrompt") optimized for state-of-the-art AI image generators (Imagen 3, DALL-E, Midjourney).
-6. Create a matching, extremely high-impact main headline in Urdu script ("headlineUrdu") (max 3-4 words for high readability).
-7. Create a matching small tagline in Urdu script ("smallTaglineUrdu").
+1. Describe EXACTLY 1 main subject with an extreme, highly expressive human emotion (surprise, shock, fear, concern, ultimate excitement) suitable for the niche and topic.
+2. The returned "thumbnailPrompt" MUST be structured as an extremely detailed, highly trained "Nano Banana 2 Prompt for an image generation model" following this EXACT layout format:
+   "Create a highly engaging YouTube [Niche Theme] thumbnail using the uploaded creator photo as the main subject (preserve facial identity exactly).
+   LEFT SIDE: A large close-up of the creator [specify gender/clothing/appearance based on topic], with a [specify expressive emotion, e.g. surprised and concerned] expression, pointing toward [specify high-impact visual object from transcript, e.g., fresh ginger root with glowing medical effects/device].
+   RIGHT SIDE: [Describe realistic visual representations of the main topic, e.g., realistic kidney illustration glowing with healthy neon green energy, or high-tech gadget glowing, or food element], and other secondary high-impact elements like [describe 2-3 supporting objects/icons].
+   BACKGROUND: [Describe a premium gradient blended with relevant graphics, e.g., a premium black and dark green gradient blended together with futuristic medical graphics, or cyber patterns, or organic textures] utilizing [Background Colors]. Use only [List specific color hexes/names from parameters, e.g. neon green (#00FF01), Black (#000000), White (#FFFFFF)].
+   Large bold Urdu headline with merged [Text Color overlays] text: \"[Headline in Urdu Nastaliq]\"
+   Small Urdu tagline underneath: \"[Tagline in Urdu Nastaliq]\".
+   Typography should be mobile-readable, ultra-realistic, cinematic lighting, high contrast, sharp focus, viral YouTube thumbnail style, professional [Niche Theme] design, maximum CTR optimization, clean bold composition with the creator's face as the main focal point."
+
+3. Keep the visual composition bold, simple, mobile-readable, and optimized for maximum YouTube CTR.
+4. Create a matching, extremely high-impact main headline in Urdu script ("headlineUrdu") (max 3-4 words for high readability).
+5. Create a matching small tagline in Urdu script ("smallTaglineUrdu").
 
 Return your response as a valid JSON object matching this schema:
 {
-  "thumbnailPrompt": "The detailed English visual prompt...",
+  "thumbnailPrompt": "The detailed English Nano Banana 2 prompt following the precise layout above...",
   "headlineUrdu": "Bold Urdu Headline...",
   "smallTaglineUrdu": "Small Urdu Tagline..."
 }
