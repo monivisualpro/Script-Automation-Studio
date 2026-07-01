@@ -80,7 +80,7 @@ app.post("/api/generate", async (req, res) => {
     }
 
     const ai = getAiClient();
-    const modelToUse = fastLiteMode ? "gemini-3.1-flash-lite" : "gemini-3.5-flash";
+    const modelToUse = fastLiteMode ? "gemini-2.5-flash-lite" : "gemini-2.5-flash";
 
     // We will generate the following transformations in parallel:
     const transformations = ["hindi", "urdu-roman", "urdu-writing", "english"];
