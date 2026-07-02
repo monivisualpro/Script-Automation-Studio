@@ -80,7 +80,8 @@ app.post("/api/generate", async (req, res) => {
     }
 
     const ai = getAiClient();
-    const modelToUse = "gemini-1.5-flash";
+    
+     const modelToUse = "gemini-3.1-flash-lite";
 
     // We will generate the following transformations in parallel:
     const transformations = ["hindi", "urdu-roman", "urdu-writing", "english"];
@@ -199,7 +200,9 @@ app.post("/api/generate-topic", async (req, res) => {
 
     const ai = getAiClient();
     const response = await generateContentWithRetry({
-      model: "gemini-3.5-flash",
+
+      model: "gemini-3.1-flash-lite",
+
       contents: `Generate a detailed, high-quality script on the topic: "${topic}". The script should be approximately ${targetWords} words. It should be highly engaging, educational, and structured, written directly as clean raw content ready for voiceover and script transformation. Return ONLY the script text itself.`,
     });
 
@@ -243,7 +246,10 @@ Since this URL belongs to a social media platform (such as YouTube, Facebook, In
     }
 
     const response = await generateContentWithRetry({
-      model: "gemini-3.5-flash",
+
+      model: "gemini-3.1-flash-lite",
+
+      
       contents: prompt,
     });
 
@@ -291,7 +297,9 @@ app.post("/api/parse-file", async (req, res) => {
     }
 
     const response = await generateContentWithRetry({
-      model: "gemini-3.5-flash",
+
+      model: "gemini-3.1-flash-lite",
+      
       contents,
     });
 
@@ -349,7 +357,12 @@ You MUST output exactly ${count} scenes. Return the output as a JSON object matc
 `;
 
     const response = await generateContentWithRetry({
-      model: "gemini-3.5-flash",
+
+
+      model: "gemini-3.1-flash-lite",
+
+
+
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -412,7 +425,11 @@ Return ONLY the prompt text, with absolutely no commentary, introduction, or JSO
 `;
 
     const response = await generateContentWithRetry({
-      model: "gemini-3.5-flash",
+
+
+      model: "gemini-3.1-flash-lite",
+
+
       contents: prompt,
     });
 
@@ -535,7 +552,11 @@ Return your response as a valid JSON object matching this schema:
     }
 
     const response = await generateContentWithRetry({
-      model: "gemini-3.5-flash",
+
+      
+      model: "gemini-3.1-flash-lite",
+
+
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -619,7 +640,12 @@ Return your response as a valid JSON object matching this schema:
 `;
 
     const response = await generateContentWithRetry({
-      model: "gemini-3.5-flash",
+
+
+      model: "gemini-3.1-flash-lite",
+
+
+
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -762,7 +788,11 @@ Return the output in the "tags" array.`;
     }
 
     const response = await generateContentWithRetry({
-      model: "gemini-3.5-flash",
+
+
+      model: "gemini-3.1-flash-lite",
+
+
       contents: fieldPrompt,
       config: {
         responseMimeType: "application/json",
