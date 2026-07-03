@@ -21,7 +21,7 @@
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 255, 1, 0.6);
+  background: rgba(0, 255, 0, 0.508);
 }
 
 /* Nastaliq Urdu style */

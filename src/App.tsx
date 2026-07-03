@@ -124,7 +124,7 @@ export default function App() {
   const [showShotsCalculator, setShowShotsCalculator] = useState(false);
   const [scenes, setScenes] = useState<Array<{ id: number; text: string; isEditing?: boolean; loading?: boolean }>>([]);
   const [scenesLoading, setScenesLoading] = useState(false);
-  const [greetingsPrefix, setGreetingsPrefix] = useState("Asslamoalaikum");
+  const [greetingsPrefix, setGreetingsPrefix] = useState("Assalamualaikum");
   const [includeHooksBodyConclusion, setIncludeHooksBodyConclusion] = useState(true);
   const [customHook, setCustomHook] = useState("Kya aap jante hain?");
   const [tutorialTone, setTutorialTone] = useState("Warm Friendly Conversational");
