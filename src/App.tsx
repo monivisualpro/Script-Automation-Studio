@@ -21,7 +21,8 @@ import {
   Search,
   ExternalLink,
   Mic,
-  MicOff
+  MicOff,
+  Calculator
 } from "lucide-react";
 
 const CATEGORIES = [
@@ -114,7 +115,13 @@ export default function App() {
   const [transcriptInput, setTranscriptInput] = useState("");
   const [numScenes, setNumScenes] = useState<number>(10);
   const [contentCategory, setContentCategory] = useState("Medical & Health");
-  const [storyboardFormat, setStoryboardFormat] = useState<"16:9" | "9:16" | "1:1">("16:9");
+  const [storyboardFormat, setStoryboardFormat] = useState<"16:9" | "9:16" | "1:1" | "none">("16:9");
+  
+  // Shots Calculator States
+  const [calcVideoMinutes, setCalcVideoMinutes] = useState<number>(10);
+  const [calcVideoSeconds, setCalcVideoSeconds] = useState<number>(0);
+  const [calcShotDuration, setCalcShotDuration] = useState<number>(8);
+  const [showShotsCalculator, setShowShotsCalculator] = useState(false);
   const [scenes, setScenes] = useState<Array<{ id: number; text: string; isEditing?: boolean; loading?: boolean }>>([]);
   const [scenesLoading, setScenesLoading] = useState(false);
   const [greetingsPrefix, setGreetingsPrefix] = useState("Asslamoalaikum");
@@ -2427,74 +2434,94 @@ export default function App() {
               
               {/* SECTION 1: TRANSCRIPT INPUT */}
               <div className="flex flex-col h-[480px] rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md overflow-hidden shadow-lg transition-all duration-300 hover:border-green-600 hover:shadow-[0_0_20px_rgba(0,255,1,0.05)]">
-                <div className="px-5 py-3 border-b border-green-800/80 bg-green-900/10 flex flex-col xl:flex-row xl:items-center justify-between gap-3">
-                  <div className="flex items-center gap-2">
+                <div className="px-5 py-3 border-b border-green-800/80 bg-green-900/10 flex flex-col xl:flex-row xl:items-start justify-between gap-3">
+                  <div className="flex flex-col gap-1">
                     <span className="text-xs font-mono font-bold tracking-wider text-[#00FF01] flex items-center gap-2">
                       <Sliders className="h-4 w-4" />
                       TRANSCRIPT INPUT <Plus className="h-4 w-4 text-[#00FF01] animate-bounce" />
                     </span>
+                    <span className="text-[9px] text-gray-500 font-mono">Configure script parameters & aspect ratios</span>
                   </div>
                   
-                  {/* Controllers */}
-                  <div className="flex items-center gap-2.5 flex-wrap">
-                    <div className="flex items-center gap-1.5 bg-black/40 px-2 py-1 rounded-xl border border-green-800/60">
-                      <span className="text-[9px] text-gray-400 font-mono">SCENES:</span>
-                      <input
-                        type="number"
-                        min="1"
-                        max="100"
-                        value={numScenes}
-                        onChange={(e) => setNumScenes(Math.min(100, Math.max(1, parseInt(e.target.value) || 1)))}
-                        className="bg-transparent w-10 text-[10px] text-[#00FF01] font-mono focus:outline-none font-bold"
-                      />
+                  {/* Controllers organized in sequential rows */}
+                  <div className="flex flex-col gap-2.5 w-full xl:w-auto items-start xl:items-end">
+                    
+                    {/* Row 1: Domain Category and Scenes (with integrated Shots Calculator) */}
+                    <div className="flex items-center gap-2 flex-wrap w-full xl:w-auto justify-start xl:justify-end">
+                      
+                      {/* Domain Category - First */}
+                      <div className="flex items-center gap-1.5 bg-black/40 px-2 py-1 rounded-xl border border-green-800/60">
+                        <span className="text-[9px] text-gray-400 font-mono">CATEGORY:</span>
+                        <select
+                          value={contentCategory}
+                          onChange={(e) => {
+                            setContentCategory(e.target.value);
+                            setTopicNiche(e.target.value);
+                          }}
+                          className="bg-transparent text-[10px] text-[#00FF01] font-mono focus:outline-none font-bold cursor-pointer"
+                          style={{ colorScheme: "dark" }}
+                        >
+                          {CATEGORIES.map((cat) => (
+                            <option key={cat} value={cat} className="bg-[#05290e] text-[#00FF01]">{cat}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Scenes with Shots Calculator toggle */}
+                      <div className="flex items-center gap-1 bg-black/40 px-2 py-1 rounded-xl border border-green-800/60">
+                        <span className="text-[9px] text-gray-400 font-mono">SCENES:</span>
+                        <input
+                          type="number"
+                          min="1"
+                          max="100"
+                          value={numScenes}
+                          onChange={(e) => setNumScenes(Math.min(100, Math.max(1, parseInt(e.target.value) || 1)))}
+                          className="bg-transparent w-8 text-[10px] text-[#00FF01] font-mono focus:outline-none font-bold"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowShotsCalculator(!showShotsCalculator)}
+                          className={`p-1 rounded hover:bg-green-900/40 text-xs transition-all flex items-center justify-center ${showShotsCalculator ? "text-[#00FF01] bg-green-950/50" : "text-gray-400"}`}
+                          title="Open Shots Calculator (duration-based)"
+                        >
+                          <Calculator className="h-3 w-3" />
+                        </button>
+                      </div>
+
                     </div>
 
-                    <div className="flex items-center gap-1.5 bg-black/40 px-2.5 py-1 rounded-xl border border-green-800/60">
-                      <span className="text-[9px] text-gray-400 font-mono">CATEGORY:</span>
-                      <select
-                        value={contentCategory}
-                        onChange={(e) => {
-                          setContentCategory(e.target.value);
-                          setTopicNiche(e.target.value);
+                    {/* Row 2: Insert and Import File in ONE line */}
+                    <div className="flex items-center gap-2 w-full xl:w-auto justify-start xl:justify-end">
+                      <button
+                        onClick={() => {
+                          if (polishedScript) {
+                            setTranscriptInput(polishedScript);
+                          }
                         }}
-                        className="bg-transparent text-[10px] text-[#00FF01] font-mono focus:outline-none font-bold cursor-pointer"
-                        style={{ colorScheme: "dark" }}
+                        disabled={!polishedScript}
+                        className={`py-1 px-3 rounded-[17px] font-mono text-[9px] font-extrabold tracking-wider uppercase transition-all duration-300 flex items-center gap-1 border cursor-pointer ${
+                          polishedScript
+                            ? "bg-[#00FF01] text-black border-[#00FF01] hover:shadow-[0_0_15px_rgba(0,255,1,0.4)] hover:scale-105"
+                            : "bg-green-900/10 text-gray-500 border-green-800/40 cursor-not-allowed"
+                        }`}
+                        title="Insert the polished voice over script"
                       >
-                        {CATEGORIES.map((cat) => (
-                          <option key={cat} value={cat} className="bg-[#05290e] text-[#00FF01]">{cat}</option>
-                        ))}
-                      </select>
+                        <Plus className="h-3 w-3" /> INSERT
+                      </button>
+
+                      <label className="py-1 px-3 rounded-[17px] font-mono text-[9px] font-extrabold tracking-wider uppercase transition-all duration-300 flex items-center gap-1 border cursor-pointer bg-green-900/30 border-green-800 text-[#00FF01] hover:border-[#00FF01] hover:bg-[#00FF01]/10 hover:scale-105 active:scale-95">
+                        <Plus className="h-3 w-3" /> IMPORT FILE
+                        <input
+                          type="file"
+                          accept=".txt,.pdf"
+                          onChange={handleTranscriptInputFileUpload}
+                          className="hidden"
+                        />
+                      </label>
                     </div>
 
-                    <button
-                      onClick={() => {
-                        if (polishedScript) {
-                          setTranscriptInput(polishedScript);
-                        }
-                      }}
-                      disabled={!polishedScript}
-                      className={`py-1.5 px-3 rounded-[17px] font-mono text-[10px] font-extrabold tracking-wider uppercase transition-all duration-300 flex items-center gap-1.5 border cursor-pointer ${
-                        polishedScript
-                          ? "bg-[#00FF01] text-black border-[#00FF01] hover:shadow-[0_0_15px_rgba(0,255,1,0.4)] hover:scale-105 active:scale-95"
-                          : "bg-green-900/10 text-gray-500 border-green-800/40 cursor-not-allowed"
-                      }`}
-                      title="Insert the polished voice over script"
-                    >
-                      <Plus className="h-3 w-3" /> INSERT POLISHED VO
-                    </button>
-
-                    <label className="py-1.5 px-3 rounded-[17px] font-mono text-[10px] font-extrabold tracking-wider uppercase transition-all duration-300 flex items-center gap-1.5 border cursor-pointer bg-green-900/30 border-green-800 text-[#00FF01] hover:border-[#00FF01] hover:bg-[#00FF01]/10 hover:scale-105 active:scale-95">
-                      <Plus className="h-3 w-3" /> IMPORT FILE
-                      <input
-                        type="file"
-                        accept=".txt,.pdf"
-                        onChange={handleTranscriptInputFileUpload}
-                        className="hidden"
-                      />
-                    </label>
-
-                    {/* Aspect Ratio Format Dropdown */}
-                    <div className="flex items-center gap-1.5 bg-black/40 px-2.5 py-1.5 rounded-[17px] border border-green-800/60 hover:border-[#00FF01]/40 transition-all duration-300">
+                    {/* Row 3: Format Dropdown below them */}
+                    <div className="flex items-center gap-1.5 bg-black/40 px-2.5 py-1 rounded-[17px] border border-green-800/60 hover:border-[#00FF01]/40 transition-all duration-300 w-fit">
                       <span className="text-[9px] text-gray-400 font-mono">FORMAT:</span>
                       <select
                         value={storyboardFormat}
@@ -2505,12 +2532,110 @@ export default function App() {
                         <option value="16:9" className="bg-[#05290e] text-[#00FF01]">Horizontal (16:9)</option>
                         <option value="9:16" className="bg-[#05290e] text-[#00FF01]">Vertical (9:16)</option>
                         <option value="1:1" className="bg-[#05290e] text-[#00FF01]">Square (1:1)</option>
+                        <option value="none" className="bg-[#05290e] text-[#00FF01]">None (No Format)</option>
                       </select>
                     </div>
+
                   </div>
                 </div>
 
                 <div className="flex-1 relative flex flex-col">
+                  {/* Shots Calculator Panel */}
+                  <AnimatePresence>
+                    {showShotsCalculator && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        className="bg-black/95 border-b border-green-800/80 p-4 space-y-3 font-mono overflow-hidden z-30"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-bold text-[#00FF01] uppercase tracking-widest flex items-center gap-1.5">
+                            <Calculator className="h-3.5 w-3.5 animate-pulse" /> duration-based shots calculator
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setShowShotsCalculator(false)}
+                            className="text-[10px] text-red-400 hover:text-red-300 font-bold border border-red-900/60 bg-red-950/20 px-2 py-0.5 rounded"
+                          >
+                            CLOSE
+                          </button>
+                        </div>
+
+                        {/* Calculator Inputs */}
+                        <div className="grid grid-cols-3 gap-2.5">
+                          <div>
+                            <label className="text-[8px] text-gray-500 block mb-1">VIDEO MINS</label>
+                            <input
+                              type="number"
+                              min="0"
+                              value={calcVideoMinutes}
+                              onChange={(e) => {
+                                const val = Math.max(0, parseInt(e.target.value) || 0);
+                                setCalcVideoMinutes(val);
+                                const totSec = (val * 60) + calcVideoSeconds;
+                                setNumScenes(Math.ceil(totSec / calcShotDuration) || 1);
+                              }}
+                              className="w-full bg-green-950/20 border border-green-800/60 rounded px-2 py-1 text-xs text-[#00FF01] font-bold font-mono focus:outline-none focus:border-[#00FF01]"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[8px] text-gray-500 block mb-1">VIDEO SECS</label>
+                            <input
+                              type="number"
+                              min="0"
+                              max="59"
+                              value={calcVideoSeconds}
+                              onChange={(e) => {
+                                const val = Math.max(0, Math.min(59, parseInt(e.target.value) || 0));
+                                setCalcVideoSeconds(val);
+                                const totSec = (calcVideoMinutes * 60) + val;
+                                setNumScenes(Math.ceil(totSec / calcShotDuration) || 1);
+                              }}
+                              className="w-full bg-green-950/20 border border-green-800/60 rounded px-2 py-1 text-xs text-[#00FF01] font-bold font-mono focus:outline-none focus:border-[#00FF01]"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[8px] text-gray-500 block mb-1">SHOT TIME (SEC)</label>
+                            <input
+                              type="number"
+                              min="1"
+                              value={calcShotDuration}
+                              onChange={(e) => {
+                                const val = Math.max(1, parseInt(e.target.value) || 1);
+                                setCalcShotDuration(val);
+                                const totSec = (calcVideoMinutes * 60) + calcVideoSeconds;
+                                setNumScenes(Math.ceil(totSec / val) || 1);
+                              }}
+                              className="w-full bg-green-950/20 border border-green-800/60 rounded px-2 py-1 text-xs text-[#00FF01] font-bold font-mono focus:outline-none focus:border-[#00FF01]"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Output format requested by the user */}
+                        <div className="bg-green-950/15 p-3 rounded-xl border border-green-800/50 space-y-1.5 text-[10px] md:text-xs">
+                          <p className="text-[#00FF01] font-bold uppercase tracking-wider text-[8px] opacity-75">Output Details:</p>
+                          <div className="space-y-1 text-gray-300 font-bold">
+                            <div className="flex justify-between border-b border-green-950 py-1">
+                              <span>Video Duration:</span>
+                              <span className="text-[#00FF01]">
+                                {calcVideoMinutes} minute{calcVideoMinutes !== 1 ? 's' : ''} {calcVideoSeconds > 0 ? `${calcVideoSeconds} second${calcVideoSeconds !== 1 ? 's' : ''}` : ''}
+                              </span>
+                            </div>
+                            <div className="flex justify-between border-b border-green-950 py-1">
+                              <span>Shot Duration:</span>
+                              <span className="text-[#00FF01]">{calcShotDuration} seconds</span>
+                            </div>
+                            <div className="flex justify-between pt-1">
+                              <span>Total Shots Required:</span>
+                              <span className="text-[#00FF01] text-xs font-black">{Math.ceil(((calcVideoMinutes * 60) + calcVideoSeconds) / calcShotDuration) || 1}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
                   <textarea
                     value={transcriptInput}
                     onChange={(e) => setTranscriptInput(e.target.value)}
