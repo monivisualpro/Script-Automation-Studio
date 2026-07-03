@@ -17,7 +17,9 @@ import {
   Plus,
   RefreshCw,
   Sliders,
-  Sparkle
+  Sparkle,
+  Search,
+  ExternalLink
 } from "lucide-react";
 
 const CATEGORIES = [
@@ -46,6 +48,44 @@ const CATEGORIES = [
   "Science",
   "Nature",
   "General"
+];
+
+const ALL_COUNTRIES = [
+  "Pakistan",
+  "India",
+  "Bangladesh",
+  "Saudi Arabia",
+  "United Arab Emirates",
+  "United Kingdom",
+  "United States",
+  "Canada",
+  "Australia",
+  "Germany",
+  "France",
+  "Japan",
+  "China",
+  "Turkey",
+  "Iran",
+  "Egypt",
+  "Malaysia",
+  "Indonesia",
+  "South Africa",
+  "Brazil",
+  "Mexico",
+  "Russia",
+  "South Korea",
+  "Spain",
+  "Italy",
+  "Singapore",
+  "Oman",
+  "Qatar",
+  "Kuwait",
+  "Bahrain",
+  "Norway",
+  "Sweden",
+  "Switzerland",
+  "Netherlands",
+  "New Zealand"
 ];
 
 export default function App() {
@@ -118,6 +158,10 @@ export default function App() {
   const [textType, setTextType] = useState<"preset" | "custom">("preset");
   const [customTextCol1, setCustomTextCol1] = useState("#00FF01");
   const [customTextCol2, setCustomTextCol2] = useState("#FFFFFF");
+
+  // Target Country selection states
+  const [selectedCountries, setSelectedCountries] = useState<string[]>([]);
+  const [countrySearchQuery, setCountrySearchQuery] = useState("");
 
   const getActiveBgColor = () => {
     if (bgType === "preset") return thumbBgColor;
@@ -215,6 +259,7 @@ export default function App() {
           customHook,
           tutorialTone,
           fastLiteMode,
+          selectedCountries,
         }),
       });
 
@@ -754,14 +799,14 @@ export default function App() {
 
   const handleCopyAllScenes = () => {
     if (scenes.length === 0) return;
-    const allText = scenes.map((s) => `Scene ${s.id}:\n${s.text}`).join("\n\n");
+    const allText = scenes.map((s) => `Scene ${s.id}: ${s.text}`).join("\n\n");
     navigator.clipboard.writeText(allText);
     alert("Copied all scene prompts to clipboard!");
   };
 
   const handleDownloadAllScenesTxt = () => {
     if (scenes.length === 0) return;
-    const allText = scenes.map((s) => `Scene ${s.id}:\n${s.text}`).join("\n\n");
+    const allText = scenes.map((s) => `Scene ${s.id}: ${s.text}`).join("\n\n");
     const blob = new Blob([allText], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -789,8 +834,7 @@ export default function App() {
         <p><strong>Category:</strong> ${contentCategory} | <strong>Total Scenes:</strong> ${scenes.length}</p>
         ${scenes.map(s => `
           <div class="scene">
-            <div class="scene-title">Scene ${s.id}</div>
-            <div>${s.text.replace(/\n/g, "<br/>")}</div>
+            <div><strong>Scene ${s.id}:</strong> ${s.text.replace(/\n/g, "<br/>")}</div>
           </div>
         `).join("")}
       </body>
@@ -1034,6 +1078,109 @@ export default function App() {
                 <option value="adults">💼 Adults up to 40 years old</option>
                 <option value="seniors">👴 Men over 60 years old</option>
               </select>
+            </div>
+
+            {/* TARGET REGIONS / COUNTRIES */}
+            <div className="p-4 rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md space-y-3 shadow-md hover:border-[#00FF01]/30 hover:shadow-[0_0_15px_rgba(0,255,1,0.1)] transition-all duration-300">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-mono text-[#00FF01] uppercase tracking-widest flex items-center gap-1.5 font-bold">
+                  <Globe className="h-3.5 w-3.5 text-[#00FF01]" />
+                  Target Regions / Countries
+                </label>
+                <span className="text-[10px] font-mono text-gray-500">{selectedCountries.length} selected</span>
+              </div>
+              
+              {/* Search Option above countries list */}
+              <div className="relative">
+                <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search countries..."
+                  value={countrySearchQuery}
+                  onChange={(e) => setCountrySearchQuery(e.target.value)}
+                  className="w-full bg-[#05290e] border border-green-800 rounded-xl py-2 pl-9 pr-4 text-xs text-white focus:outline-none focus:border-[#00FF01] focus:shadow-[0_0_12px_rgba(0,255,1,0.2)] font-mono transition-all duration-300 hover:border-[#00FF01]"
+                />
+                {countrySearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setCountrySearchQuery("")}
+                    className="absolute right-3 top-2 text-[10px] text-gray-400 hover:text-white cursor-pointer"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+
+              {/* List of Countries (Filtered) */}
+              <div className="bg-[#031d0a] border border-green-800/60 rounded-xl max-h-[140px] overflow-y-auto p-1.5 space-y-1 scrollbar-thin scrollbar-thumb-green-800">
+                {ALL_COUNTRIES.filter(country =>
+                  country.toLowerCase().includes(countrySearchQuery.toLowerCase())
+                ).map((country) => {
+                  const isSelected = selectedCountries.includes(country);
+                  return (
+                    <button
+                      key={country}
+                      type="button"
+                      onClick={() => {
+                        if (isSelected) {
+                          setSelectedCountries(selectedCountries.filter(c => c !== country));
+                        } else {
+                          setSelectedCountries([...selectedCountries, country]);
+                        }
+                      }}
+                      className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-mono transition-all flex items-center justify-between cursor-pointer ${
+                        isSelected
+                          ? "bg-[#00FF01]/20 text-[#00FF01] border border-[#00FF01]/40 font-bold"
+                          : "text-gray-300 hover:bg-green-900/15 border border-transparent"
+                      }`}
+                    >
+                      <span>{country}</span>
+                      {isSelected ? (
+                        <span className="text-[9px] bg-[#00FF01] text-black px-1.5 py-0.5 rounded-full font-bold">Added</span>
+                      ) : (
+                        <span className="text-[9px] text-gray-500 opacity-0 group-hover:opacity-100">+ Add</span>
+                      )}
+                    </button>
+                  );
+                })}
+                {ALL_COUNTRIES.filter(country =>
+                  country.toLowerCase().includes(countrySearchQuery.toLowerCase())
+                ).length === 0 && (
+                  <div className="text-[10px] text-gray-500 font-mono text-center py-4">
+                    No countries match your search
+                  </div>
+                )}
+              </div>
+
+              {/* Selected Countries List Display */}
+              {selectedCountries.length > 0 ? (
+                <div className="space-y-1.5 pt-1 border-t border-green-800/30">
+                  <span className="text-[9px] font-mono text-gray-400 uppercase tracking-wider block">
+                    Selected (V.O. Customizing):
+                  </span>
+                  <div className="flex flex-wrap gap-1">
+                    {selectedCountries.map((country) => (
+                      <span
+                        key={country}
+                        className="inline-flex items-center gap-1 bg-[#00FF01] text-black text-[9px] font-mono px-2 py-0.5 rounded-full font-bold animate-fade-in"
+                      >
+                        {country}
+                        <button
+                          type="button"
+                          onClick={() => setSelectedCountries(selectedCountries.filter(c => c !== country))}
+                          className="hover:bg-black/20 text-black rounded-full w-3 h-3 flex items-center justify-center font-black cursor-pointer text-[8px]"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-[10px] text-gray-500 font-mono italic text-center pt-1">
+                  No countries selected (defaults to global audience)
+                </div>
+              )}
             </div>
 
              {/* SCRIPT LENGTH TYPE & DETAILS */}
@@ -1341,14 +1488,6 @@ export default function App() {
                 <span className="text-xs font-mono text-[#00FF01] uppercase tracking-wider block font-bold">
                   thumbnail director & Tagline
                 </span>
-                <a
-                  href="https://labs.google/fx/tools/flow"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-[9px] font-mono text-[#00FF01] bg-green-900/40 px-2 py-0.5 rounded border border-green-800 hover:bg-[#00FF01] hover:text-black hover:scale-105 active:scale-95 transition-all duration-300 block font-bold text-center cursor-pointer shadow-[0_0_8px_rgba(0,255,1,0.15)]"
-                >
-                  Google Flow Nano Banana 2
-                </a>
               </div>
 
               {/* Niche dropdown synced with Domain */}
@@ -1568,11 +1707,49 @@ export default function App() {
                       </div>
                     </div>
                     
+                    {/* Custom Color Palette Swatches */}
+                    <div className="space-y-1 pt-1.5">
+                      <span className="text-[8px] font-mono text-gray-400 uppercase tracking-wider block">
+                        Quick Custom Palette Swatches:
+                      </span>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {[
+                          { primary: "#00E5FF", accent: "#FFFFFF", label: "Blue Highlight & White" },
+                          { primary: "#00FF01", accent: "#E5E7EB", label: "Neon Green & Silver" },
+                          { primary: "#FFD700", accent: "#F3F4F6", label: "Golden Yellow & Light Grey" },
+                          { primary: "#FF5722", accent: "#FEF3C7", label: "Sunset Orange & Cream" },
+                          { primary: "#FF2E93", accent: "#F9FAFB", label: "Electric Pink & Cool White" },
+                          { primary: "#A855F7", accent: "#FFFFFF", label: "Vivid Purple & Pure White" }
+                        ].map((swatch, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => {
+                              setCustomTextCol1(swatch.primary);
+                              setCustomTextCol2(swatch.accent);
+                            }}
+                            className={`p-1 rounded bg-black/40 border transition-all text-left flex items-center gap-1.5 cursor-pointer text-[8px] font-mono ${
+                              customTextCol1 === swatch.primary && customTextCol2 === swatch.accent
+                                ? "border-[#00FF01] bg-[#00FF01]/5 text-white"
+                                : "border-green-900/60 hover:border-[#00FF01] text-gray-400 hover:text-white"
+                            }`}
+                          >
+                            <span className="flex gap-0.5 shrink-0">
+                              <span style={{ backgroundColor: swatch.primary }} className="w-2.5 h-2.5 rounded-full border border-black/35" />
+                              <span style={{ backgroundColor: swatch.accent }} className="w-2.5 h-2.5 rounded-full border border-black/35" />
+                            </span>
+                            <span className="truncate">{swatch.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
                     {/* Live Preview Text Overlay */}
-                    <div className="py-1 px-3 rounded-lg border border-green-850 bg-black/40 text-center font-bold">
-                      <span style={{ color: customTextCol1 }} className="text-xs">Main Headline</span>
+                    <div className="py-1.5 px-3 rounded-lg border border-green-850 bg-black/40 text-center">
+                      <span className="text-[8px] font-mono text-gray-500 block mb-1">Live Text Color Contrast Preview:</span>
+                      <span style={{ color: customTextCol1 }} className="text-xs font-black">Main Headline (Primary Blue/Highlight)</span>
                       {" "}
-                      <span style={{ color: customTextCol2 }} className="text-[10px]">Tagline</span>
+                      <span style={{ color: customTextCol2 }} className="text-[10px] font-medium">Tagline (Accent/Secondary)</span>
                     </div>
                   </div>
                 )}
@@ -1811,7 +1988,7 @@ export default function App() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               
               {/* RAW SOURCE SCRIPT BOX */}
-              <div className="flex flex-col h-[360px] rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md overflow-hidden shadow-lg transition-all duration-300 hover:border-green-600 hover:shadow-[0_0_20px_rgba(0,255,1,0.05)]">
+              <div className="flex flex-col h-[480px] rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md overflow-hidden shadow-lg transition-all duration-300 hover:border-green-600 hover:shadow-[0_0_20px_rgba(0,255,1,0.05)]">
                 <div className="px-5 py-3 border-b border-green-800/80 bg-green-900/10 flex items-center justify-between">
                   <span className="text-xs font-mono font-extrabold tracking-wider text-[#00FF01] flex items-center gap-2 animate-pulse">
                     <FileText className="h-4 w-4 text-[#00FF01]" />
@@ -1844,7 +2021,7 @@ export default function App() {
               </div>
 
               {/* POLISHED V.O. SCRIPT / OUTPUT BOX */}
-              <div className="flex flex-col h-[360px] rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md overflow-hidden shadow-lg relative transition-all duration-300 hover:border-green-600 hover:shadow-[0_0_25px_rgba(0,255,1,0.08)]">
+              <div className="flex flex-col h-[480px] rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md overflow-hidden shadow-lg relative transition-all duration-300 hover:border-green-600 hover:shadow-[0_0_25px_rgba(0,255,1,0.08)]">
                 {/* Active glowing ambient frame segment */}
                 <div className="absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r from-transparent via-[#00FF01]/50 to-transparent" />
                 
@@ -2051,7 +2228,7 @@ export default function App() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
               
               {/* SECTION 1: TRANSCRIPT INPUT */}
-              <div className="flex flex-col h-[360px] rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md overflow-hidden shadow-lg transition-all duration-300 hover:border-green-600 hover:shadow-[0_0_20px_rgba(0,255,1,0.05)]">
+              <div className="flex flex-col h-[480px] rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md overflow-hidden shadow-lg transition-all duration-300 hover:border-green-600 hover:shadow-[0_0_20px_rgba(0,255,1,0.05)]">
                 <div className="px-5 py-3 border-b border-green-800/80 bg-green-900/10 flex flex-col xl:flex-row xl:items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-mono font-bold tracking-wider text-[#00FF01] flex items-center gap-2">
@@ -2131,7 +2308,7 @@ export default function App() {
               </div>
 
               {/* SECTION 2: GENERATED SCENE PROMPTS */}
-              <div className="flex flex-col h-[360px] rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md overflow-hidden shadow-lg relative transition-all duration-300 hover:border-green-600 hover:shadow-[0_0_20px_rgba(0,255,1,0.05)]">
+              <div className="flex flex-col h-[480px] rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md overflow-hidden shadow-lg relative transition-all duration-300 hover:border-green-600 hover:shadow-[0_0_20px_rgba(0,255,1,0.05)]">
                 <div className="px-5 py-3 border-b border-green-800/80 bg-green-900/15 flex flex-col xl:flex-row xl:items-center justify-between gap-3">
                   <span className="text-xs font-mono font-bold tracking-wider text-[#00FF01] flex items-center gap-1.5">
                     <Sparkles className="h-4 w-4 text-[#00FF01]" />
@@ -2252,7 +2429,7 @@ export default function App() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   
                   {/* Left Column: Video Transcript Input */}
-                  <div className="flex flex-col h-[360px] rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md overflow-hidden shadow-lg transition-all duration-300 hover:border-green-600">
+                  <div className="flex flex-col h-[480px] rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md overflow-hidden shadow-lg transition-all duration-300 hover:border-green-600">
                     <div className="px-5 py-3 border-b border-green-800/80 bg-green-900/10 flex items-center justify-between">
                       <span className="text-xs font-mono font-extrabold tracking-wider text-[#00FF01] flex items-center gap-2">
                         <FileText className="h-4 w-4" />
@@ -2307,7 +2484,7 @@ export default function App() {
                   </div>
 
                   {/* Right Column: CTR YT & SM output */}
-                  <div className="flex flex-col h-[360px] rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md overflow-hidden shadow-lg relative transition-all duration-300 hover:border-green-600">
+                  <div className="flex flex-col h-[480px] rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md overflow-hidden shadow-lg relative transition-all duration-300 hover:border-green-600">
                     <div className="px-4 py-3 border-b border-green-800/80 bg-green-900/15 flex items-center justify-between">
                       <span className="text-xs font-mono font-bold tracking-wider text-[#00FF01] flex items-center gap-1.5">
                         <Sparkles className="h-4 w-4 text-[#00FF01]" />
@@ -2540,7 +2717,7 @@ export default function App() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   
                   {/* Left Column: Thumbnail Transcript Input */}
-                  <div className="flex flex-col h-[360px] rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md overflow-hidden shadow-lg transition-all duration-300 hover:border-green-600">
+                  <div className="flex flex-col h-[480px] rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md overflow-hidden shadow-lg transition-all duration-300 hover:border-green-600">
                     <div className="px-5 py-3 border-b border-green-800/80 bg-green-900/10 flex items-center justify-between">
                       <span className="text-xs font-mono font-extrabold tracking-wider text-[#00FF01] flex items-center gap-2">
                         <FileText className="h-4 w-4" />
@@ -2595,7 +2772,7 @@ export default function App() {
                   </div>
 
                   {/* Right Column: YT Thumbnails Prompt output */}
-                  <div className="flex flex-col h-[360px] rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md overflow-hidden shadow-lg relative transition-all duration-300 hover:border-green-600">
+                  <div className="flex flex-col h-[480px] rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md overflow-hidden shadow-lg relative transition-all duration-300 hover:border-green-600">
                     <div className="px-4 py-3 border-b border-green-800/80 bg-green-900/15 flex items-center justify-between">
                       <span className="text-xs font-mono font-bold tracking-wider text-[#00FF01] flex items-center gap-1.5">
                         <Sparkles className="h-4 w-4 text-[#00FF01]" />
@@ -2708,6 +2885,19 @@ export default function App() {
                           </p>
                         </div>
                       )}
+                    </div>
+
+                    {/* Floating Google Flow link in bottom right corner */}
+                    <div className="absolute bottom-3 right-3 z-20">
+                      <a
+                        href="https://labs.google/fx/tools/flow"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-[9px] font-mono text-[#00FF01] bg-black/95 hover:bg-[#00FF01] hover:text-black px-2 py-1 rounded border border-green-800 hover:border-[#00FF01] hover:scale-105 active:scale-95 transition-all duration-300 font-bold cursor-pointer shadow-[0_4px_12px_rgba(0,0,0,0.6)]"
+                      >
+                        <span>Google Flow Nano Banana 2</span>
+                        <ExternalLink className="h-2 w-2" />
+                      </a>
                     </div>
                   </div>
 

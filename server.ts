@@ -73,6 +73,7 @@ app.post("/api/generate", async (req, res) => {
       customHook,
       tutorialTone,
       fastLiteMode,
+      selectedCountries,
     } = req.body;
 
     if (!rawScript || rawScript.trim() === "") {
@@ -133,6 +134,10 @@ Strict rules for formatting and content:
 8. ABSOLUTE DIVERSITY REQUIREMENT:
    - Introduce a totally fresh, unique perspective, phrasing style, and layout for this script. Do not reuse similar phrasing patterns or sentence structures from previous generations. Every generation must be highly dynamic and unique.
    - Internal Entropy Seed: ${Math.random().toString(36).substring(2, 10)}
+
+9. TARGET REGIONS / COUNTRIES COMPLIANCE:
+   - Selected Target Regions/Countries: ${selectedCountries && selectedCountries.length > 0 ? selectedCountries.join(", ") : "Global audience"}
+   - If specific countries or regions are selected, you MUST deeply customize the script's cultural references, local context, statistics, examples, dialects/idiomatic preferences, and vocabulary specifically to match and appeal to the native population of those regions. Incorporate region-specific nuances or locally relatable anecdotes of the selected countries to make the content highly localized and high-converting.
 
 Ensure the output is strictly the polished script itself, completely ready to read or perform, containing zero meta-commentary, zero "Sure, here is your script" or filler explanations. Just output the final polished script.
 `;
@@ -338,6 +343,7 @@ Your task is to:
    - Ensure the visuals in each scene strictly match and visually represent the corresponding part of the transcript. Do not add anything extra from your own initiative that doesn't belong to the field.
    - Specify precise camera angles (e.g., extreme close-up, wide tracking shot), lighting (e.g., medical white fluorescent, warm industrial low-key amber glow), subject action, and cinematic realism.
    - Maintain perfect character, environment, and visual consistency across all scenes.
+   - FORMATTING CONSTRAINT: The "text" of each scene MUST be a single line of text containing only the cinematic video prompt itself. It MUST NOT contain any newline characters, and it MUST NOT start with "Scene X" or any custom header. The client will combine the scene number and text on a single line (e.g. "Scene X: {text}") for correct VEO3 parsing.
 
 TRANSCRIPT:
 """
@@ -421,7 +427,7 @@ Previous scene prompt (for reference/improvement):
 "${previousPrompt || ""}"
 
 Please provide a fresh, significantly improved, highly detailed cinematic video generation prompt for this scene.
-Return ONLY the prompt text, with absolutely no commentary, introduction, or JSON. Just the direct prompt itself in English.
+The prompt MUST be on a single contiguous line of text, containing ONLY the prompt description itself (no prepended "Scene X:" label or headers), with absolutely no commentary, introduction, or JSON. Just the direct prompt itself in English.
 `;
 
     const response = await generateContentWithRetry({
@@ -486,6 +492,11 @@ Strict Requirements:
 2. "description": (If YES) SEO description of exactly 2 paragraphs.
    - First line must be a highly engaging hook.
    - Include high-traffic keywords and a clear Call-To-Action (CTA). No fluff.
+   - POLICY AND MONETIZATION SAFETY COMPLIANCE (CRITICAL): Do NOT use sensitive, overly dramatic medical claims, pseudo-medical claims, or unverified scientific statements that violate monetization policies. Specifically:
+     * NEVER claim quick cures or reverse-health milestones (e.g. do NOT use "in just three weeks", "rapidly reversing", "restoring crystal clear eyesight", "instant cure", "reverses diabetes").
+     * NEVER claim direct biological cure/regulatory statements (e.g. do NOT write "works by regulating insulin resistance", "completely cures blood sugar spikes").
+     * NEVER suggest bypassing standard healthcare or medications (e.g. do NOT write "without expensive medications", "avoid doctors", "alternatives to surgery").
+     * Instead, frame all description insights safely and educationally, focusing on healthy habit discussions, scientific curiosity, educational exploration, and general lifestyle awareness. Use cautious, compliant, and supportive terminology.
 3. "timestamps": (If YES) Chronological list of timestamps outlining the video progression.
    - Automatically detect topic shifts from the transcript.
    - Provide between 8 to 12 chronological chapters starting at "00:00".
@@ -717,6 +728,11 @@ ${transcript}
 """
 - First line must be an engaging hook.
 - Include high-traffic keywords + clear Call-To-Action (CTA). No fluff.
+- POLICY AND MONETIZATION SAFETY COMPLIANCE (CRITICAL): Do NOT use sensitive, overly dramatic medical claims, pseudo-medical claims, or unverified scientific statements that violate monetization policies. Specifically:
+  * NEVER claim quick cures or reverse-health milestones (e.g. do NOT use "in just three weeks", "rapidly reversing", "restoring crystal clear eyesight", "instant cure", "reverses diabetes").
+  * NEVER claim direct biological cure/regulatory statements (e.g. do NOT write "works by regulating insulin resistance", "completely cures blood sugar spikes").
+  * NEVER suggest bypassing standard healthcare or medications (e.g. do NOT write "without expensive medications", "avoid doctors", "alternatives to surgery").
+  * Instead, frame all description insights safely and educationally, focusing on healthy habit discussions, scientific curiosity, educational exploration, and general lifestyle awareness. Use cautious, compliant, and supportive terminology.
 Return the output in the "description" key.`;
       responseSchema = {
         type: Type.OBJECT,
