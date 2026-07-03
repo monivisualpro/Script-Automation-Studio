@@ -318,7 +318,7 @@ app.post("/api/parse-file", async (req, res) => {
 // Divide Transcript into scenes and generate Text-to-Video prompts for each
 app.post("/api/generate-scenes", async (req, res) => {
   try {
-    const { transcript, numScenes, category } = req.body;
+    const { transcript, numScenes, category, format } = req.body;
     if (!transcript || !transcript.trim()) {
       return res.status(400).json({ error: "Transcript is required." });
     }
@@ -327,6 +327,8 @@ app.post("/api/generate-scenes", async (req, res) => {
 
     const ai = getAiClient();
     
+    const formatInstruction = format ? `Ensure the scenes and video prompts are strictly designed and described for a ${format === "16:9" ? "Horizontal (16:9) widescreen landscape" : format === "9:16" ? "Vertical (9:16) portrait format (for Shorts/Reels/TikTok)" : "Square (1:1) format"} aspect ratio. Incorporate appropriate framing, blocking, camera movement guidelines, and vertical/horizontal composition descriptions that match this specific format (e.g., center framing and close-ups for 9:16, wide panoramic views and cinematic horizon lines for 16:9).` : "";
+
     const prompt = `
 You are an award-winning cinematic director and AI prompt engineer specializing in Text-to-Video models (Veo 3, Wan 2.2, Sora).
 Your task is to:
@@ -336,6 +338,7 @@ Your task is to:
 4. Each prompt must:
    - Be optimized for modern video generators like Veo 3 and Wan 2.2.
    - Be EXACTLY aligned with the category field: "${cat}". Do not deviate or add unrelated themes.
+   - ${formatInstruction}
    - For example:
      * If the category is "Health and medical", describe ONLY clinical, medical, healthcare settings, doctors, anatomical details, surgical tools, or health visuals.
      * If the category is "Industrial technology", describe ONLY industrial scenes, heavy machinery, automated assembly lines, robotic arms, factories, or mechanical components.
@@ -409,12 +412,15 @@ You MUST output exactly ${count} scenes. Return the output as a JSON object matc
 // Regenerate single scene prompt
 app.post("/api/regenerate-scene", async (req, res) => {
   try {
-    const { transcript, sceneNumber, totalScenes, category, previousPrompt } = req.body;
+    const { transcript, sceneNumber, totalScenes, category, previousPrompt, format } = req.body;
     const ai = getAiClient();
+
+    const formatInstruction = format ? `Ensure this scene is strictly designed and described for a ${format === "16:9" ? "Horizontal (16:9) widescreen landscape" : format === "9:16" ? "Vertical (9:16) portrait format (for Shorts/Reels/TikTok)" : "Square (1:1) format"} aspect ratio.` : "";
 
     const prompt = `
 You are an expert AI prompt engineer specializing in cinematic Text-to-Video models.
 Regenerate Scene ${sceneNumber} out of ${totalScenes} for a storyboard with content category "${category}".
+${formatInstruction}
 Ensure this scene has smooth visual and narrative continuity with preceding and succeeding scenes based on the overall transcript.
 Optimize it fully for Veo 3 and Wan 2.2 with detailed camera angles, lighting, actions, and consistent styling.
 

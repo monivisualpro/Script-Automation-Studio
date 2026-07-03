@@ -19,7 +19,9 @@ import {
   Sliders,
   Sparkle,
   Search,
-  ExternalLink
+  ExternalLink,
+  Mic,
+  MicOff
 } from "lucide-react";
 
 const CATEGORIES = [
@@ -112,6 +114,7 @@ export default function App() {
   const [transcriptInput, setTranscriptInput] = useState("");
   const [numScenes, setNumScenes] = useState<number>(10);
   const [contentCategory, setContentCategory] = useState("Medical & Health");
+  const [storyboardFormat, setStoryboardFormat] = useState<"16:9" | "9:16" | "1:1">("16:9");
   const [scenes, setScenes] = useState<Array<{ id: number; text: string; isEditing?: boolean; loading?: boolean }>>([]);
   const [scenesLoading, setScenesLoading] = useState(false);
   const [greetingsPrefix, setGreetingsPrefix] = useState("Asslamoalaikum");
@@ -162,6 +165,76 @@ export default function App() {
   // Target Country selection states
   const [selectedCountries, setSelectedCountries] = useState<string[]>([]);
   const [countrySearchQuery, setCountrySearchQuery] = useState("");
+
+  // Speech-to-text states & helper functions
+  const [listeningInput, setListeningInput] = useState<"topic" | "transcript" | "thumbnail" | "rawScript" | "videoTranscript" | null>(null);
+
+  const startSpeechToText = (target: "topic" | "transcript" | "thumbnail" | "rawScript" | "videoTranscript") => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Speech recognition is not supported in your browser. Please try using Google Chrome or Safari.");
+      return;
+    }
+
+    if (listeningInput) {
+      stopSpeechToText();
+    }
+
+    try {
+      const rec = new SpeechRecognition();
+      rec.continuous = false;
+      rec.interimResults = false;
+      rec.lang = ""; 
+
+      rec.onstart = () => {
+        setListeningInput(target);
+      };
+
+      rec.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        if (transcript) {
+          if (target === "topic") {
+            setTopicName((prev) => (prev ? prev + " " + transcript : transcript));
+          } else if (target === "transcript") {
+            setTranscriptInput((prev) => (prev ? prev + " " + transcript : transcript));
+          } else if (target === "thumbnail") {
+            setThumbnailTranscriptInput((prev) => (prev ? prev + " " + transcript : transcript));
+          } else if (target === "rawScript") {
+            setRawScript((prev) => (prev ? prev + " " + transcript : transcript));
+          } else if (target === "videoTranscript") {
+            setVideoTranscriptInput((prev) => (prev ? prev + " " + transcript : transcript));
+          }
+        }
+      };
+
+      rec.onerror = (e: any) => {
+        console.error("Speech recognition error:", e);
+        setListeningInput(null);
+      };
+
+      rec.onend = () => {
+        setListeningInput(null);
+      };
+
+      (window as any)._activeRecognition = rec;
+      rec.start();
+    } catch (err) {
+      console.error("Failed to start speech recognition", err);
+      setListeningInput(null);
+    }
+  };
+
+  const stopSpeechToText = () => {
+    if ((window as any)._activeRecognition) {
+      try {
+        (window as any)._activeRecognition.stop();
+      } catch (err) {
+        console.error(err);
+      }
+      (window as any)._activeRecognition = null;
+    }
+    setListeningInput(null);
+  };
 
   const getActiveBgColor = () => {
     if (bgType === "preset") return thumbBgColor;
@@ -785,6 +858,7 @@ export default function App() {
           transcript: transcriptInput,
           numScenes,
           category: contentCategory,
+          format: storyboardFormat,
         }),
       });
       if (!res.ok) throw new Error("Failed to generate scenes.");
@@ -886,6 +960,7 @@ export default function App() {
           totalScenes: scenes.length,
           category: contentCategory,
           previousPrompt: previous,
+          format: storyboardFormat,
         }),
       });
       if (!res.ok) throw new Error("Failed to regenerate single scene.");
@@ -1796,15 +1871,74 @@ export default function App() {
               <div>
                 {inputSource === "topic" && (
                   <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
-                    <div className="md:col-span-6 space-y-1.5">
+                    <div className="md:col-span-6 space-y-1.5 relative">
                       <label className="text-[10px] font-mono text-[#00FF01] uppercase tracking-wider block">Topic</label>
-                      <input
-                        type="text"
-                        value={topicName}
-                        onChange={(e) => setTopicName(e.target.value)}
-                        placeholder="e.g. Benefits of Intermittent Fasting, Quantum Physics Explained..."
-                        className="w-full bg-[#05290e] border border-green-800 rounded-xl py-2 px-4 text-xs text-white focus:outline-none focus:border-[#00FF01] focus:shadow-[0_0_10px_rgba(0,255,1,0.25)] font-mono transition-all duration-300"
-                      />
+                      <div className="relative flex items-center">
+                        <input
+                          type="text"
+                          value={topicName}
+                          onChange={(e) => setTopicName(e.target.value)}
+                          placeholder="e.g. Benefits of Intermittent Fasting, Quantum Physics Explained..."
+                          className="w-full bg-[#05290e] border border-green-800 rounded-xl py-2 pl-4 pr-10 text-xs text-white focus:outline-none focus:border-[#00FF01] focus:shadow-[0_0_10px_rgba(0,255,1,0.25)] font-mono transition-all duration-300"
+                        />
+                        
+                        {/* Mic Icon / STT button */}
+                        <div className="absolute right-2.5 flex items-center gap-1.5">
+                          {listeningInput === "topic" ? (
+                            <button
+                              type="button"
+                              onClick={stopSpeechToText}
+                              className="p-1 rounded-lg bg-red-950/40 text-red-400 border border-red-900/40 hover:bg-red-900 hover:text-white transition-all cursor-pointer"
+                              title="Stop listening"
+                            >
+                              <MicOff className="h-3.5 w-3.5 animate-pulse text-[#00FF00]" />
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => startSpeechToText("topic")}
+                              className="p-1 rounded-lg bg-green-950/40 text-gray-400 border border-green-900/40 hover:border-[#00FF01] hover:text-[#00FF01] transition-all cursor-pointer"
+                              title="Speech to Text"
+                            >
+                              <Mic className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Gemini STT Animation Wave Overlay */}
+                      <AnimatePresence>
+                        {listeningInput === "topic" && (
+                          <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            className="absolute inset-x-0 bottom-0 top-[18px] bg-black/95 border border-[#00FF01]/60 rounded-xl flex items-center justify-between px-3 z-20"
+                          >
+                            <span className="text-[10px] font-mono text-[#00FF01] uppercase tracking-wider animate-pulse flex items-center gap-1">
+                              <span className="h-2 w-2 rounded-full bg-[#00FF00] animate-ping" />
+                              Listening...
+                            </span>
+                            
+                            {/* Gemini Waveform */}
+                            <div className="flex items-end gap-1 h-5 mr-2">
+                              <motion.div className="w-1 bg-[#00FF00] rounded-full" animate={{ height: ["20%", "80%", "20%"] }} transition={{ duration: 0.6, repeat: Infinity, ease: "easeInOut" }} />
+                              <motion.div className="w-1 bg-[#00FF00] rounded-full" animate={{ height: ["40%", "100%", "40%"] }} transition={{ duration: 0.5, repeat: Infinity, ease: "easeInOut", delay: 0.1 }} />
+                              <motion.div className="w-1 bg-[#00FF00] rounded-full" animate={{ height: ["15%", "75%", "15%"] }} transition={{ duration: 0.7, repeat: Infinity, ease: "easeInOut", delay: 0.25 }} />
+                              <motion.div className="w-1 bg-[#00FF00] rounded-full" animate={{ height: ["50%", "90%", "50%"] }} transition={{ duration: 0.4, repeat: Infinity, ease: "easeInOut", delay: 0.15 }} />
+                              <motion.div className="w-1 bg-[#00FF00] rounded-full" animate={{ height: ["25%", "60%", "25%"] }} transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut", delay: 0.3 }} />
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={stopSpeechToText}
+                              className="text-[9px] font-mono text-white hover:text-[#00FF01] px-1.5 py-0.5 rounded bg-red-950/40 border border-red-900/40 transition-all hover:bg-red-900"
+                            >
+                              Stop
+                            </button>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
                     <div className="md:col-span-3 space-y-1.5">
                       <label className="text-[10px] font-mono text-[#00FF01] uppercase tracking-wider block">Word Count Limit</label>
@@ -2005,18 +2139,82 @@ export default function App() {
                     value={rawScript}
                     onChange={(e) => setRawScript(e.target.value)}
                     placeholder="Provide your script, video notes, medical findings, or tech ideas here. Any input language is supported. The engine completely rewrites your ideas into highly fluent wording with no plagiarism..."
-                    className="w-full h-full bg-transparent resize-none p-5 text-xs md:text-sm text-gray-200 focus:outline-none placeholder-gray-600 leading-relaxed font-mono transition-all duration-300 hover:bg-[#00FF01]/2 focus:bg-[#031d0a]/30"
+                    className="w-full h-full bg-transparent resize-none p-5 text-xs md:text-sm text-gray-200 focus:outline-none placeholder-gray-600 leading-relaxed font-mono transition-all duration-300 hover:bg-[#00FF01]/2 focus:bg-[#031d0a]/30 pr-12"
                   />
-                  {rawScript && (
-                    <button
-                      id="btn-clear-raw"
-                      onClick={() => setRawScript("")}
-                      className="absolute bottom-4 right-4 p-2 rounded-xl bg-red-950/30 text-red-400 border border-red-900/40 hover:bg-red-900 hover:text-white transition-all duration-300 cursor-pointer hover:scale-105 active:scale-95 glow-on-hover"
-                      title="Clear text"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  )}
+                  
+                  {/* Controls container in bottom right corner */}
+                  <div className="absolute bottom-4 right-4 flex items-center gap-2 z-10">
+                    {listeningInput === "rawScript" ? (
+                      <button
+                        type="button"
+                        onClick={stopSpeechToText}
+                        className="p-2.5 rounded-full bg-red-950/80 text-red-400 border border-red-800/80 hover:bg-red-900 transition-all cursor-pointer shadow-lg flex items-center justify-center"
+                        title="Stop speech-to-text"
+                      >
+                        <MicOff className="h-4 w-4 animate-bounce text-[#00FF00]" />
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => startSpeechToText("rawScript")}
+                        className="p-2.5 rounded-full bg-green-950/85 text-gray-300 border border-green-800/80 hover:border-[#00FF01] hover:text-[#00FF01] hover:bg-green-900/30 transition-all cursor-pointer shadow-lg flex items-center justify-center hover:scale-110 active:scale-95"
+                        title="Speak to enter script"
+                      >
+                        <Mic className="h-4 w-4" />
+                      </button>
+                    )}
+
+                    {rawScript && (
+                      <button
+                        id="btn-clear-raw"
+                        onClick={() => setRawScript("")}
+                        className="p-2 rounded-xl bg-red-950/30 text-red-400 border border-red-900/40 hover:bg-red-900 hover:text-white transition-all duration-300 cursor-pointer hover:scale-105 active:scale-95"
+                        title="Clear text"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Gemini listening wave animation overlay */}
+                  <AnimatePresence>
+                    {listeningInput === "rawScript" && (
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="absolute inset-0 bg-black/95 backdrop-blur-md flex flex-col items-center justify-center p-6 space-y-5 z-20"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="h-3 w-3 rounded-full bg-[#00FF00] animate-ping" />
+                          <h3 className="text-sm font-mono text-[#00FF01] uppercase tracking-widest font-black">
+                            Gemini Voice Scriptwriter Active
+                          </h3>
+                        </div>
+                        <p className="text-xs text-gray-400 max-w-sm text-center leading-relaxed font-mono">
+                          Speak your script ideas, narration drafts, or notes. Your voice is captured in real-time.
+                        </p>
+                        
+                        {/* Gemini Waveform */}
+                        <div className="flex items-end gap-1.5 h-10 px-6 py-2 bg-green-950/20 rounded-full border border-green-900/40">
+                          <motion.div className="w-1.5 bg-[#00FF00] rounded-full" animate={{ height: ["15%", "85%", "15%"] }} transition={{ duration: 0.6, repeat: Infinity, ease: "easeInOut" }} />
+                          <motion.div className="w-1.5 bg-[#00FF00] rounded-full" animate={{ height: ["40%", "100%", "40%"] }} transition={{ duration: 0.5, repeat: Infinity, ease: "easeInOut", delay: 0.08 }} />
+                          <motion.div className="w-1.5 bg-[#00FF00] rounded-full" animate={{ height: ["20%", "70%", "20%"] }} transition={{ duration: 0.7, repeat: Infinity, ease: "easeInOut", delay: 0.16 }} />
+                          <motion.div className="w-1.5 bg-[#00FF00] rounded-full" animate={{ height: ["50%", "95%", "50%"] }} transition={{ duration: 0.4, repeat: Infinity, ease: "easeInOut", delay: 0.12 }} />
+                          <motion.div className="w-1.5 bg-[#00FF00] rounded-full" animate={{ height: ["10%", "60%", "10%"] }} transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut", delay: 0.2 }} />
+                          <motion.div className="w-1.5 bg-[#00FF00] rounded-full" animate={{ height: ["35%", "80%", "35%"] }} transition={{ duration: 0.55, repeat: Infinity, ease: "easeInOut", delay: 0.14 }} />
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={stopSpeechToText}
+                          className="px-5 py-2 rounded-xl bg-red-950/30 hover:bg-red-900 border border-red-900/60 text-red-200 text-xs font-mono transition-all cursor-pointer hover:scale-105"
+                        >
+                          Finish & Save Script
+                        </button>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               </div>
 
@@ -2294,6 +2492,21 @@ export default function App() {
                         className="hidden"
                       />
                     </label>
+
+                    {/* Aspect Ratio Format Dropdown */}
+                    <div className="flex items-center gap-1.5 bg-black/40 px-2.5 py-1.5 rounded-[17px] border border-green-800/60 hover:border-[#00FF01]/40 transition-all duration-300">
+                      <span className="text-[9px] text-gray-400 font-mono">FORMAT:</span>
+                      <select
+                        value={storyboardFormat}
+                        onChange={(e) => setStoryboardFormat(e.target.value as any)}
+                        className="bg-transparent text-[10px] text-[#00FF01] font-mono focus:outline-none font-bold cursor-pointer outline-none"
+                        style={{ colorScheme: "dark" }}
+                      >
+                        <option value="16:9" className="bg-[#05290e] text-[#00FF01]">Horizontal (16:9)</option>
+                        <option value="9:16" className="bg-[#05290e] text-[#00FF01]">Vertical (9:16)</option>
+                        <option value="1:1" className="bg-[#05290e] text-[#00FF01]">Square (1:1)</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
 
@@ -2304,6 +2517,69 @@ export default function App() {
                     placeholder="Paste complete raw transcript here. Specify the Number of Scenes and Content Category above, then hit Generate Scene Prompts..."
                     className="flex-1 bg-transparent resize-none p-5 text-xs md:text-sm text-gray-200 focus:outline-none placeholder-gray-600 leading-relaxed font-mono transition-all duration-300 hover:bg-[#00FF01]/2 focus:bg-[#031d0a]/30"
                   />
+
+                  {/* Speech to Text Floating Activator */}
+                  <div className="absolute bottom-4 right-4 flex items-center gap-2">
+                    {listeningInput === "transcript" ? (
+                      <button
+                        type="button"
+                        onClick={stopSpeechToText}
+                        className="p-2.5 rounded-full bg-red-950/80 text-red-400 border border-red-800/80 hover:bg-red-900 transition-all cursor-pointer shadow-lg flex items-center justify-center"
+                        title="Stop speech-to-text"
+                      >
+                        <MicOff className="h-4 w-4 animate-bounce text-[#00FF00]" />
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => startSpeechToText("transcript")}
+                        className="p-2.5 rounded-full bg-green-950/85 text-gray-300 border border-green-800/80 hover:border-[#00FF01] hover:text-[#00FF01] hover:bg-green-900/30 transition-all cursor-pointer shadow-lg flex items-center justify-center hover:scale-110 active:scale-95"
+                        title="Speak to enter transcript / explain scene"
+                      >
+                        <Mic className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Gemini listening wave animation overlay */}
+                  <AnimatePresence>
+                    {listeningInput === "transcript" && (
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="absolute inset-0 bg-black/95 backdrop-blur-md flex flex-col items-center justify-center p-6 space-y-5 z-20"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="h-3 w-3 rounded-full bg-[#00FF00] animate-ping" />
+                          <h3 className="text-sm font-mono text-[#00FF01] uppercase tracking-widest font-black">
+                            Gemini Voice Explainer Active
+                          </h3>
+                        </div>
+                        <p className="text-xs text-gray-400 max-w-sm text-center leading-relaxed font-mono">
+                          Speak your scene idea or raw narration naturally. Your speech will be transcribed and added directly as a storyboard segment.
+                        </p>
+                        
+                        {/* Gemini Waveform */}
+                        <div className="flex items-end gap-1.5 h-10 px-6 py-2 bg-green-950/20 rounded-full border border-green-900/40">
+                          <motion.div className="w-1.5 bg-[#00FF00] rounded-full" animate={{ height: ["15%", "85%", "15%"] }} transition={{ duration: 0.6, repeat: Infinity, ease: "easeInOut" }} />
+                          <motion.div className="w-1.5 bg-[#00FF00] rounded-full" animate={{ height: ["40%", "100%", "40%"] }} transition={{ duration: 0.5, repeat: Infinity, ease: "easeInOut", delay: 0.08 }} />
+                          <motion.div className="w-1.5 bg-[#00FF00] rounded-full" animate={{ height: ["20%", "70%", "20%"] }} transition={{ duration: 0.7, repeat: Infinity, ease: "easeInOut", delay: 0.16 }} />
+                          <motion.div className="w-1.5 bg-[#00FF00] rounded-full" animate={{ height: ["50%", "95%", "50%"] }} transition={{ duration: 0.4, repeat: Infinity, ease: "easeInOut", delay: 0.12 }} />
+                          <motion.div className="w-1.5 bg-[#00FF00] rounded-full" animate={{ height: ["10%", "60%", "10%"] }} transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut", delay: 0.2 }} />
+                          <motion.div className="w-1.5 bg-[#00FF00] rounded-full" animate={{ height: ["35%", "80%", "35%"] }} transition={{ duration: 0.55, repeat: Infinity, ease: "easeInOut", delay: 0.14 }} />
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={stopSpeechToText}
+                          className="px-5 py-2 rounded-xl bg-red-950/30 hover:bg-red-900 border border-red-900/60 text-red-200 text-xs font-mono transition-all cursor-pointer hover:scale-105"
+                        >
+                          Finish & Save Input
+                        </button>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               </div>
 
@@ -2469,17 +2745,81 @@ export default function App() {
                         value={videoTranscriptInput}
                         onChange={(e) => setVideoTranscriptInput(e.target.value)}
                         placeholder="Paste complete video transcript here to auto-generate fully optimized, high-CTR metadata titles, description, timestamps, hashtags, and tags..."
-                        className="w-full h-full bg-transparent resize-none p-4 text-xs md:text-sm text-gray-200 focus:outline-none placeholder-gray-600 leading-relaxed font-mono focus:bg-[#031d0a]/30"
+                        className="w-full h-full bg-transparent resize-none p-4 text-xs md:text-sm text-gray-200 focus:outline-none placeholder-gray-600 leading-relaxed font-mono focus:bg-[#031d0a]/30 pr-12"
                       />
-                      {videoTranscriptInput && (
-                        <button
-                          onClick={() => setVideoTranscriptInput("")}
-                          className="absolute bottom-4 right-4 p-2 rounded-xl bg-red-950/30 text-red-400 border border-red-900/40 hover:bg-red-900 hover:text-white transition-all duration-300 cursor-pointer hover:scale-105"
-                          title="Clear transcript input"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      )}
+                      
+                      {/* Controls container in bottom right corner */}
+                      <div className="absolute bottom-4 right-4 flex items-center gap-2 z-10">
+                        {listeningInput === "videoTranscript" ? (
+                          <button
+                            type="button"
+                            onClick={stopSpeechToText}
+                            className="p-2.5 rounded-full bg-red-950/80 text-red-400 border border-red-800/80 hover:bg-red-900 transition-all cursor-pointer shadow-lg flex items-center justify-center"
+                            title="Stop speech-to-text"
+                          >
+                            <MicOff className="h-4 w-4 animate-bounce text-[#00FF00]" />
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => startSpeechToText("videoTranscript")}
+                            className="p-2.5 rounded-full bg-green-950/85 text-gray-300 border border-green-800/80 hover:border-[#00FF01] hover:text-[#00FF01] hover:bg-green-900/30 transition-all cursor-pointer shadow-lg flex items-center justify-center hover:scale-110 active:scale-95"
+                            title="Speak to enter video transcript"
+                          >
+                            <Mic className="h-4 w-4" />
+                          </button>
+                        )}
+
+                        {videoTranscriptInput && (
+                          <button
+                            onClick={() => setVideoTranscriptInput("")}
+                            className="p-2 rounded-xl bg-red-950/30 text-red-400 border border-red-900/40 hover:bg-red-900 hover:text-white transition-all duration-300 cursor-pointer hover:scale-105"
+                            title="Clear transcript input"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Gemini listening wave animation overlay */}
+                      <AnimatePresence>
+                        {listeningInput === "videoTranscript" && (
+                          <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="absolute inset-0 bg-black/95 backdrop-blur-md flex flex-col items-center justify-center p-6 space-y-5 z-20"
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="h-3 w-3 rounded-full bg-[#00FF00] animate-ping" />
+                              <h3 className="text-sm font-mono text-[#00FF01] uppercase tracking-widest font-black">
+                                Gemini Voice Explainer Active
+                              </h3>
+                            </div>
+                            <p className="text-xs text-gray-400 max-w-sm text-center leading-relaxed font-mono">
+                              Speak or read your video transcript naturally. Your voice is captured in real-time to generate optimized YouTube metadata.
+                            </p>
+                            
+                            {/* Gemini Waveform */}
+                            <div className="flex items-end gap-1.5 h-10 px-6 py-2 bg-green-950/20 rounded-full border border-green-900/40">
+                              <motion.div className="w-1.5 bg-[#00FF00] rounded-full" animate={{ height: ["15%", "85%", "15%"] }} transition={{ duration: 0.6, repeat: Infinity, ease: "easeInOut" }} />
+                              <motion.div className="w-1.5 bg-[#00FF00] rounded-full" animate={{ height: ["40%", "100%", "40%"] }} transition={{ duration: 0.5, repeat: Infinity, ease: "easeInOut", delay: 0.08 }} />
+                              <motion.div className="w-1.5 bg-[#00FF00] rounded-full" animate={{ height: ["20%", "70%", "20%"] }} transition={{ duration: 0.7, repeat: Infinity, ease: "easeInOut", delay: 0.16 }} />
+                              <motion.div className="w-1.5 bg-[#00FF00] rounded-full" animate={{ height: ["50%", "95%", "50%"] }} transition={{ duration: 0.4, repeat: Infinity, ease: "easeInOut", delay: 0.12 }} />
+                              <motion.div className="w-1.5 bg-[#00FF00] rounded-full" animate={{ height: ["10%", "60%", "10%"] }} transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut", delay: 0.2 }} />
+                              <motion.div className="w-1.5 bg-[#00FF00] rounded-full" animate={{ height: ["35%", "80%", "35%"] }} transition={{ duration: 0.55, repeat: Infinity, ease: "easeInOut", delay: 0.14 }} />
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={stopSpeechToText}
+                              className="px-5 py-2 rounded-xl bg-red-950/30 hover:bg-red-900 border border-red-900/60 text-red-200 text-xs font-mono transition-all cursor-pointer hover:scale-105"
+                            >
+                              Finish & Save Transcript
+                            </button>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
                   </div>
 
@@ -2759,15 +3099,79 @@ export default function App() {
                         placeholder="Paste voice transcript segment or complete text here. Specify design parameters on the left to direct thumbnail graphic concepts..."
                         className="w-full h-full bg-transparent resize-none p-4 text-xs md:text-sm text-gray-200 focus:outline-none placeholder-gray-600 leading-relaxed font-mono focus:bg-[#031d0a]/30"
                       />
-                      {thumbnailTranscriptInput && (
-                        <button
-                          onClick={() => setThumbnailTranscriptInput("")}
-                          className="absolute bottom-4 right-4 p-2 rounded-xl bg-red-950/30 text-red-400 border border-red-900/40 hover:bg-red-900 hover:text-white transition-all duration-300 cursor-pointer hover:scale-105"
-                          title="Clear transcript input"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      )}
+                      
+                      {/* Controls container in bottom right corner */}
+                      <div className="absolute bottom-4 right-4 flex items-center gap-2 z-10">
+                        {listeningInput === "thumbnail" ? (
+                          <button
+                            type="button"
+                            onClick={stopSpeechToText}
+                            className="p-2.5 rounded-full bg-red-950/80 text-red-400 border border-red-800/80 hover:bg-red-900 transition-all cursor-pointer shadow-lg flex items-center justify-center"
+                            title="Stop speech-to-text"
+                          >
+                            <MicOff className="h-4 w-4 animate-bounce text-[#00FF00]" />
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => startSpeechToText("thumbnail")}
+                            className="p-2.5 rounded-full bg-green-950/85 text-gray-300 border border-green-800/80 hover:border-[#00FF01] hover:text-[#00FF01] hover:bg-green-900/30 transition-all cursor-pointer shadow-lg flex items-center justify-center hover:scale-110 active:scale-95"
+                            title="Speak to enter thumbnail details"
+                          >
+                            <Mic className="h-4 w-4" />
+                          </button>
+                        )}
+
+                        {thumbnailTranscriptInput && (
+                          <button
+                            onClick={() => setThumbnailTranscriptInput("")}
+                            className="p-2 rounded-xl bg-red-950/30 text-red-400 border border-red-900/40 hover:bg-red-900 hover:text-white transition-all duration-300 cursor-pointer hover:scale-105"
+                            title="Clear transcript input"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Gemini listening wave animation overlay */}
+                      <AnimatePresence>
+                        {listeningInput === "thumbnail" && (
+                          <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="absolute inset-0 bg-black/95 backdrop-blur-md flex flex-col items-center justify-center p-6 space-y-5 z-20"
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="h-3 w-3 rounded-full bg-[#00FF00] animate-ping" />
+                              <h3 className="text-sm font-mono text-[#00FF01] uppercase tracking-widest font-black">
+                                Gemini Voice Explainer Active
+                              </h3>
+                            </div>
+                            <p className="text-xs text-gray-400 max-w-sm text-center leading-relaxed font-mono">
+                              Explain your thumbnail concept or transcript context. Your voice will be transcribed directly to guide thumbnail prompt synthesis.
+                            </p>
+                            
+                            {/* Gemini Waveform */}
+                            <div className="flex items-end gap-1.5 h-10 px-6 py-2 bg-green-950/20 rounded-full border border-green-900/40">
+                              <motion.div className="w-1.5 bg-[#00FF00] rounded-full" animate={{ height: ["15%", "85%", "15%"] }} transition={{ duration: 0.6, repeat: Infinity, ease: "easeInOut" }} />
+                              <motion.div className="w-1.5 bg-[#00FF00] rounded-full" animate={{ height: ["40%", "100%", "40%"] }} transition={{ duration: 0.5, repeat: Infinity, ease: "easeInOut", delay: 0.08 }} />
+                              <motion.div className="w-1.5 bg-[#00FF00] rounded-full" animate={{ height: ["20%", "70%", "20%"] }} transition={{ duration: 0.7, repeat: Infinity, ease: "easeInOut", delay: 0.16 }} />
+                              <motion.div className="w-1.5 bg-[#00FF00] rounded-full" animate={{ height: ["50%", "95%", "50%"] }} transition={{ duration: 0.4, repeat: Infinity, ease: "easeInOut", delay: 0.12 }} />
+                              <motion.div className="w-1.5 bg-[#00FF00] rounded-full" animate={{ height: ["10%", "60%", "10%"] }} transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut", delay: 0.2 }} />
+                              <motion.div className="w-1.5 bg-[#00FF00] rounded-full" animate={{ height: ["35%", "80%", "35%"] }} transition={{ duration: 0.55, repeat: Infinity, ease: "easeInOut", delay: 0.14 }} />
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={stopSpeechToText}
+                              className="px-5 py-2 rounded-xl bg-red-950/30 hover:bg-red-900 border border-red-900/60 text-red-200 text-xs font-mono transition-all cursor-pointer hover:scale-105"
+                            >
+                              Finish & Save Input
+                            </button>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
                   </div>
 
