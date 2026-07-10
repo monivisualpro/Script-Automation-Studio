@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 
 const CATEGORIES = [
+  "Islamic",
   "Medical & Health",
   "Software Engineering",
   "Computer Science",
@@ -158,6 +159,8 @@ export default function App() {
   const [thumbHeadline, setThumbHeadline] = useState("");
   const [thumbSmallTagline, setThumbSmallTagline] = useState("");
   const [thumbTextColor, setThumbTextColor] = useState("Neon Green (#00FF01) & White");
+  const [thumbnailFormat, setThumbnailFormat] = useState<"16:9" | "9:16" | "1:1" | "none">("16:9");
+  const [thumbnailEngine, setThumbnailEngine] = useState<"nano_banana" | "flux1">("nano_banana");
 
   // Custom Color Picker & Gradient States
   const [bgType, setBgType] = useState<"preset" | "custom_solid" | "custom_gradient">("preset");
@@ -500,6 +503,8 @@ export default function App() {
           smallTagline: thumbSmallTagline,
           textColor: getActiveTextColor(),
           niche: topicNiche,
+          format: thumbnailFormat,
+          engine: thumbnailEngine,
         }),
       });
 
@@ -552,12 +557,34 @@ export default function App() {
   const formatThumbnailOutputText = (data: any) => {
     if (!data) return "";
     let txt = "";
-    txt += "=== CINEMATIC THUMBNAIL PROMPT ===\n";
-    txt += data.thumbnailPrompt + "\n\n";
-    txt += "=== MAIN URDU HEADLINE ===\n";
-    txt += data.headlineUrdu + "\n\n";
-    txt += "=== SMALL TAGLINE ===\n";
-    txt += data.smallTaglineUrdu + "\n";
+    if (data.engine === "flux1") {
+      txt += "=== 1️⃣ Scene Prompt (Positive Box) — English, NO Urdu ===\n";
+      txt += (data.fluxScenePrompt || data.thumbnailPrompt) + "\n\n";
+      txt += "=== 2️⃣ Negative Prompt (Anti-Text) ===\n";
+      txt += (data.fluxNegativePrompt || "low quality, blurry, bad anatomy, deformed, extra fingers, text, letters, words, watermark, gibberish script, distorted") + "\n\n";
+      txt += "=== 3️⃣ Urdu Poster Text Overlay Fields ===\n";
+      if (data.overlayFields) {
+        txt += `heading_text: ${data.overlayFields.heading_text}\n`;
+        txt += `tagline_text: ${data.overlayFields.tagline_text}\n`;
+        txt += `text_color: ${data.overlayFields.text_color}\n`;
+        txt += `stroke_color: ${data.overlayFields.stroke_color}\n`;
+        txt += `stroke_width: ${data.overlayFields.stroke_width}\n`;
+        txt += `heading_y_percent: ${data.overlayFields.heading_y_percent}\n`;
+        txt += `tagline_y_percent: ${data.overlayFields.tagline_y_percent}\n\n`;
+      } else {
+        txt += "None\n\n";
+      }
+      txt += "=== 4️⃣ EmptyLatentImage Size ===\n";
+      txt += `Width: ${data.emptyLatentImage?.width || 1024}\n`;
+      txt += `Height: ${data.emptyLatentImage?.height || 1820}\n`;
+    } else {
+      txt += "=== CINEMATIC THUMBNAIL PROMPT ===\n";
+      txt += data.thumbnailPrompt + "\n\n";
+      txt += "=== MAIN URDU HEADLINE ===\n";
+      txt += data.headlineUrdu + "\n\n";
+      txt += "=== SMALL TAGLINE ===\n";
+      txt += data.smallTaglineUrdu + "\n";
+    }
     return txt.trim();
   };
 
@@ -1109,6 +1136,7 @@ export default function App() {
                 className="w-full bg-[#05290e] border border-green-800 rounded-xl py-2.5 px-4 text-xs text-white focus:outline-none focus:border-[#00FF01] focus:shadow-[0_0_15px_rgba(0,255,1,0.25)] font-mono cursor-pointer transition-all duration-300 hover:border-[#00FF01] glow-on-hover"
               >
                 <option value="Warm Friendly Conversational">Warm Friendly Conversational</option>
+                <option value="Islamic / Religious Tone">Islamic / Religious Tone</option>
                 <option value="Engaging Food Blogger Vibe">Engaging Food Blogger Vibe</option>
                 <option value="Fast Paced Explainer (YouTube FB)">Fast Paced Explainer (YouTube FB)</option>
                 <option value="Informative Health Explainer">Informative Health Explainer</option>
@@ -3356,52 +3384,161 @@ export default function App() {
                           <p className="text-[10px] font-mono text-[#00FF01] uppercase tracking-wider animate-pulse">COMPOSING HIGH-CTR IMAGE METRICS...</p>
                         </div>
                       ) : thumbnailOutput ? (
-                        <div className="space-y-4 text-xs select-text">
-                          {/* ENGLISH PROMPT SPECIFICATION */}
-                          <div className="p-3 rounded-xl border border-green-900/80 bg-green-950/10 space-y-2">
-                            <div className="flex justify-between items-center border-b border-green-900/50 pb-1.5">
-                              <span className="font-mono font-bold text-[#00FF01]">🖼️ CINEMATIC VISUAL SPECIFICATION</span>
-                              <button
-                                onClick={() => handleCopyText(thumbnailOutput.thumbnailPrompt, "Visual Prompt")}
-                                className="p-1 text-[9px] bg-black/40 text-gray-400 hover:text-[#00FF01] rounded border border-green-900 cursor-pointer"
-                              >
-                                Copy Specification
-                              </button>
-                            </div>
-                            <p className="font-sans text-gray-300 leading-relaxed text-xs">{thumbnailOutput.thumbnailPrompt}</p>
-                          </div>
+                        <div className="space-y-4 text-xs select-text animate-[fadeIn_0.4s_ease-out]">
+                          {thumbnailOutput.engine === "flux1" ? (
+                            <>
+                              {/* FLUX 1 SCENE PROMPT */}
+                              <div className="p-3 rounded-xl border border-green-900/80 bg-green-950/10 space-y-2">
+                                <div className="flex justify-between items-center border-b border-green-900/50 pb-1.5">
+                                  <span className="font-mono font-bold text-[#00FF01]">1️⃣ Scene Prompt (Positive) — English, NO Urdu</span>
+                                  <button
+                                    onClick={() => handleCopyText(thumbnailOutput.fluxScenePrompt || thumbnailOutput.thumbnailPrompt, "Scene Prompt")}
+                                    className="p-1 text-[9px] bg-black/40 text-gray-400 hover:text-[#00FF01] rounded border border-green-900 cursor-pointer"
+                                  >
+                                    Copy Scene Prompt
+                                  </button>
+                                </div>
+                                <p className="font-sans text-gray-300 leading-relaxed text-xs">{thumbnailOutput.fluxScenePrompt || thumbnailOutput.thumbnailPrompt}</p>
+                              </div>
 
-                          {/* URDU HEADLINE */}
-                          <div className="p-3 rounded-xl border border-green-900/80 bg-green-950/10 space-y-2">
-                            <div className="flex justify-between items-center border-b border-green-900/50 pb-1.5">
-                              <span className="font-mono font-bold text-[#00FF01]">🇵🇰 URDU OVERLAY HEADLINE</span>
-                              <button
-                                onClick={() => handleCopyText(thumbnailOutput.headlineUrdu, "Urdu Headline")}
-                                className="p-1 text-[9px] bg-black/40 text-gray-400 hover:text-[#00FF01] rounded border border-green-900 cursor-pointer"
-                              >
-                                Copy text
-                              </button>
-                            </div>
-                            <p className="font-urdu text-right text-lg text-white font-bold tracking-wide py-2 leading-relaxed font-semibold" dir="rtl">
-                              {thumbnailOutput.headlineUrdu}
-                            </p>
-                          </div>
+                              {/* FLUX 1 NEGATIVE PROMPT */}
+                              <div className="p-3 rounded-xl border border-green-900/80 bg-green-950/10 space-y-2">
+                                <div className="flex justify-between items-center border-b border-green-900/50 pb-1.5">
+                                  <span className="font-mono font-bold text-[#00FF01]">2️⃣ Negative Prompt (Anti-Text)</span>
+                                  <button
+                                    onClick={() => handleCopyText(thumbnailOutput.fluxNegativePrompt || "low quality, blurry, bad anatomy, deformed hands, extra fingers, text, letters, words, watermark, gibberish script, distorted face, cartoon", "Negative Prompt")}
+                                    className="p-1 text-[9px] bg-black/40 text-gray-400 hover:text-[#00FF01] rounded border border-green-900 cursor-pointer"
+                                  >
+                                    Copy Negative
+                                  </button>
+                                </div>
+                                <p className="font-sans text-gray-400 text-xs italic">
+                                  {thumbnailOutput.fluxNegativePrompt || "low quality, blurry, bad anatomy, deformed hands, extra fingers, text, letters, words, watermark, gibberish script, distorted face, cartoon"}
+                                </p>
+                              </div>
 
-                          {/* URDU TAGLINE */}
-                          <div className="p-3 rounded-xl border border-green-900/80 bg-green-950/10 space-y-2">
-                            <div className="flex justify-between items-center border-b border-green-900/50 pb-1.5">
-                              <span className="font-mono font-bold text-[#00FF01]">🇵🇰 URDU OVERLAY TAGLINE</span>
-                              <button
-                                onClick={() => handleCopyText(thumbnailOutput.smallTaglineUrdu, "Urdu Tagline")}
-                                className="p-1 text-[9px] bg-black/40 text-gray-400 hover:text-[#00FF01] rounded border border-green-900 cursor-pointer"
-                              >
-                                Copy text
-                              </button>
-                            </div>
-                            <p className="font-urdu text-right text-base text-gray-300 py-1 leading-relaxed" dir="rtl">
-                              {thumbnailOutput.smallTaglineUrdu}
-                            </p>
-                          </div>
+                              {/* FLUX 1 URDU POSTER TEXT OVERLAY NODE FIELDS */}
+                              <div className="p-3 rounded-xl border border-green-900/80 bg-green-950/10 space-y-2">
+                                <div className="flex justify-between items-center border-b border-green-900/50 pb-1.5">
+                                  <span className="font-mono font-bold text-[#00FF01]">3️⃣ Urdu Poster Text Overlay Fields</span>
+                                  <button
+                                    onClick={() => {
+                                      const fieldsStr = thumbnailOutput.overlayFields
+                                        ? Object.entries(thumbnailOutput.overlayFields)
+                                            .map(([key, val]) => `${key}: ${val}`)
+                                            .join("\n")
+                                        : "";
+                                      handleCopyText(fieldsStr, "Overlay Fields");
+                                    }}
+                                    className="p-1 text-[9px] bg-black/40 text-gray-400 hover:text-[#00FF01] rounded border border-green-900 cursor-pointer"
+                                  >
+                                    Copy Fields
+                                  </button>
+                                </div>
+                                <div className="font-mono text-[10px] space-y-1 bg-black/35 p-2.5 rounded-lg border border-green-900/40">
+                                  {thumbnailOutput.overlayFields ? (
+                                    <>
+                                      <div className="flex justify-between py-0.5 border-b border-green-950/20">
+                                        <span className="text-gray-400">heading_text</span>
+                                        <span className="text-[#00FF01] font-urdu" dir="rtl">{thumbnailOutput.overlayFields.heading_text}</span>
+                                      </div>
+                                      <div className="flex justify-between py-0.5 border-b border-green-950/20">
+                                        <span className="text-gray-400">tagline_text</span>
+                                        <span className="text-[#00FF01] font-urdu" dir="rtl">{thumbnailOutput.overlayFields.tagline_text}</span>
+                                      </div>
+                                      <div className="flex justify-between py-0.5 border-b border-green-950/20">
+                                        <span className="text-gray-400">text_color</span>
+                                        <span className="text-white font-bold">{thumbnailOutput.overlayFields.text_color}</span>
+                                      </div>
+                                      <div className="flex justify-between py-0.5 border-b border-green-950/20">
+                                        <span className="text-gray-400">stroke_color</span>
+                                        <span className="text-[#00FF01] font-bold">{thumbnailOutput.overlayFields.stroke_color}</span>
+                                      </div>
+                                      <div className="flex justify-between py-0.5 border-b border-green-950/20">
+                                        <span className="text-gray-400">stroke_width</span>
+                                        <span className="text-white">{thumbnailOutput.overlayFields.stroke_width}</span>
+                                      </div>
+                                      <div className="flex justify-between py-0.5 border-b border-green-950/20">
+                                        <span className="text-gray-400">heading_y_percent</span>
+                                        <span className="text-white">{thumbnailOutput.overlayFields.heading_y_percent}</span>
+                                      </div>
+                                      <div className="flex justify-between py-0.5">
+                                        <span className="text-gray-400">tagline_y_percent</span>
+                                        <span className="text-white">{thumbnailOutput.overlayFields.tagline_y_percent}</span>
+                                      </div>
+                                    </>
+                                  ) : (
+                                    <p className="text-gray-500">No fields specified.</p>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* FLUX 1 EMPTY LATENT IMAGE */}
+                              <div className="p-3 rounded-xl border border-green-900/80 bg-green-950/10 space-y-2">
+                                <div className="flex justify-between items-center border-b border-green-900/50 pb-1.5">
+                                  <span className="font-mono font-bold text-[#00FF01]">4️⃣ EmptyLatentImage Size</span>
+                                </div>
+                                <div className="flex gap-4 font-mono text-[10px] bg-black/35 p-2.5 rounded-lg border border-green-900/40 justify-around">
+                                  <div>
+                                    <span className="text-gray-400">Width: </span>
+                                    <span className="text-[#00FF01] font-bold">{thumbnailOutput.emptyLatentImage?.width || 1024}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-400">Height: </span>
+                                    <span className="text-[#00FF01] font-bold">{thumbnailOutput.emptyLatentImage?.height || 1820}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              {/* ENGLISH PROMPT SPECIFICATION */}
+                              <div className="p-3 rounded-xl border border-green-900/80 bg-green-950/10 space-y-2">
+                                <div className="flex justify-between items-center border-b border-green-900/50 pb-1.5">
+                                  <span className="font-mono font-bold text-[#00FF01]">🖼️ CINEMATIC VISUAL SPECIFICATION</span>
+                                  <button
+                                    onClick={() => handleCopyText(thumbnailOutput.thumbnailPrompt, "Visual Prompt")}
+                                    className="p-1 text-[9px] bg-black/40 text-gray-400 hover:text-[#00FF01] rounded border border-green-900 cursor-pointer"
+                                  >
+                                    Copy Specification
+                                  </button>
+                                </div>
+                                <p className="font-sans text-gray-300 leading-relaxed text-xs">{thumbnailOutput.thumbnailPrompt}</p>
+                              </div>
+
+                              {/* URDU HEADLINE */}
+                              <div className="p-3 rounded-xl border border-green-900/80 bg-green-950/10 space-y-2">
+                                <div className="flex justify-between items-center border-b border-green-900/50 pb-1.5">
+                                  <span className="font-mono font-bold text-[#00FF01]">🇵🇰 URDU OVERLAY HEADLINE</span>
+                                  <button
+                                    onClick={() => handleCopyText(thumbnailOutput.headlineUrdu, "Urdu Headline")}
+                                    className="p-1 text-[9px] bg-black/40 text-gray-400 hover:text-[#00FF01] rounded border border-green-900 cursor-pointer"
+                                  >
+                                    Copy text
+                                  </button>
+                                </div>
+                                <p className="font-urdu text-right text-lg text-white font-bold tracking-wide py-2 leading-relaxed font-semibold" dir="rtl">
+                                  {thumbnailOutput.headlineUrdu}
+                                </p>
+                              </div>
+
+                              {/* URDU TAGLINE */}
+                              <div className="p-3 rounded-xl border border-green-900/80 bg-green-950/10 space-y-2">
+                                <div className="flex justify-between items-center border-b border-green-900/50 pb-1.5">
+                                  <span className="font-mono font-bold text-[#00FF01]">🇵🇰 URDU OVERLAY TAGLINE</span>
+                                  <button
+                                    onClick={() => handleCopyText(thumbnailOutput.smallTaglineUrdu, "Urdu Tagline")}
+                                    className="p-1 text-[9px] bg-black/40 text-gray-400 hover:text-[#00FF01] rounded border border-green-900 cursor-pointer"
+                                  >
+                                    Copy text
+                                  </button>
+                                </div>
+                                <p className="font-urdu text-right text-base text-gray-300 py-1 leading-relaxed" dir="rtl">
+                                  {thumbnailOutput.smallTaglineUrdu}
+                                </p>
+                              </div>
+                            </>
+                          )}
                         </div>
                       ) : (
                         <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-3">
@@ -3414,6 +3551,35 @@ export default function App() {
                           </p>
                         </div>
                       )}
+                    </div>
+
+                    {/* Floating Thumbnail Controls (Format & Engine Selectors) */}
+                    <div className="absolute bottom-3 left-3 z-20 flex items-center gap-2 bg-black/95 px-2.5 py-1.5 rounded border border-green-800 shadow-[0_4px_12px_rgba(0,0,0,0.6)] text-[9px] font-mono">
+                      <div className="flex items-center gap-1">
+                        <span className="text-gray-500 uppercase tracking-widest font-bold text-[8px]">FORMAT:</span>
+                        <select
+                          value={thumbnailFormat}
+                          onChange={(e) => setThumbnailFormat(e.target.value as any)}
+                          className="bg-transparent text-[#00FF01] font-bold focus:outline-none cursor-pointer text-[9px]"
+                        >
+                          <option value="16:9" className="bg-[#051a09] text-[#00FF01]">Landscape</option>
+                          <option value="9:16" className="bg-[#051a09] text-[#00FF01]">Vertical</option>
+                          <option value="1:1" className="bg-[#051a09] text-[#00FF01]">Square format</option>
+                          <option value="none" className="bg-[#051a09] text-[#00FF01]">None</option>
+                        </select>
+                      </div>
+                      <div className="w-[1px] h-3 bg-green-900/60" />
+                      <div className="flex items-center gap-1">
+                        <span className="text-gray-500 uppercase tracking-widest font-bold text-[8px]">ENGINE:</span>
+                        <select
+                          value={thumbnailEngine}
+                          onChange={(e) => setThumbnailEngine(e.target.value as any)}
+                          className="bg-transparent text-[#00FF01] font-bold focus:outline-none cursor-pointer text-[9px]"
+                        >
+                          <option value="nano_banana" className="bg-[#051a09] text-[#00FF01]">Nano banana two</option>
+                          <option value="flux1" className="bg-[#051a09] text-[#00FF01]">Flux 1</option>
+                        </select>
+                      </div>
                     </div>
 
                     {/* Floating Google Flow link in bottom right corner */}

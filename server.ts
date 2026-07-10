@@ -88,6 +88,15 @@ app.post("/api/generate", async (req, res) => {
     const transformations = ["hindi", "urdu-roman", "urdu-writing", "english"];
 
     const generateForTransformation = async (transOpt: string) => {
+      const isIslamic = (topicNiche && topicNiche.toLowerCase().includes("islamic")) || 
+                        (tutorialTone && tutorialTone.toLowerCase().includes("islamic"));
+      const islamicInstruction = isIslamic ? `
+10. ISLAMIC CONTENT DIRECTION (CRITICAL):
+    - Since the topic/category or tone is Islamic-related, integrate respectful Islamic terminologies, values, modest and humble wording, and phrases where appropriate (e.g., "Alhamdulillah", "InshaAllah", "MashaAllah", "SubhanAllah").
+    - If referencing children, represent them as respectful, eager, and modest (e.g., studying Islamic values, wearing modest Islamic dress).
+    - If referencing adults, represent them as respectful, modest, and knowledgeable (e.g., wearing traditional Islamic attire, seeking or teaching religious/historical knowledge).
+` : "";
+
       // System Instructions to guide the voice persona, plagiarism-free requirement, language, structure, etc.
       const systemInstruction = `
 You are an elite, professional Script Automation Engineer and Creative Rephraser.
@@ -101,7 +110,7 @@ Strict rules for formatting and content:
    - If Male: Use male grammatical conjugations, vocabulary, and styling (e.g. in Hindi/Urdu, use masculine gender verbs/pronouns like "karta hoon", "raha hoon", "mera", "jaunga", "sikhayunga"; in English, use confident, authoritative, energetic, and direct vocabulary).
 3. Apply the TRANSFORMATION option:
    - Option selected: "${transOpt}"
-    - If "hindi": Translate/Rephrase entirely into Devanagari script (Hindi characters/writing). It MUST be written exactly in beautiful Hindi script (e.g. "अस्सलामु अलैकुम", "दोस्तों", "ज़िंदगी", "मुहब्बत", "ख़ुशामदीद", "शुक्रिया", "जनाब", "क्या आप जानते हैं", "आज हम बात करेंगे"). It is STRICTLY FORBIDDEN to use Roman Urdu or Latin letters for this option. The script must be in Devanagari characters but utilizing 100% beautiful spoken Urdu vocabulary, elegant Urdu sentence structures, and refined Urdu phonetic cadence. You MUST completely avoid pure, formal, or Sanskritized Hindi words (e.g., do NOT use 'नमस्ते', 'स्वागत', 'विषय', 'मित्र', 'सफलता', 'धन्यवाद', 'जीवन', 'ज्ञान', 'प्रयास', 'समय', 'महत्वपूर्ण', 'आवश्यकता', 'शिक्षक', 'कठिन', 'सरल', 'प्रश्न', 'उत्तर', 'विश्वास'). Instead, you MUST use their direct spoken Urdu equivalents written in Devanagari script: use 'अस्सलामु अलैकुम' instead of 'नमस्ते', 'ख़ुशामदीद' instead of 'स्वागत', 'दोस्तों'/'अज़ीज़ साथियों' instead of 'मित्रों', 'ज़िंदगी' instead of 'जीवन', 'इल्म'/'जानकारी' instead of 'ज्ञान', 'कोशिश' instead of 'प्रयास', 'वक़्त' instead of 'समय', 'ज़रूरी' instead of 'महत्वपूर्ण'/'आवश्यक', 'मुश्किल' instead of 'कठिन', 'आसान' instead of 'सरल', 'सवाल' instead of 'प्रश्न', 'जवाब' instead of 'उत्तर', 'यक़ीन' instead of 'विश्वास', 'कामयाबी' instead of 'सफलता', 'सफ़र' instead of 'यात्रा', and 'शुक्रिया' instead of 'धन्यवाद'. The output must sound 100% like elegant spoken Urdu with a beautiful Urdu pronunciation, feelings, accent, and rhythm when read aloud, but written perfectly in Devanagari (Hindi) letters. Maintain highly natural video-script flow with warm, high-engagement phrasing.
+    - If "hindi": Translate/Rephrase entirely into Devanagari script (Hindi characters/writing). It MUST be written exactly in beautiful Hindi script (e.g. "अस्सलामु अलैकुम", "दोस्तों", "ज़िंदगी", "मुहब्बत", "ख़ुशामदीद", "शुक्रिया", "जनाब", "क्या आप जानते हैं", "आज हम बात करेंगे"). It is STRICTLY FORBIDDEN to use Roman Urdu or Latin letters for this option. The script must be in Devanagari characters but utilizing 100% beautiful spoken Urdu vocabulary, elegant Urdu sentence structures, and refined Urdu phonetic cadence. You MUST completely avoid pure, formal, or Sanskritized Hindi words (e.g., do NOT use 'नमस्ते', 'स्वागत', 'विषय', 'मित्र', 'सफलता', 'धन्यवाद', 'जीवन', 'ज्ञान', 'प्रयास', 'समय', 'महत्वपूर्ण', 'आवश्यकता', 'शिक्षक', 'कठिन', 'सरल', 'प्रश्न', 'उत्तर', 'विश्वास'). Instead, you MUST use their direct spoken Urdu equivalents written in Devanagari script: use 'अस्सलामु अलैकुम' instead of 'नमस्ते', 'ख़ुशामदीद' instead of 'स्वागत', 'दोस्तों'/'अज़ीज़ साथियों' instead of 'मित्रों', 'ज़िंदगी' instead of 'जीवन', 'इल्म'/'जानकारी' instead of 'ज्ञान', 'कोशिश' instead of 'प्रयास', 'वक़्त' instead of 'समय', 'ज़रूरी' instead of 'महत्वपूर्ण'/'आवश्यक', 'मुश्किल' instead of 'कठिन', 'आसान' instead of 'सरल', 'सवाल' instead of 'प्रश्न', 'जवाब' instead of 'उत्तर', 'यक़ीन' instead of 'विश्वास', 'कामयाबी' instead of 'सफलता', 'सफ़ر' instead of 'यात्रा', and 'शुक्रिया' instead of 'धन्यवाद'. The output must sound 100% like elegant spoken Urdu with a beautiful Urdu pronunciation, feelings, accent, and rhythm when read aloud, but written perfectly in Devanagari (Hindi) letters. Maintain highly natural video-script flow with warm, high-engagement phrasing.
    - If "urdu-roman": Translate/Rephrase entirely into Urdu written in Roman letters (e.g., "Assalamu Alaikum dosto, aaj hum baat karenge..."). Use conversational, native, and easy-to-read Roman Urdu wording.
    - If "english": Translate/Rephrase entirely into fluent, highly engaging English.
    - If "urdu-writing": Translate/Rephrase entirely into beautiful, professional Urdu script (Nastaliq/Arabic script, using proper Urdu characters) in the authentic Pakistani Urdu language. You must use rich, elegant Pakistani Urdu vocabulary and proper Urdu Nastaliq punctuation, phrasing, and sentence structures. It is strictly forbidden to use English or Hindi words where proper Urdu equivalents exist. The output script must flow beautifully and natively in proper Urdu.
@@ -138,6 +147,8 @@ Strict rules for formatting and content:
 9. TARGET REGIONS / COUNTRIES COMPLIANCE:
    - Selected Target Regions/Countries: ${selectedCountries && selectedCountries.length > 0 ? selectedCountries.join(", ") : "Global audience"}
    - If specific countries or regions are selected, you MUST deeply customize the script's cultural references, local context, statistics, examples, dialects/idiomatic preferences, and vocabulary specifically to match and appeal to the native population of those regions. Incorporate region-specific nuances or locally relatable anecdotes of the selected countries to make the content highly localized and high-converting.
+
+${islamicInstruction}
 
 Ensure the output is strictly the polished script itself, completely ready to read or perform, containing zero meta-commentary, zero "Sure, here is your script" or filler explanations. Just output the final polished script.
 `;
@@ -240,25 +251,35 @@ Rules:
 - DO NOT write any meta-introductions or commentary.
 - Return ONLY the clean transcript text, starting directly with the spoken dialogue.`;
     } else {
-      prompt = `You are an advanced video transcribing and content generation agent. Given this video/social media URL: "${url}", your goal is to retrieve or construct the complete, high-quality, word-for-word spoken transcript.
-
-Since this URL belongs to a social media platform (such as YouTube, Facebook, Instagram, or TikTok), direct crawler/audio extraction might be restricted. If so, apply the following intelligence:
-1. Analyze the URL structure: extract any usernames, handles, keywords, video IDs, slug keywords, or topic indicators present in the URL.
-2. Based on this information, reconstruct/generate a highly realistic, engaging, full-length spoken transcript of what is said in this video (such as an educational tutorial, product review, culinary vlog, tech talk, or motivational story).
-3. Ensure the dialogue feels 100% natural, capturing speech-like pauses, clear hooks, descriptive insights, and transitions.
-4. Remove timestamps, captions, subtitles, and metadata.
-5. Return ONLY the clean, word-by-word spoken transcript text. Do NOT include meta-introductions, descriptions, or any surrounding comments. Just start directly with the spoken text.`;
+      prompt = `You are an advanced video transcribing and content generation agent. Given this video/social media URL: "${url}", use your web browsing tool and url context tool to access the URL if possible and retrieve or reconstruct the complete, high-quality, word-for-word spoken transcript of the video.
+If direct transcription is restricted, extract metadata from the page structure, usernames, handles, keywords, video ID, or slug keywords, and reconstruct an incredibly natural, high-quality, word-for-word spoken transcript of this video (such as an educational tutorial, medical advice, culinary vlog, or documentary).
+Ensure the transcript has a native human conversational feel with clear hooks and transitions.
+Return ONLY the clean, word-by-word spoken transcript text with NO speaker tags, timestamps, meta-introductions, descriptions, or surrounding commentary. Start directly with the spoken dialogue.`;
     }
 
-    const response = await generateContentWithRetry({
+    let transcript = "";
+    try {
+      console.log("Calling Antigravity Agent for transcript extraction of URL:", url);
+      const interaction = await ai.interactions.create({
+        agent: "antigravity-preview-05-2026",
+        input: prompt,
+        environment: "remote",
+        tools: [
+          { type: "google_search" },
+          { type: "url_context" }
+        ]
+      }, { timeout: 300000 });
+      transcript = (interaction.output_text || "").trim();
+    } catch (apiError: any) {
+      console.warn("Antigravity agent failed or not allowed, falling back to gemini-3.1-flash-lite:", apiError);
+      const response = await generateContentWithRetry({
+        model: "gemini-3.1-flash-lite",
+        contents: prompt
+      });
+      transcript = (response.text || "").trim();
+    }
 
-      model: "gemini-3.1-flash-lite",
-
-      
-      contents: prompt,
-    });
-
-    res.json({ transcript: (response.text || "").trim() });
+    res.json({ transcript });
   } catch (error: any) {
     console.error("Error in /api/extract-transcript:", error);
     res.status(500).json({ error: error.message || "An error occurred extracting transcript." });
@@ -329,6 +350,16 @@ app.post("/api/generate-scenes", async (req, res) => {
     
     const formatInstruction = (format && format !== "none") ? `Ensure the scenes and video prompts are strictly designed and described for a ${format === "16:9" ? "Horizontal (16:9) widescreen landscape" : format === "9:16" ? "Vertical (9:16) portrait format (for Shorts/Reels/TikTok)" : "Square (1:1) format"} aspect ratio. Incorporate appropriate framing, blocking, camera movement guidelines, and vertical/horizontal composition descriptions that match this specific format (e.g., center framing and close-ups for 9:16, wide panoramic views and cinematic horizon lines for 16:9).` : "";
 
+    const isIslamic = (cat && cat.toLowerCase().includes("islamic")) || 
+                      (transcript && transcript.toLowerCase().includes("islamic"));
+                      
+    const islamicSceneInstruction = isIslamic ? `
+   - Since the topic/category is Islamic-related, ensure that all visual scene prompts describe characters in proper traditional Islamic attire. 
+   - For children characters, explicitly describe them as wearing modest Islamic dress (e.g., boys wearing clean traditional dress or prayer caps/kurta, girls wearing elegant headscarves/hijabs/modest clothing).
+   - For adult characters, describe them wearing traditional Islamic religious attire (e.g., modest clothing, long elegant robes/abayas, hijabs/headscarves for women, clean traditional attire/kurtas and prayer caps or neat beards for men).
+   - Visual descriptions should reflect a respectful, peaceful, and clean Islamic environment (e.g., beautiful Islamic architectures, mosques, clean peaceful homes, or serene natural backgrounds).
+` : "";
+
     const prompt = `
 You are an award-winning cinematic director and AI prompt engineer specializing in Text-to-Video models (Veo 3, Wan 2.2, Sora).
 Your task is to:
@@ -339,6 +370,7 @@ Your task is to:
    - Be optimized for modern video generators like Veo 3 and Wan 2.2.
    - Be EXACTLY aligned with the category field: "${cat}". Do not deviate or add unrelated themes.
    - ${formatInstruction}
+   - ${islamicSceneInstruction}
    - For example:
      * If the category is "Health and medical", describe ONLY clinical, medical, healthcare settings, doctors, anatomical details, surgical tools, or health visuals.
      * If the category is "Industrial technology", describe ONLY industrial scenes, heavy machinery, automated assembly lines, robotic arms, factories, or mechanical components.
@@ -417,10 +449,21 @@ app.post("/api/regenerate-scene", async (req, res) => {
 
     const formatInstruction = (format && format !== "none") ? `Ensure this scene is strictly designed and described for a ${format === "16:9" ? "Horizontal (16:9) widescreen landscape" : format === "9:16" ? "Vertical (9:16) portrait format (for Shorts/Reels/TikTok)" : "Square (1:1) format"} aspect ratio.` : "";
 
+    const isIslamic = (category && category.toLowerCase().includes("islamic")) || 
+                      (transcript && transcript.toLowerCase().includes("islamic"));
+                      
+    const islamicSceneInstruction = isIslamic ? `
+- Since the topic/category is Islamic-related, ensure that all visual scene prompts describe characters in proper traditional Islamic attire. 
+- For children characters, explicitly describe them as wearing modest Islamic dress (e.g., boys wearing clean traditional dress or prayer caps/kurta, girls wearing elegant headscarves/hijabs/modest clothing).
+- For adult characters, describe them wearing traditional Islamic religious attire (e.g., modest clothing, long elegant robes/abayas, hijabs/headscarves for women, clean traditional attire/kurtas and prayer caps or neat beards for men).
+- Visual descriptions should reflect a respectful, peaceful, and clean Islamic environment (e.g., beautiful Islamic architectures, mosques, clean peaceful homes, or serene natural backgrounds).
+` : "";
+
     const prompt = `
 You are an expert AI prompt engineer specializing in cinematic Text-to-Video models.
 Regenerate Scene ${sceneNumber} out of ${totalScenes} for a storyboard with content category "${category}".
 ${formatInstruction}
+${islamicSceneInstruction}
 Ensure this scene has smooth visual and narrative continuity with preceding and succeeding scenes based on the overall transcript.
 Optimize it fully for Veo 3 and Wan 2.2 with detailed camera angles, lighting, actions, and consistent styling.
 
@@ -569,11 +612,7 @@ Return your response as a valid JSON object matching this schema:
     }
 
     const response = await generateContentWithRetry({
-
-      
       model: "gemini-3.1-flash-lite",
-
-
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -609,6 +648,8 @@ app.post("/api/generate-thumbnail-prompt", async (req, res) => {
       smallTagline,
       textColor,
       niche,
+      format,
+      engine,
     } = req.body;
 
     if (!transcript || !transcript.trim()) {
@@ -617,7 +658,239 @@ app.post("/api/generate-thumbnail-prompt", async (req, res) => {
 
     const ai = getAiClient();
 
-    const prompt = `
+    const selectedFormat = format || "none";
+    let formatGuidelines = "";
+    if (selectedFormat === "16:9") {
+      formatGuidelines = `
+- Detected Selected Thumbnail Format: 16:9 (YouTube Landscape).
+- Create a cinematic YouTube thumbnail optimized for a 16:9 layout.
+- Composition Guidelines:
+  * Keep the main character on the left or right third.
+  * Leave large clean negative space for bold headline text.
+  * Position the main object (fruit, medicine, food, organ, etc.) opposite the character.
+  * Everything should remain inside the safe area.
+  * No important elements should touch the edges.
+  * The composition must remain balanced and highly clickable.
+`;
+    } else if (selectedFormat === "9:16") {
+      formatGuidelines = `
+- Detected Selected Thumbnail Format: 9:16 (Vertical Shorts / TikTok / Instagram Reels).
+- Create a vertical thumbnail optimized for YouTube Shorts, Instagram Reels, and TikTok.
+- Composition Rules:
+  * The composition must fully utilize the vertical canvas.
+  * Place the headline text in the upper 20–30% of the image.
+  * Position the main subject (fruit, medicine, supplement, organ, food, etc.) near the top or upper-middle area.
+  * Position the human character in the center or lower-middle portion.
+  * If the product is the primary focus, allow it to occupy the lower section while the character remains centered.
+  * Ensure the character's face is never cropped.
+  * Keep all critical elements inside the vertical safe area.
+  * Avoid empty side space.
+  * Maintain strong visual hierarchy from top to bottom.
+  * The thumbnail should remain readable on mobile devices.
+`;
+    } else if (selectedFormat === "1:1") {
+      formatGuidelines = `
+- Detected Selected Thumbnail Format: 1:1 (Square - Facebook / Instagram Feed).
+- Create a square thumbnail optimized for Facebook, Instagram Feed, and social media.
+- Composition Rules:
+  * Place the headline text across the upper portion.
+  * Place the main object near the upper-middle.
+  * Place the human character in the center or lower-middle.
+  * If necessary, slightly overlap the object and character to create depth.
+  * Keep all important elements away from the edges.
+  * Ensure the layout feels balanced and centered.
+  * The thumbnail should remain readable even at small sizes.
+`;
+    } else {
+      formatGuidelines = `
+- Detected Selected Thumbnail Format: Standard (No specific aspect ratio requested).
+- Create a premium YouTube-quality thumbnail with balanced composition, readable overlays, and high CTR focus.
+`;
+    }
+
+    const universalRules = `
+Universal Rules (Apply to ALL Formats):
+- Hyper-realistic.
+- Premium YouTube-quality thumbnail.
+- Ultra high detail.
+- Strong emotional facial expression.
+- Bright, vibrant colors.
+- High contrast.
+- Dramatic cinematic lighting.
+- Sharp focus.
+- Large readable headline.
+- Clean composition.
+- No clutter.
+- No watermarks.
+- No logos.
+- No extra text beyond the intended headline.
+- Design for maximum click-through rate (CTR).
+- The generated prompt must automatically adapt the composition based on the selected thumbnail format while preserving the same subject, message, and emotional impact.
+`;
+
+    const isIslamic = (niche && niche.toLowerCase().includes("islamic")) ||
+                      (transcript && transcript.toLowerCase().includes("islamic")) ||
+                      (headline && headline.toLowerCase().includes("islamic"));
+                      
+    const islamicThumbnailInstruction = isIslamic ? `
+ISLAMIC CHARACTERS & ATTIRE RULES (CRITICAL):
+- Since the thumbnail is Islamic-related, any human characters depicted must wear proper traditional Islamic religious attire.
+- If discussing children, they must be described in Islamic dress (e.g., a young boy with a prayer cap/kurta or a young girl with an elegant colorful hijab/modest dress).
+- If discussing adults, they must be described in Islamic religious attire (e.g., adult men in traditional clean attire with a neat beard and optional prayer cap, and women in modest abaya/hijab/elegant traditional modest clothing).
+- Ensure the prompt instructions incorporate these attire and character styling elements elegantly.
+` : "";
+
+    const formatLabel = selectedFormat === "16:9" ? "wide landscape format" : selectedFormat === "9:16" ? "vertical 9:16 format" : "square 1:1 format";
+    const selectedEngine = engine || "nano_banana";
+
+    if (selectedEngine === "flux1") {
+      const prompt = `
+You are an expert YouTube Thumbnail Director, Visual Designer, and CTR Optimization expert specializing in highly trained "FLUX 1" visual image generation prompts.
+Create a highly engaging, viral YouTube thumbnail concept, positive prompt, negative prompt, and Urdu poster text overlay parameters based on the provided video transcript.
+
+TRANSCRIPT:
+"""
+${transcript}
+"""
+
+Design parameters to integrate:
+- Background Colors: ${bgColor || "Slate black, dark green gradient"}
+- Thumbnail Text Headline (Reference/Guideline): ${headline || "None specified"}
+- Small Tagline text: ${smallTagline || "None specified"}
+- Text Color overlays: ${textColor || "Neon green (#00FF01) and white"}
+- Niche Theme: ${niche || "General"}
+- Selected Format: ${selectedFormat} (${formatLabel})
+
+${formatGuidelines}
+${universalRules}
+${islamicThumbnailInstruction}
+
+Strict Rules for FLUX 1 Prompt Creation:
+1. The "fluxScenePrompt" MUST be in English only, with NO Urdu/Arabic/Latin text/letters/words written in the image itself. It should describe the visual layout perfectly matching the selected format guidelines. It should be a single highly-detailed paragraphs, fully descriptive, cinematic, and clear.
+2. It must explicitly include empty spaces reserved for text overlays:
+   - For landscape (16:9): "Empty clear space reserved on the right side (or left side) for bold headline text. No text, no letters, no watermark."
+   - For vertical (9:16): "Empty clear space reserved at the very top and very bottom for title text. No text, no letters, no words."
+   - For square (1:1): "Empty clear space across the upper portion for headline text. No text, no letters, no watermark."
+3. The "fluxNegativePrompt" must be a robust set of negative terms to prevent text generation inside the FLUX 1 image:
+   "low quality, blurry, bad anatomy, deformed hands, extra fingers, text, letters, words, watermark, gibberish script, distorted face, cartoon"
+4. Create high-impact Urdu translations for the overlay:
+   - "headlineUrdu": A bold, high-click-through Urdu headline in Nastaliq script (3-4 words max).
+   - "smallTaglineUrdu": A matching small Urdu tagline in Nastaliq script.
+5. Determine the appropriate overlay node coordinate percentages, stroke styling, and hex color codes based on parameters:
+   - For landscape: headingYPercent = 0.08, taglineYPercent = 0.22, strokeWidth = 5.
+   - For vertical: headingYPercent = 0.10, taglineYPercent = 0.92 (or 0.20), strokeWidth = 6.
+   - For square: headingYPercent = 0.10, taglineYPercent = 0.90 (or 0.25), strokeWidth = 4.
+6. Return hex color codes (e.g. "#FFFFFF", "#00FF01", or "#000000") for "textColor" and "strokeColor" that best fit the design parameter overlays.
+7. Define the exact dimensions for EmptyLatentImage:
+   - For 16:9: width = 1820, height = 1024
+   - For 9:16: width = 1024, height = 1820
+   - For 1:1 or none: width = 1024, height = 1024
+
+Return your response as a valid JSON object matching this schema:
+{
+  "fluxScenePrompt": "The detailed English positive scene prompt...",
+  "fluxNegativePrompt": "The negative prompt terms...",
+  "headlineUrdu": "High-impact Urdu headline...",
+  "smallTaglineUrdu": "Matching small Urdu tagline...",
+  "textColor": "#FFFFFF or similar hex color",
+  "strokeColor": "#00FF01 or similar hex color",
+  "strokeWidth": 6,
+  "headingYPercent": 0.10,
+  "taglineYPercent": 0.92,
+  "emptyLatentImageWidth": 1024,
+  "emptyLatentImageHeight": 1820
+}
+`;
+
+      const response = await generateContentWithRetry({
+        model: "gemini-3.1-flash-lite",
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              fluxScenePrompt: { type: Type.STRING },
+              fluxNegativePrompt: { type: Type.STRING },
+              headlineUrdu: { type: Type.STRING },
+              smallTaglineUrdu: { type: Type.STRING },
+              textColor: { type: Type.STRING },
+              strokeColor: { type: Type.STRING },
+              strokeWidth: { type: Type.NUMBER },
+              headingYPercent: { type: Type.NUMBER },
+              taglineYPercent: { type: Type.NUMBER },
+              emptyLatentImageWidth: { type: Type.NUMBER },
+              emptyLatentImageHeight: { type: Type.NUMBER }
+            },
+            required: [
+              "fluxScenePrompt",
+              "fluxNegativePrompt",
+              "headlineUrdu",
+              "smallTaglineUrdu",
+              "textColor",
+              "strokeColor",
+              "strokeWidth",
+              "headingYPercent",
+              "taglineYPercent",
+              "emptyLatentImageWidth",
+              "emptyLatentImageHeight"
+            ]
+          }
+        }
+      });
+
+      let data;
+      try {
+        const parsed = JSON.parse(response.text || "{}");
+        data = {
+          engine: "flux1",
+          thumbnailPrompt: parsed.fluxScenePrompt, // Fallback combined string
+          fluxScenePrompt: parsed.fluxScenePrompt,
+          fluxNegativePrompt: parsed.fluxNegativePrompt,
+          headlineUrdu: parsed.headlineUrdu,
+          smallTaglineUrdu: parsed.smallTaglineUrdu,
+          overlayFields: {
+            heading_text: parsed.headlineUrdu,
+            tagline_text: parsed.smallTaglineUrdu,
+            text_color: parsed.textColor,
+            stroke_color: parsed.strokeColor,
+            stroke_width: parsed.strokeWidth,
+            heading_y_percent: parsed.headingYPercent,
+            tagline_y_percent: parsed.taglineYPercent
+          },
+          emptyLatentImage: {
+            width: parsed.emptyLatentImageWidth,
+            height: parsed.emptyLatentImageHeight
+          }
+        };
+      } catch {
+        data = {
+          engine: "flux1",
+          thumbnailPrompt: "",
+          fluxScenePrompt: "",
+          fluxNegativePrompt: "",
+          headlineUrdu: "",
+          smallTaglineUrdu: "",
+          overlayFields: {
+            heading_text: "",
+            tagline_text: "",
+            text_color: "#FFFFFF",
+            stroke_color: "#00FF01",
+            stroke_width: 6,
+            heading_y_percent: 0.10,
+            tagline_y_percent: 0.92
+          },
+          emptyLatentImage: {
+            width: 1024,
+            height: 1820
+          }
+        };
+      }
+      return res.json(data);
+
+    } else {
+      // Default: Nano Banana 2
+      const prompt = `
 You are an expert YouTube Thumbnail Director, Visual Designer, and CTR Optimization expert specializing in highly trained "Nano Banana 2" visual image generation prompts.
 Create a highly engaging, viral YouTube thumbnail concept and Urdu text overlays based on the provided video transcript.
 
@@ -633,63 +906,70 @@ Design parameters to integrate:
 - Text Color overlays: ${textColor || "Neon green (#00FF01) and white"}
 - Niche Theme: ${niche || "General"}
 
+${formatGuidelines}
+${universalRules}
+${islamicThumbnailInstruction}
+
 Strict Rules for Thumbnail Prompt Creation:
 1. Describe EXACTLY 1 main subject with an extreme, highly expressive human emotion (surprise, shock, fear, concern, ultimate excitement) suitable for the niche and topic.
 2. The returned "thumbnailPrompt" MUST be structured as an extremely detailed, highly trained "Nano Banana 2 Prompt for an image generation model" following this EXACT layout format:
    "Create a highly engaging YouTube [Niche Theme] thumbnail using the uploaded creator photo as the main subject (preserve facial identity exactly).
-   LEFT SIDE: A large close-up of the creator [specify gender/clothing/appearance based on topic], with a [specify expressive emotion, e.g. surprised and concerned] expression, pointing toward [specify high-impact visual object from transcript, e.g., fresh ginger root with glowing medical effects/device].
+   LEFT SIDE: A large close-up of the creator [specify gender/clothing/appearance based on topic, ensuring Islamic dress if applicable], with a [specify expressive emotion, e.g. surprised and concerned] expression, pointing toward [specify high-impact visual object from transcript, e.g., fresh ginger root with glowing medical effects/device].
    RIGHT SIDE: [Describe realistic visual representations of the main topic, e.g., realistic kidney illustration glowing with healthy neon green energy, or high-tech gadget glowing, or food element], and other secondary high-impact elements like [describe 2-3 supporting objects/icons].
    BACKGROUND: [Describe a premium gradient blended with relevant graphics, e.g., a premium black and dark green gradient blended together with futuristic medical graphics, or cyber patterns, or organic textures] utilizing [Background Colors]. Use only [List specific color hexes/names from parameters, e.g. neon green (#00FF01), Black (#000000), White (#FFFFFF)].
    Large bold Urdu headline with merged [Text Color overlays] text: \"[Headline in Urdu Nastaliq]\"
    Small Urdu tagline underneath: \"[Tagline in Urdu Nastaliq]\".
    Typography should be mobile-readable, ultra-realistic, cinematic lighting, high contrast, sharp focus, viral YouTube thumbnail style, professional [Niche Theme] design, maximum CTR optimization, clean bold composition with the creator's face as the main focal point."
 
-3. Keep the visual composition bold, simple, mobile-readable, and optimized for maximum YouTube CTR.
+3. Keep the visual composition bold, simple, mobile-readable, and optimized for maximum YouTube CTR, strictly adjusting the composition according to the selected format guidelines.
 4. Create a matching, extremely high-impact main headline in Urdu script ("headlineUrdu") (max 3-4 words for high readability).
 5. Create a matching small tagline in Urdu script ("smallTaglineUrdu").
 
 Return your response as a valid JSON object matching this schema:
 {
-  "thumbnailPrompt": "The detailed English Nano Banana 2 prompt following the precise layout above...",
+  "thumbnailPrompt": "The detailed English Nano Banana 2 prompt following the precise layout above adapted to the selected format...",
   "headlineUrdu": "Bold Urdu Headline...",
   "smallTaglineUrdu": "Small Urdu Tagline..."
 }
 `;
 
-    const response = await generateContentWithRetry({
-
-
-      model: "gemini-3.1-flash-lite",
-
-
-
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            thumbnailPrompt: { type: Type.STRING },
-            headlineUrdu: { type: Type.STRING },
-            smallTaglineUrdu: { type: Type.STRING }
-          },
-          required: ["thumbnailPrompt", "headlineUrdu", "smallTaglineUrdu"]
+      const response = await generateContentWithRetry({
+        model: "gemini-3.1-flash-lite",
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              thumbnailPrompt: { type: Type.STRING },
+              headlineUrdu: { type: Type.STRING },
+              smallTaglineUrdu: { type: Type.STRING }
+            },
+            required: ["thumbnailPrompt", "headlineUrdu", "smallTaglineUrdu"]
+          }
         }
+      });
+
+      let data;
+      try {
+        const parsed = JSON.parse(response.text || "{}");
+        data = {
+          engine: "nano_banana",
+          thumbnailPrompt: parsed.thumbnailPrompt,
+          headlineUrdu: parsed.headlineUrdu,
+          smallTaglineUrdu: parsed.smallTaglineUrdu
+        };
+      } catch {
+        data = {
+          engine: "nano_banana",
+          thumbnailPrompt: "",
+          headlineUrdu: "",
+          smallTaglineUrdu: ""
+        };
       }
-    });
 
-    let data;
-    try {
-      data = JSON.parse(response.text || "{}");
-    } catch {
-      data = {
-        thumbnailPrompt: "",
-        headlineUrdu: "",
-        smallTaglineUrdu: ""
-      };
+      res.json(data);
     }
-
-    res.json(data);
   } catch (error: any) {
     console.error("Error in /api/generate-thumbnail-prompt:", error);
     res.status(500).json({ error: error.message || "An error occurred generating thumbnail prompt." });
