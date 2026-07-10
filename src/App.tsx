@@ -22,7 +22,9 @@ import {
   ExternalLink,
   Mic,
   MicOff,
-  Calculator
+  Calculator,
+  Image,
+  User
 } from "lucide-react";
 
 const CATEGORIES = [
@@ -161,6 +163,11 @@ export default function App() {
   const [thumbTextColor, setThumbTextColor] = useState("Neon Green (#00FF01) & White");
   const [thumbnailFormat, setThumbnailFormat] = useState<"16:9" | "9:16" | "1:1" | "none">("16:9");
   const [thumbnailEngine, setThumbnailEngine] = useState<"nano_banana" | "flux1">("nano_banana");
+
+  // Character Image States
+  const [characterImage, setCharacterImage] = useState<string | null>(null);
+  const [characterImageType, setCharacterImageType] = useState<string | null>(null);
+  const [characterImageName, setCharacterImageName] = useState<string | null>(null);
 
   // Custom Color Picker & Gradient States
   const [bgType, setBgType] = useState<"preset" | "custom_solid" | "custom_gradient">("preset");
@@ -505,6 +512,8 @@ export default function App() {
           niche: topicNiche,
           format: thumbnailFormat,
           engine: thumbnailEngine,
+          characterImage,
+          characterImageType,
         }),
       });
 
@@ -875,6 +884,35 @@ export default function App() {
     const file = e.target.files?.[0];
     if (!file) return;
     await handleGenericFileUpload(file, setThumbnailTranscriptInput, setThumbnailLoading);
+  };
+
+  const handleCharacterImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    if (!file.type.startsWith("image/")) {
+      alert("Please upload a valid image file (PNG, JPG, JPEG, WEBP).");
+      return;
+    }
+    
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        setCharacterImage(reader.result);
+        setCharacterImageType(file.type);
+        setCharacterImageName(file.name);
+      }
+    };
+    reader.onerror = () => {
+      alert("Failed to read image file.");
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleClearCharacterImage = () => {
+    setCharacterImage(null);
+    setCharacterImageType(null);
+    setCharacterImageName(null);
   };
 
   const handleGenerateScenes = async () => {
@@ -3245,47 +3283,86 @@ export default function App() {
                       </div>
                     </div>
 
-                    <div className="flex-1 relative">
+                    <div className="flex-1 relative flex flex-col min-h-0">
                       <textarea
                         value={thumbnailTranscriptInput}
                         onChange={(e) => setThumbnailTranscriptInput(e.target.value)}
                         placeholder="Paste voice transcript segment or complete text here. Specify design parameters on the left to direct thumbnail graphic concepts..."
-                        className="w-full h-full bg-transparent resize-none p-4 text-xs md:text-sm text-gray-200 focus:outline-none placeholder-gray-600 leading-relaxed font-mono focus:bg-[#031d0a]/30"
+                        className="flex-1 w-full bg-transparent resize-none p-4 pb-2 text-xs md:text-sm text-gray-200 focus:outline-none placeholder-gray-600 leading-relaxed font-mono focus:bg-[#031d0a]/30"
                       />
                       
-                      {/* Controls container in bottom right corner */}
-                      <div className="absolute bottom-4 right-4 flex items-center gap-2 z-10">
-                        {listeningInput === "thumbnail" ? (
-                          <button
-                            type="button"
-                            onClick={stopSpeechToText}
-                            className="p-2.5 rounded-full bg-red-950/80 text-red-400 border border-red-800/80 hover:bg-red-900 transition-all cursor-pointer shadow-lg flex items-center justify-center"
-                            title="Stop speech-to-text"
-                          >
-                            <MicOff className="h-4 w-4 animate-bounce text-[#00FF00]" />
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => startSpeechToText("thumbnail")}
-                            className="p-2.5 rounded-full bg-green-950/85 text-gray-300 border border-green-800/80 hover:border-[#00FF01] hover:text-[#00FF01] hover:bg-green-900/30 transition-all cursor-pointer shadow-lg flex items-center justify-center hover:scale-110 active:scale-95"
-                            title="Speak to enter thumbnail details"
-                          >
-                            <Mic className="h-4 w-4" />
-                          </button>
-                        )}
+                      {/* Character Picture upload & voice/clear controls bottom bar */}
+                      <div className="border-t border-green-900/40 bg-[#051408]/60 p-2.5 px-3 flex items-center justify-between gap-3 select-none">
+                        {/* Left Side: Character Picture Upload/Preview */}
+                        <div className="flex items-center gap-2">
+                          {characterImage ? (
+                            <div className="flex items-center gap-2 bg-black/40 border border-green-800/80 rounded-xl p-1 px-2.5">
+                              <img
+                                src={characterImage}
+                                alt="Character Preview"
+                                referrerPolicy="no-referrer"
+                                className="w-8 h-8 object-cover rounded-lg border border-[#00FF01]/60"
+                              />
+                              <div className="flex flex-col text-[10px] font-mono leading-tight max-w-[120px]">
+                                <span className="text-gray-300 truncate font-semibold">Character Attached</span>
+                                <span className="text-[8px] text-gray-500 truncate">{characterImageName || "image.png"}</span>
+                              </div>
+                              <button
+                                onClick={handleClearCharacterImage}
+                                className="p-1 text-red-400 hover:text-red-300 hover:bg-red-950/40 rounded transition-colors cursor-pointer ml-1"
+                                title="Remove character photo"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </button>
+                            </div>
+                          ) : (
+                            <label className="flex items-center gap-1.5 py-1.5 px-3 rounded-xl border border-dashed border-green-900/80 bg-green-950/20 text-[#00FF01]/80 hover:text-[#00FF01] hover:border-[#00FF01] hover:bg-green-950/40 cursor-pointer text-[10px] font-mono transition-all">
+                              <Image className="h-3.5 w-3.5" />
+                              <span>CHARACTER PIC (OPTIONAL)</span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={handleCharacterImageUpload}
+                                className="hidden"
+                              />
+                            </label>
+                          )}
+                        </div>
 
-                        {thumbnailTranscriptInput && (
-                          <button
-                            onClick={() => setThumbnailTranscriptInput("")}
-                            className="p-2 rounded-xl bg-red-950/30 text-red-400 border border-red-900/40 hover:bg-red-900 hover:text-white transition-all duration-300 cursor-pointer hover:scale-105"
-                            title="Clear transcript input"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        )}
+                        {/* Right Side: Voice/Trash controls */}
+                        <div className="flex items-center gap-1.5">
+                          {listeningInput === "thumbnail" ? (
+                            <button
+                              type="button"
+                              onClick={stopSpeechToText}
+                              className="p-2 rounded-xl bg-red-950/80 text-red-400 border border-red-800/80 hover:bg-red-900 transition-all cursor-pointer flex items-center justify-center shadow"
+                              title="Stop speech-to-text"
+                            >
+                              <MicOff className="h-3.5 w-3.5 animate-bounce text-[#00FF00]" />
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => startSpeechToText("thumbnail")}
+                              className="p-2 rounded-xl bg-green-950/85 text-gray-300 border border-green-800/80 hover:border-[#00FF01] hover:text-[#00FF01] hover:bg-green-900/30 transition-all cursor-pointer flex items-center justify-center hover:scale-105 active:scale-95 shadow animate-[fadeIn_0.3s_ease]"
+                              title="Speak to enter thumbnail details"
+                            >
+                              <Mic className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+
+                          {thumbnailTranscriptInput && (
+                            <button
+                              onClick={() => setThumbnailTranscriptInput("")}
+                              className="p-2 rounded-xl bg-red-950/30 text-red-400 border border-red-900/40 hover:bg-red-900 hover:text-white transition-all duration-300 cursor-pointer"
+                              title="Clear transcript input"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </div>
                       </div>
-
+                      
                       {/* Gemini listening wave animation overlay */}
                       <AnimatePresence>
                         {listeningInput === "thumbnail" && (
@@ -3331,10 +3408,22 @@ export default function App() {
                   {/* Right Column: YT Thumbnails Prompt output */}
                   <div className="flex flex-col h-[480px] rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md overflow-hidden shadow-lg relative transition-all duration-300 hover:border-green-600">
                     <div className="px-4 py-3 border-b border-green-800/80 bg-green-900/15 flex items-center justify-between">
-                      <span className="text-xs font-mono font-bold tracking-wider text-[#00FF01] flex items-center gap-1.5">
-                        <Sparkles className="h-4 w-4 text-[#00FF01]" />
-                        YT Thumbnails Prompt output
-                      </span>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs font-mono font-bold tracking-wider text-[#00FF01] flex items-center gap-1.5 shrink-0">
+                          <Sparkles className="h-4 w-4 text-[#00FF01]" />
+                          YT Thumbnails Prompt output
+                        </span>
+                        <a
+                          href="https://labs.google/fx/tools/flow"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-[9px] font-mono text-black bg-[#00FF01] hover:bg-white px-2 py-0.5 rounded-full border border-[#00FF01] hover:border-white font-bold cursor-pointer transition-all duration-300 shadow-[0_0_8px_rgba(0,255,1,0.2)] hover:scale-105 active:scale-95 shrink-0"
+                          title="Open Google Flow Nano Banana 2 & Flux 1"
+                        >
+                          <span>Google Flow</span>
+                          <ExternalLink className="h-2 w-2" />
+                        </a>
+                      </div>
 
                       <div className="flex items-center gap-1.5">
                         <button
@@ -3580,19 +3669,6 @@ export default function App() {
                           <option value="flux1" className="bg-[#051a09] text-[#00FF01]">Flux 1</option>
                         </select>
                       </div>
-                    </div>
-
-                    {/* Floating Google Flow link in bottom right corner */}
-                    <div className="absolute bottom-3 right-3 z-20">
-                      <a
-                        href="https://labs.google/fx/tools/flow"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-[9px] font-mono text-[#00FF01] bg-black/95 hover:bg-[#00FF01] hover:text-black px-2 py-1 rounded border border-green-800 hover:border-[#00FF01] hover:scale-105 active:scale-95 transition-all duration-300 font-bold cursor-pointer shadow-[0_4px_12px_rgba(0,0,0,0.6)]"
-                      >
-                        <span>Google Flow Nano Banana 2</span>
-                        <ExternalLink className="h-2 w-2" />
-                      </a>
                     </div>
                   </div>
 

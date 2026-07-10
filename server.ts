@@ -650,6 +650,8 @@ app.post("/api/generate-thumbnail-prompt", async (req, res) => {
       niche,
       format,
       engine,
+      characterImage,
+      characterImageType,
     } = req.body;
 
     if (!transcript || !transcript.trim()) {
@@ -657,6 +659,26 @@ app.post("/api/generate-thumbnail-prompt", async (req, res) => {
     }
 
     const ai = getAiClient();
+
+    // Prepare multimodal inline data if character image is attached
+    let inlineDataPart: any = null;
+    if (characterImage && characterImage.trim()) {
+      let base64Data = characterImage;
+      let mimeType = characterImageType || "image/png";
+      if (characterImage.startsWith("data:")) {
+        const matches = characterImage.match(/^data:([^;]+);base64,(.*)$/);
+        if (matches && matches.length === 3) {
+          mimeType = matches[1];
+          base64Data = matches[2];
+        }
+      }
+      inlineDataPart = {
+        inlineData: {
+          mimeType,
+          data: base64Data
+        }
+      };
+    }
 
     const selectedFormat = format || "none";
     let formatGuidelines = "";
@@ -677,16 +699,16 @@ app.post("/api/generate-thumbnail-prompt", async (req, res) => {
 - Detected Selected Thumbnail Format: 9:16 (Vertical Shorts / TikTok / Instagram Reels).
 - Create a vertical thumbnail optimized for YouTube Shorts, Instagram Reels, and TikTok.
 - Composition Rules:
-  * The composition must fully utilize the vertical canvas.
-  * Place the headline text in the upper 20–30% of the image.
-  * Position the main subject (fruit, medicine, supplement, organ, food, etc.) near the top or upper-middle area.
-  * Position the human character in the center or lower-middle portion.
-  * If the product is the primary focus, allow it to occupy the lower section while the character remains centered.
-  * Ensure the character's face is never cropped.
-  * Keep all critical elements inside the vertical safe area.
-  * Avoid empty side space.
-  * Maintain strong visual hierarchy from top to bottom.
-  * The thumbnail should remain readable on mobile devices.
+  * TEXT ON TOP: The headline / overlay text must be in the upper part of the thumbnail, above the character (in the top 20–30% of the image).
+  * CHARACTER IN CENTER: The human character must be in the middle / center of the vertical thumbnail layout.
+  * CHARACTER DRESS / ATTIRE (CRITICAL):
+    - Dynamically adapt the character's attire to match their field, occupation, or role in the script (for example, if the script is about medicine or health, they wear a doctor's outfit like a white coat; if they are a mechanic, they wear a mechanic's outfit / jumpsuit; if a teacher, a teacher's dress, etc.).
+    - Crucially, the attire must be a traditional Pakistani dress (e.g. Shalwar Kameez) adapted or integrated beautifully to fit that professional field (e.g. traditional Pakistani Shalwar Kameez style doctor's white coat or elegant traditional Pakistani attire representing that occupation/domain). Mention traditional Pakistani Shalwar Kameez as the primary/standard choice.
+  * ITEMS BELOW CHARACTER: Any items, products, or elements mentioned in the script (for example, fruits, medicines, organic herbs, supplements, tools, or relevant objects) must be positioned in the lower portion of the image, BELOW the character.
+  * Ensure the character's face is never cropped and has a clear emotional expression.
+  * Keep all critical elements inside the vertical safe area with zero empty side space.
+  * Maintain a strong visual vertical hierarchy (Headline Text on top -> Character in middle/center -> Script Items below the character).
+  * The thumbnail layout should fully utilize the vertical canvas and remain highly readable on mobile devices.
 `;
     } else if (selectedFormat === "1:1") {
       formatGuidelines = `
@@ -740,6 +762,16 @@ ISLAMIC CHARACTERS & ATTIRE RULES (CRITICAL):
 - Ensure the prompt instructions incorporate these attire and character styling elements elegantly.
 ` : "";
 
+    const imageInstruction = inlineDataPart ? `
+CHARACTER IMAGE ATTACHED RULE (CRITICAL):
+- An image of the character is attached. You must analyze this character in detail (gender, approximate age, hairstyle/color, facial structure, clothing style, general aesthetic) from the attached visual.
+- Explicitly dictate that the image generator should use the exact appearance, style, and face of the attached character image. Describe their features meticulously in the positive scene prompt so the model can recreate their exact likeness as the main focal subject of the thumbnail.
+- If the format is vertical or square, describe how this character is positioned in the center or lower-middle area according to the composition guidelines.
+` : `
+NO CHARACTER IMAGE ATTACHED:
+- Since no character image is attached, you can add whatever character or subject you want, ideally customized to the script/transcript, niche theme/domain field, and format.
+`;
+
     const formatLabel = selectedFormat === "16:9" ? "wide landscape format" : selectedFormat === "9:16" ? "vertical 9:16 format" : "square 1:1 format";
     const selectedEngine = engine || "nano_banana";
 
@@ -764,6 +796,7 @@ Design parameters to integrate:
 ${formatGuidelines}
 ${universalRules}
 ${islamicThumbnailInstruction}
+${imageInstruction}
 
 Strict Rules for FLUX 1 Prompt Creation:
 1. The "fluxScenePrompt" MUST be in English only, with NO Urdu/Arabic/Latin text/letters/words written in the image itself. It should describe the visual layout perfectly matching the selected format guidelines. It should be a single highly-detailed paragraphs, fully descriptive, cinematic, and clear.
@@ -802,9 +835,15 @@ Return your response as a valid JSON object matching this schema:
 }
 `;
 
+      const contentsArray: any[] = [];
+      if (inlineDataPart) {
+        contentsArray.push(inlineDataPart);
+      }
+      contentsArray.push({ text: prompt });
+
       const response = await generateContentWithRetry({
         model: "gemini-3.1-flash-lite",
-        contents: prompt,
+        contents: contentsArray,
         config: {
           responseMimeType: "application/json",
           responseSchema: {
@@ -909,6 +948,7 @@ Design parameters to integrate:
 ${formatGuidelines}
 ${universalRules}
 ${islamicThumbnailInstruction}
+${imageInstruction}
 
 Strict Rules for Thumbnail Prompt Creation:
 1. Describe EXACTLY 1 main subject with an extreme, highly expressive human emotion (surprise, shock, fear, concern, ultimate excitement) suitable for the niche and topic.
@@ -933,9 +973,15 @@ Return your response as a valid JSON object matching this schema:
 }
 `;
 
+      const contentsArray: any[] = [];
+      if (inlineDataPart) {
+        contentsArray.push(inlineDataPart);
+      }
+      contentsArray.push({ text: prompt });
+
       const response = await generateContentWithRetry({
         model: "gemini-3.1-flash-lite",
-        contents: prompt,
+        contents: contentsArray,
         config: {
           responseMimeType: "application/json",
           responseSchema: {
