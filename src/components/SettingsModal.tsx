@@ -293,6 +293,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                   ))}
                 </select>
               </div>
+
+              {/* 7. Image Generation (Image Studio) */}
+              <div className="p-3.5 rounded-2xl bg-black/60 border border-green-900/60 space-y-2 sm:col-span-2">
+                <label className="block text-gray-200 font-bold flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Sparkles className="h-3.5 w-3.5 text-[#00FF01]" />
+                    <span>7. Image Generation Studio Engine</span>
+                  </span>
+                  <span className="text-[10px] text-gray-500 font-normal">Native AI Image Synthesis</span>
+                </label>
+                <select
+                  value={localModels.imageGeneration || "gemini-3.1-flash-image"}
+                  onChange={(e) => setLocalModels({ ...localModels, imageGeneration: e.target.value })}
+                  className="w-full bg-[#051a09] border border-green-900/80 rounded-xl py-2 px-3 text-xs text-[#00FF01] font-bold focus:outline-none focus:border-[#00FF01] cursor-pointer"
+                >
+                  <option value="gemini-3.1-flash-image">Gemini 3.1 Flash Image (Balanced & High Quality)</option>
+                  <option value="gemini-3-pro-image">Gemini 3 Pro Image (Maximum Detail & Realism)</option>
+                  <option value="gemini-3.1-flash-lite-image">Gemini 3.1 Flash Lite Image (Ultra Speed)</option>
+                  <option value="imagen-3.0-generate-002">Imagen 3 Studio (High-Res Photorealistic)</option>
+                  <option value="imagen-3.0-fast-generate-001">Imagen 3 Fast (Rapid Generation)</option>
+                </select>
+              </div>
             </div>
 
             <button

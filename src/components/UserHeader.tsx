@@ -11,7 +11,8 @@ import {
   User as UserIcon, 
   ChevronDown, 
   Cpu, 
-  LogIn 
+  LogIn,
+  Wand2
 } from "lucide-react";
 
 export const UserHeader: React.FC = () => {
@@ -21,7 +22,8 @@ export const UserHeader: React.FC = () => {
     setIsAuthModalOpen, 
     setIsApiKeyModalOpen, 
     setIsSettingsModalOpen, 
-    setIsAdminModalOpen 
+    setIsAdminModalOpen,
+    setIsImageStudioOpen
   } = useAuth();
 
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
@@ -66,6 +68,16 @@ export const UserHeader: React.FC = () => {
 
       {/* Right User Navigation & Controls */}
       <div className="flex items-center gap-2.5 sm:gap-3 relative">
+        {/* Image Studio Modal Trigger Button */}
+        <button
+          onClick={() => setIsImageStudioOpen(true)}
+          className="p-2 sm:px-3 rounded-xl bg-gradient-to-r from-green-950 to-emerald-950 text-[#00FF01] border border-[#00FF01]/60 hover:bg-green-900/80 hover:scale-105 transition-all cursor-pointer flex items-center gap-1.5 shadow-[0_0_12px_rgba(0,255,1,0.2)]"
+          title="Open Image Generation Studio"
+        >
+          <Wand2 className="h-4 w-4 text-[#00FF01] animate-pulse" />
+          <span className="text-xs font-mono font-bold hidden sm:inline">Image Studio</span>
+        </button>
+
         {/* Gear Icon (Settings & Model Config) */}
         <button
           onClick={() => setIsSettingsModalOpen(true)}

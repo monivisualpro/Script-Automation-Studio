@@ -10,6 +10,7 @@ export interface FeatureModelConfig {
   promptGeneration: string;
   bulkPromptGeneration: string;
   rewriteExpand: string;
+  imageGeneration: string;
 }
 
 export const DEFAULT_FEATURE_MODELS: FeatureModelConfig = {
@@ -19,6 +20,7 @@ export const DEFAULT_FEATURE_MODELS: FeatureModelConfig = {
   promptGeneration: "gemini-2.5-flash",
   bulkPromptGeneration: "gemini-2.5-flash",
   rewriteExpand: "gemini-2.5-pro",
+  imageGeneration: "gemini-3.1-flash-image",
 };
 
 interface AuthContextType {
@@ -37,6 +39,10 @@ interface AuthContextType {
   setIsSettingsModalOpen: (open: boolean) => void;
   isAdminModalOpen: boolean;
   setIsAdminModalOpen: (open: boolean) => void;
+  isImageStudioOpen: boolean;
+  setIsImageStudioOpen: (open: boolean) => void;
+  initialImagePrompt: string;
+  openImageStudioWithPrompt: (prompt?: string) => void;
   modelSettings: FeatureModelConfig;
   updateModelSettings: (newSettings: Partial<FeatureModelConfig>) => Promise<void>;
   availableModels: Array<{ id: string; displayName: string }>;
@@ -59,6 +65,10 @@ const AuthContext = createContext<AuthContextType>({
   setIsSettingsModalOpen: () => {},
   isAdminModalOpen: false,
   setIsAdminModalOpen: () => {},
+  isImageStudioOpen: false,
+  setIsImageStudioOpen: () => {},
+  initialImagePrompt: "",
+  openImageStudioWithPrompt: () => {},
   modelSettings: DEFAULT_FEATURE_MODELS,
   updateModelSettings: async () => {},
   availableModels: [],
@@ -74,6 +84,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState<boolean>(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState<boolean>(false);
   const [isAdminModalOpen, setIsAdminModalOpen] = useState<boolean>(false);
+  const [isImageStudioOpen, setIsImageStudioOpen] = useState<boolean>(false);
+  const [initialImagePrompt, setInitialImagePrompt] = useState<string>("");
+
+  const openImageStudioWithPrompt = (prompt: string = "") => {
+    setInitialImagePrompt(prompt);
+    setIsImageStudioOpen(true);
+  };
   const [modelSettings, setModelSettings] = useState<FeatureModelConfig>(() => {
     try {
       const saved = localStorage.getItem("script_automation_model_settings");
@@ -250,6 +267,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsSettingsModalOpen,
         isAdminModalOpen,
         setIsAdminModalOpen,
+        isImageStudioOpen,
+        setIsImageStudioOpen,
+        initialImagePrompt,
+        openImageStudioWithPrompt,
         modelSettings,
         updateModelSettings,
         availableModels,

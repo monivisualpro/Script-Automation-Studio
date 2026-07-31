@@ -6,6 +6,7 @@ import { AuthModal } from "./components/AuthModal";
 import { ApiKeyModal } from "./components/ApiKeyModal";
 import { SettingsModal } from "./components/SettingsModal";
 import { AdminModal } from "./components/AdminModal";
+import { ImageStudioModal } from "./components/ImageStudioModal";
 import {
   Volume2,
   VolumeX,
@@ -116,6 +117,10 @@ export default function App() {
     setIsSettingsModalOpen,
     isAdminModalOpen,
     setIsAdminModalOpen,
+    isImageStudioOpen,
+    setIsImageStudioOpen,
+    initialImagePrompt,
+    openImageStudioWithPrompt,
     modelSettings,
   } = useAuth();
 
@@ -245,7 +250,7 @@ export default function App() {
       const rec = new SpeechRecognition();
       rec.continuous = false;
       rec.interimResults = false;
-      rec.lang = ""; 
+      rec.lang = navigator.language || "en-US"; 
 
       rec.onstart = () => {
         setListeningInput(target);
@@ -1158,6 +1163,11 @@ export default function App() {
       />
       <SettingsModal isOpen={isSettingsModalOpen} onClose={() => setIsSettingsModalOpen(false)} />
       <AdminModal isOpen={isAdminModalOpen} onClose={() => setIsAdminModalOpen(false)} />
+      <ImageStudioModal
+        isOpen={isImageStudioOpen}
+        onClose={() => setIsImageStudioOpen(false)}
+        initialPrompt={initialImagePrompt}
+      />
 
       {/* Unauthenticated / Missing API Key Alert Banners */}
       {!user && (
@@ -3625,14 +3635,24 @@ export default function App() {
                             <>
                               {/* FLUX 1 SCENE PROMPT */}
                               <div className="p-3 rounded-xl border border-green-900/80 bg-green-950/10 space-y-2">
-                                <div className="flex justify-between items-center border-b border-green-900/50 pb-1.5">
+                                <div className="flex justify-between items-center border-b border-green-900/50 pb-1.5 flex-wrap gap-2">
                                   <span className="font-mono font-bold text-[#00FF01]">1️⃣ Scene Prompt (Positive) — English, NO Urdu</span>
-                                  <button
-                                    onClick={() => handleCopyText(thumbnailOutput.fluxScenePrompt || thumbnailOutput.thumbnailPrompt, "Scene Prompt")}
-                                    className="p-1 text-[9px] bg-black/40 text-gray-400 hover:text-[#00FF01] rounded border border-green-900 cursor-pointer"
-                                  >
-                                    Copy Scene Prompt
-                                  </button>
+                                  <div className="flex items-center gap-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => openImageStudioWithPrompt(thumbnailOutput.fluxScenePrompt || thumbnailOutput.thumbnailPrompt)}
+                                      className="px-2 py-1 text-[10px] bg-[#00FF01] text-black font-extrabold rounded-lg border border-[#00FF01] cursor-pointer hover:bg-white transition-all flex items-center gap-1"
+                                    >
+                                      <Sparkles className="h-3 w-3" />
+                                      <span>Generate Image in Studio</span>
+                                    </button>
+                                    <button
+                                      onClick={() => handleCopyText(thumbnailOutput.fluxScenePrompt || thumbnailOutput.thumbnailPrompt, "Scene Prompt")}
+                                      className="p-1 text-[9px] bg-black/40 text-gray-400 hover:text-[#00FF01] rounded border border-green-900 cursor-pointer"
+                                    >
+                                      Copy Scene Prompt
+                                    </button>
+                                  </div>
                                 </div>
                                 <p className="font-sans text-gray-300 leading-relaxed text-xs">{thumbnailOutput.fluxScenePrompt || thumbnailOutput.thumbnailPrompt}</p>
                               </div>

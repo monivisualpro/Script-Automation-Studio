@@ -12,6 +12,7 @@ import {
   deleteFirestoreDoc,
   listFirestoreCollection,
 } from "./server/firestoreRest.js";
+import { imageProviderRegistry } from "./server/imageProviders/index.js";
 
 dotenv.config();
 
@@ -377,6 +378,148 @@ app.post("/api/admin/toggle-role", async (req, res) => {
   } catch (error: any) {
     console.error("Admin toggle role error:", error);
     return res.status(500).json({ error: error.message || "Failed to update user role." });
+  }
+});
+
+// ============================================================================
+// Google Flow Image Studio API Routes
+// ============================================================================
+
+// GET Available Models & Provider Config
+app.get("/api/image-studio/models", async (req, res) => {
+  try {
+    const activeProvider = imageProviderRegistry.getActiveProvider();
+    const allProviders = imageProviderRegistry.getAllProviders();
+    const models = await activeProvider.getAvailableModels();
+
+    return res.json({
+      activeProvider: {
+        id: activeProvider.id,
+        name: activeProvider.name,
+        description: activeProvider.description,
+        isOfficialFlow: activeProvider.isOfficialFlow,
+      },
+      allProviders,
+      models,
+    });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message || "Failed to load image models." });
+  }
+});
+
+// POST Generate Images
+app.post("/api/image-studio/generate", verifyUserAuth as express.RequestHandler, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { prompt, negativePrompt, model, aspectRatio, numberOfImages, stylePreset, seed, referenceImage } = req.body;
+
+    if (!prompt || !prompt.trim()) {
+      return res.status(400).json({ error: "Image generation prompt is required." });
+    }
+
+    const apiKey = req.userApiKey || process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return res.status(403).json({ error: "API key required for image generation." });
+    }
+
+    const activeProvider = imageProviderRegistry.getActiveProvider();
+    const images = await activeProvider.generateImages(apiKey, {
+      prompt,
+      negativePrompt,
+      model,
+      aspectRatio,
+      numberOfImages: numberOfImages || 1,
+      stylePreset,
+      seed,
+      referenceImage,
+    });
+
+    // Save generated images to user Firestore history if authenticated
+    if (req.userAuth?.uid && req.headers.authorization) {
+      const token = req.headers.authorization.substring(7);
+      try {
+        const userDoc = await getFirestoreDoc("users", req.userAuth.uid, token);
+        const existingHistory = userDoc.data?.imageHistory || [];
+        const updatedHistory = [...images, ...existingHistory].slice(0, 50); // Keep last 50
+        await updateFirestoreDoc("users", req.userAuth.uid, {
+          imageHistory: updatedHistory,
+          updatedAt: new Date().toISOString(),
+        }, token);
+      } catch (histErr) {
+        console.warn("Failed to save image history to Firestore:", histErr);
+      }
+    }
+
+    return res.json({ success: true, images });
+  } catch (error: any) {
+    console.error("Image generation error:", error);
+    return res.status(500).json({ error: error.message || "Image generation failed." });
+  }
+});
+
+// POST AI Prompt Enhancer (Google Flow Style "Enhance / Expand Prompt")
+app.post("/api/image-studio/enhance-prompt", verifyUserAuth as express.RequestHandler, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { prompt, stylePreset } = req.body;
+    if (!prompt || !prompt.trim()) {
+      return res.status(400).json({ error: "Prompt text is required." });
+    }
+
+    const ai = req.userAiClient!;
+    const enhancementPrompt = `
+You are an expert AI Image Generation Prompt Engineer specializing in Google Flow Studio and Imagen 3 prompts.
+Transform the following raw user prompt into a rich, highly detailed, photorealistic visual prompt suitable for Google Flow / Imagen 3.
+Incorporate lighting, camera angle, atmospheric details, artistic composition, texture, color grading, and focal clarity.
+If a style preset is specified (${stylePreset || "None"}), seamlessly integrate that style.
+
+User Raw Prompt: "${prompt}"
+
+Return ONLY the enhanced prompt string. Do not include markdown headers, quotes, or conversational preamble.
+`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.1-flash-lite",
+      contents: enhancementPrompt,
+    });
+
+    const enhancedText = response.text ? response.text.trim() : prompt;
+    return res.json({ success: true, enhancedPrompt: enhancedText });
+  } catch (error: any) {
+    console.error("Enhance prompt error:", error);
+    return res.status(500).json({ error: error.message || "Failed to enhance prompt." });
+  }
+});
+
+// GET Image History
+app.get("/api/image-studio/history", verifyUserAuth as express.RequestHandler, async (req: AuthenticatedRequest, res) => {
+  try {
+    const token = req.headers.authorization!.substring(7);
+    const userDoc = await getFirestoreDoc("users", req.userAuth!.uid, token);
+    const history = userDoc.data?.imageHistory || [];
+    return res.json({ success: true, history });
+  } catch (error: any) {
+    console.error("Get image history error:", error);
+    return res.status(500).json({ error: error.message || "Failed to retrieve image history." });
+  }
+});
+
+// DELETE Image from History
+app.delete("/api/image-studio/history/:imageId", verifyUserAuth as express.RequestHandler, async (req: AuthenticatedRequest, res) => {
+  try {
+    const { imageId } = req.params;
+    const token = req.headers.authorization!.substring(7);
+    const userDoc = await getFirestoreDoc("users", req.userAuth!.uid, token);
+    const existingHistory: any[] = userDoc.data?.imageHistory || [];
+    const updatedHistory = existingHistory.filter((img: any) => img.id !== imageId);
+
+    await updateFirestoreDoc("users", req.userAuth!.uid, {
+      imageHistory: updatedHistory,
+      updatedAt: new Date().toISOString(),
+    }, token);
+
+    return res.json({ success: true });
+  } catch (error: any) {
+    console.error("Delete image history error:", error);
+    return res.status(500).json({ error: error.message || "Failed to delete image." });
   }
 });
 
