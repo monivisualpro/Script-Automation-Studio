@@ -4,6 +4,14 @@ import { fileURLToPath } from "url";
 import { GoogleGenAI, Type } from "@google/genai";
 import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
+import firebaseConfig from "./firebase-applet-config.json" with { type: "json" };
+import { encryptApiKey, decryptApiKey, maskApiKey } from "./server/encryption.js";
+import {
+  getFirestoreDoc,
+  updateFirestoreDoc,
+  deleteFirestoreDoc,
+  listFirestoreCollection,
+} from "./server/firestoreRest.js";
 
 dotenv.config();
 
@@ -12,29 +20,97 @@ const PORT = 3000;
 
 app.use(express.json({ limit: "10mb" }));
 
-// Lazy initializer for GoogleGenAI
-let aiClient: GoogleGenAI | null = null;
-function getAiClient(): GoogleGenAI {
-  if (!aiClient) {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      throw new Error("GEMINI_API_KEY environment variable is required. Please set it in the Secrets panel.");
+// Helper to verify Firebase Auth ID token via Google Identity Toolkit API
+async function verifyAuthToken(idToken: string): Promise<{ uid: string; email?: string; name?: string }> {
+  const url = `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${firebaseConfig.apiKey}`;
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ idToken }),
+  });
+
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData?.error?.message || "Invalid or expired authentication token.");
+  }
+
+  const data = await response.json();
+  if (!data.users || data.users.length === 0) {
+    throw new Error("User associated with token not found.");
+  }
+
+  const user = data.users[0];
+  return {
+    uid: user.localId,
+    email: user.email,
+    name: user.displayName,
+  };
+}
+
+// Interface for Authenticated Requests
+interface AuthenticatedRequest extends express.Request {
+  userAuth?: { uid: string; email?: string };
+  userAiClient?: GoogleGenAI;
+  userApiKey?: string;
+}
+
+// Authentication Middleware - Enforces user login and personal API key configuration
+async function verifyUserAuth(req: AuthenticatedRequest, res: express.Response, next: express.NextFunction) {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ error: "Authentication required. Please log in to access AI features." });
     }
-    aiClient = new GoogleGenAI({
-      apiKey,
+
+    const token = authHeader.substring(7);
+    const userInfo = await verifyAuthToken(token);
+    req.userAuth = userInfo;
+
+    // Retrieve user document from Firestore to get encrypted API key
+    const userDocSnap = await getFirestoreDoc("users", userInfo.uid, token);
+
+    if (!userDocSnap.exists || !userDocSnap.data) {
+      return res.status(403).json({ error: "User account profile not found. Please log in again." });
+    }
+
+    const userData = userDocSnap.data;
+    const encryptedKey = userData.encryptedApiKey;
+
+    if (!encryptedKey) {
+      return res.status(403).json({
+        error: "NO_API_KEY",
+        message: "No personal Google AI API Key set up for this account. Please add your API Key in Settings.",
+      });
+    }
+
+    const plainKey = decryptApiKey(encryptedKey);
+    if (!plainKey || !plainKey.trim()) {
+      return res.status(403).json({
+        error: "NO_API_KEY",
+        message: "Invalid or corrupted API Key. Please re-enter your API key in Settings.",
+      });
+    }
+
+    // Create a new GoogleGenAI client exclusively using the logged-in user's API key
+    req.userApiKey = plainKey;
+    req.userAiClient = new GoogleGenAI({
+      apiKey: plainKey,
       httpOptions: {
         headers: {
-          "User-Agent": "aistudio-build",
+          "User-Agent": "script-automation-studio",
         },
       },
     });
+
+    next();
+  } catch (error: any) {
+    console.error("Auth Verification Error:", error.message || error);
+    return res.status(401).json({ error: "Authentication failed. Please sign in again." });
   }
-  return aiClient;
 }
 
-// Wrapper to call Gemini API with automatic retry and exponential backoff
-async function generateContentWithRetry(params: any, maxRetries = 3, delayMs = 1500) {
-  const ai = getAiClient();
+// Wrapper to call Gemini API with automatic retry and exponential backoff using user's AI client
+async function generateContentWithRetry(ai: GoogleGenAI, params: any, maxRetries = 3, delayMs = 1500) {
   let attempt = 0;
   while (true) {
     try {
@@ -42,16 +118,11 @@ async function generateContentWithRetry(params: any, maxRetries = 3, delayMs = 1
     } catch (error: any) {
       attempt++;
       console.error(`Gemini API call failed (attempt ${attempt}/${maxRetries}):`, error);
-      
+
       if (attempt >= maxRetries) {
         throw error;
       }
-      
-      const errorMessage = String(error.message || error).toLowerCase();
-      const is503 = errorMessage.includes("503") || errorMessage.includes("unavailable") || errorMessage.includes("demand") || errorMessage.includes("busy");
-      const isTimeout = errorMessage.includes("timeout") || error.name === "HeadersTimeoutError" || error.code === "UND_ERR_HEADERS_TIMEOUT" || errorMessage.includes("fetch failed");
-      
-      // If it's a transient error, retry with exponential backoff
+
       const backoff = delayMs * Math.pow(2.2, attempt - 1);
       console.log(`Transient Gemini API error detected. Retrying in ${Math.round(backoff)}ms...`);
       await new Promise((resolve) => setTimeout(resolve, backoff));
@@ -59,8 +130,258 @@ async function generateContentWithRetry(params: any, maxRetries = 3, delayMs = 1
   }
 }
 
-// API Routes
-app.post("/api/generate", async (req, res) => {
+// User Management Endpoints
+app.post("/api/user/save-key", async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ error: "Authentication required." });
+    }
+    const token = authHeader.substring(7);
+    const userInfo = await verifyAuthToken(token);
+
+    const { apiKey } = req.body;
+    if (!apiKey || typeof apiKey !== "string" || !apiKey.trim()) {
+      return res.status(400).json({ error: "API Key is required." });
+    }
+
+    const trimmedKey = apiKey.trim();
+
+    // Validate the key against Gemini API with a test ping
+    const testAi = new GoogleGenAI({ apiKey: trimmedKey });
+    try {
+      await testAi.models.generateContent({
+        model: "gemini-3.1-flash-lite",
+        contents: "API Key Ping Test",
+      });
+    } catch (testErr: any) {
+      console.error("API Key Validation Ping Failed:", testErr);
+      return res.status(400).json({
+        error: "API Key validation failed. Please check that your key is valid and active in Google AI Studio.",
+      });
+    }
+
+    // Encrypt key and derive mask
+    const encrypted = encryptApiKey(trimmedKey);
+    const masked = maskApiKey(trimmedKey);
+
+    await updateFirestoreDoc("users", userInfo.uid, {
+      encryptedApiKey: encrypted,
+      apiKeyMasked: masked,
+      updatedAt: new Date().toISOString(),
+    }, token);
+
+    return res.json({ success: true, apiKeyMasked: masked });
+  } catch (error: any) {
+    console.error("Error saving API Key:", error);
+    return res.status(500).json({ error: error.message || "Failed to save API Key." });
+  }
+});
+
+app.post("/api/user/remove-key", async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ error: "Authentication required." });
+    }
+    const token = authHeader.substring(7);
+    const userInfo = await verifyAuthToken(token);
+
+    await updateFirestoreDoc("users", userInfo.uid, {
+      encryptedApiKey: null,
+      apiKeyMasked: null,
+      updatedAt: new Date().toISOString(),
+    }, token);
+
+    return res.json({ success: true });
+  } catch (error: any) {
+    console.error("Error removing API Key:", error);
+    return res.status(500).json({ error: error.message || "Failed to remove API Key." });
+  }
+});
+
+app.get("/api/user/available-models", verifyUserAuth as express.RequestHandler, async (req: AuthenticatedRequest, res) => {
+  try {
+    const ai = req.userAiClient!;
+    const defaultModels = [
+      { id: "gemini-3.6-flash", displayName: "Gemini 3.6 Flash (Fast & Capable)" },
+      { id: "gemini-3.1-pro-preview", displayName: "Gemini 3.1 Pro (Reasoning & Quality)" },
+      { id: "gemini-3.1-flash-lite", displayName: "Gemini 3.1 Flash Lite (Ultra Fast)" },
+      { id: "gemini-2.5-flash", displayName: "Gemini 2.5 Flash" },
+      { id: "gemini-2.5-pro", displayName: "Gemini 2.5 Pro" },
+      { id: "gemini-2.5-flash-lite", displayName: "Gemini 2.5 Flash Lite" },
+    ];
+
+    try {
+      const response = await ai.models.list();
+      const dynamicList: any[] = [];
+      if (response && Array.isArray((response as any).models)) {
+        for (const m of (response as any).models) {
+          if (m.name && m.name.includes("gemini")) {
+            const cleanId = m.name.replace(/^models\//, "");
+            dynamicList.push({
+              id: cleanId,
+              displayName: m.displayName || cleanId,
+            });
+          }
+        }
+      }
+      if (dynamicList.length > 0) {
+        return res.json({ models: dynamicList });
+      }
+    } catch (e) {
+      console.warn("Dynamic model fetching failed, using fallback list:", e);
+    }
+
+    return res.json({ models: defaultModels });
+  } catch (error: any) {
+    console.error("Error in available-models:", error);
+    return res.status(500).json({ error: error.message || "Failed to fetch available models." });
+  }
+});
+
+app.post("/api/user/model-settings", async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ error: "Authentication required." });
+    }
+    const token = authHeader.substring(7);
+    const userInfo = await verifyAuthToken(token);
+
+    const { modelSettings } = req.body;
+    if (!modelSettings) {
+      return res.status(400).json({ error: "Model settings required." });
+    }
+
+    await updateFirestoreDoc("users", userInfo.uid, {
+      modelSettings,
+      updatedAt: new Date().toISOString(),
+    }, token);
+
+    return res.json({ success: true });
+  } catch (error: any) {
+    console.error("Error saving model settings:", error);
+    return res.status(500).json({ error: error.message || "Failed to save model settings." });
+  }
+});
+
+app.post("/api/user/delete-account", async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ error: "Authentication required." });
+    }
+    const token = authHeader.substring(7);
+    const userInfo = await verifyAuthToken(token);
+
+    await deleteFirestoreDoc("users", userInfo.uid, token);
+
+    return res.json({ success: true });
+  } catch (error: any) {
+    console.error("Error deleting user account:", error);
+    return res.status(500).json({ error: error.message || "Failed to delete account." });
+  }
+});
+
+// Admin Endpoints
+const ADMIN_PRIMARY_EMAIL = "tahsinirshad7370@gmail.com";
+
+app.get("/api/admin/users", async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ error: "Authentication required." });
+    }
+    const token = authHeader.substring(7);
+    const userInfo = await verifyAuthToken(token);
+
+    const callerEmail = (userInfo.email || "").toLowerCase();
+    const callerSnap = await getFirestoreDoc("users", userInfo.uid, token);
+    const isCallerAdmin = callerEmail === ADMIN_PRIMARY_EMAIL || (callerSnap.exists && callerSnap.data?.role === "admin");
+
+    if (!isCallerAdmin) {
+      return res.status(403).json({ error: "Access denied. Admin privileges required." });
+    }
+
+    const docsList = await listFirestoreCollection("users", token);
+    const usersList: any[] = [];
+
+    docsList.forEach(({ id, data }) => {
+      const userEmail = (data.email || "").toLowerCase();
+      const isAdmin = userEmail === ADMIN_PRIMARY_EMAIL || data.role === "admin";
+
+      usersList.push({
+        userId: id,
+        name: data.name || "User",
+        email: data.email || "No email",
+        provider: data.provider || "password",
+        role: isAdmin ? "admin" : (data.role || "user"),
+        isAdmin,
+        hasApiKey: Boolean(data.encryptedApiKey || data.apiKeyMasked),
+        apiKeyMasked: data.apiKeyMasked || null,
+        createdAt: data.createdAt || null,
+        updatedAt: data.updatedAt || null,
+      });
+    });
+
+    return res.json({ users: usersList });
+  } catch (error: any) {
+    console.error("Admin list users error:", error);
+    return res.status(500).json({ error: error.message || "Failed to fetch user list." });
+  }
+});
+
+app.post("/api/admin/toggle-role", async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ error: "Authentication required." });
+    }
+    const token = authHeader.substring(7);
+    const userInfo = await verifyAuthToken(token);
+
+    const callerEmail = (userInfo.email || "").toLowerCase();
+    const callerSnap = await getFirestoreDoc("users", userInfo.uid, token);
+    const isCallerAdmin = callerEmail === ADMIN_PRIMARY_EMAIL || (callerSnap.exists && callerSnap.data?.role === "admin");
+
+    if (!isCallerAdmin) {
+      return res.status(403).json({ error: "Access denied. Admin privileges required." });
+    }
+
+    const { targetUserId, newRole } = req.body;
+    if (!targetUserId || !["admin", "user"].includes(newRole)) {
+      return res.status(400).json({ error: "Target userId and valid role ('admin' | 'user') required." });
+    }
+
+    const targetSnap = await getFirestoreDoc("users", targetUserId, token);
+    const targetEmail = targetSnap.exists ? targetSnap.data?.email || "" : "";
+
+    await updateFirestoreDoc("users", targetUserId, {
+      role: newRole,
+      updatedAt: new Date().toISOString(),
+    }, token);
+
+    if (newRole === "admin") {
+      await updateFirestoreDoc("admins", targetUserId, {
+        userId: targetUserId,
+        email: targetEmail,
+        role: "admin",
+        updatedAt: new Date().toISOString(),
+      }, token);
+    } else {
+      await deleteFirestoreDoc("admins", targetUserId, token).catch(() => {});
+    }
+
+    return res.json({ success: true, targetUserId, newRole });
+  } catch (error: any) {
+    console.error("Admin toggle role error:", error);
+    return res.status(500).json({ error: error.message || "Failed to update user role." });
+  }
+});
+
+// Protected AI Script Generation API Routes
+app.post("/api/generate", verifyUserAuth as express.RequestHandler, async (req: AuthenticatedRequest, res) => {
   try {
     const {
       rawScript,
@@ -80,9 +401,9 @@ app.post("/api/generate", async (req, res) => {
       return res.status(400).json({ error: "Source script is required." });
     }
 
-    const ai = getAiClient();
+    const ai = req.userAiClient!;
     
-     const modelToUse = "gemini-3.1-flash-lite";
+    const modelToUse = req.body.model || "gemini-3.1-flash-lite";
 
     // We will generate the following transformations in parallel:
     const transformations = ["hindi", "urdu-roman", "urdu-writing", "english"];
@@ -164,7 +485,7 @@ ${rawScript}
 Ensure the output is 100% plagiarism-free, customized for a ${voicePersona} speaker, written in the "${transOpt}" format, targeted at ${targetAudience}, following the "${topicNiche}" niche and "${tutorialTone}" tone, and starting with greeting "${greetingsPrefix || ""}" and hook "${customHook || ""}".
 `;
 
-      const response = await generateContentWithRetry({
+      const response = await generateContentWithRetry(ai, {
         model: modelToUse,
         contents: prompt,
         config: {
@@ -206,7 +527,7 @@ Ensure the output is 100% plagiarism-free, customized for a ${voicePersona} spea
 });
 
 // Generate a script draft based on a Topic & Word Count limit
-app.post("/api/generate-topic", async (req, res) => {
+app.post("/api/generate-topic", verifyUserAuth as express.RequestHandler, async (req: AuthenticatedRequest, res) => {
   try {
     const { topic, wordCount } = req.body;
     if (!topic || !topic.trim()) {
@@ -214,15 +535,14 @@ app.post("/api/generate-topic", async (req, res) => {
     }
     const targetWords = parseInt(wordCount) || 300;
 
-    const ai = getAiClient();
-    const response = await generateContentWithRetry({
-
-      model: "gemini-3.1-flash-lite",
-
+    const ai = req.userAiClient!;
+    const modelToUse = req.body.model || "gemini-3.1-flash-lite";
+    const response = await generateContentWithRetry(ai, {
+      model: modelToUse,
       contents: `Generate a detailed, high-quality script on the topic: "${topic}". The script should be approximately ${targetWords} words. It should be highly engaging, educational, and structured, written directly as clean raw content ready for voiceover and script transformation. Return ONLY the script text itself.`,
     });
 
-    res.json({ rawScript: (response.text || "").trim() });
+    res.json({ rawScript: (response.text || "").trim(), modelUsed: modelToUse });
   } catch (error: any) {
     console.error("Error in /api/generate-topic:", error);
     res.status(500).json({ error: error.message || "An error occurred generating from topic." });
@@ -230,14 +550,14 @@ app.post("/api/generate-topic", async (req, res) => {
 });
 
 // Extract clean word-by-word spoken transcript from Video URL via Gemini
-app.post("/api/extract-transcript", async (req, res) => {
+app.post("/api/extract-transcript", verifyUserAuth as express.RequestHandler, async (req: AuthenticatedRequest, res) => {
   try {
     const { url, mode } = req.body;
     if (!url || !url.trim()) {
       return res.status(400).json({ error: "URL is required." });
     }
 
-    const ai = getAiClient();
+    const ai = req.userAiClient!;
     
     let prompt = "";
     if (mode === "gemini") {
@@ -272,7 +592,7 @@ Return ONLY the clean, word-by-word spoken transcript text with NO speaker tags,
       transcript = (interaction.output_text || "").trim();
     } catch (apiError: any) {
       console.warn("Antigravity agent failed or not allowed, falling back to gemini-3.1-flash-lite:", apiError);
-      const response = await generateContentWithRetry({
+      const response = await generateContentWithRetry(ai, {
         model: "gemini-3.1-flash-lite",
         contents: prompt
       });
@@ -287,14 +607,14 @@ Return ONLY the clean, word-by-word spoken transcript text with NO speaker tags,
 });
 
 // Parse File (.txt or PDF) using Gemini for direct text extraction
-app.post("/api/parse-file", async (req, res) => {
+app.post("/api/parse-file", verifyUserAuth as express.RequestHandler, async (req: AuthenticatedRequest, res) => {
   try {
     const { fileName, fileType, fileData } = req.body;
     if (!fileData) {
       return res.status(400).json({ error: "File data is required." });
     }
 
-    const ai = getAiClient();
+    const ai = req.userAiClient!;
     let contents: any[] = [];
     
     if (fileType && fileType.includes("pdf")) {
@@ -322,7 +642,7 @@ app.post("/api/parse-file", async (req, res) => {
       contents = [`Extract and return the full text content of this document:\n\n${plainText}`];
     }
 
-    const response = await generateContentWithRetry({
+    const response = await generateContentWithRetry(ai, {
 
       model: "gemini-3.1-flash-lite",
       
@@ -337,7 +657,7 @@ app.post("/api/parse-file", async (req, res) => {
 });
 
 // Divide Transcript into scenes and generate Text-to-Video prompts for each
-app.post("/api/generate-scenes", async (req, res) => {
+app.post("/api/generate-scenes", verifyUserAuth as express.RequestHandler, async (req: AuthenticatedRequest, res) => {
   try {
     const { transcript, numScenes, category, format } = req.body;
     if (!transcript || !transcript.trim()) {
@@ -346,7 +666,7 @@ app.post("/api/generate-scenes", async (req, res) => {
     const count = parseInt(numScenes) || 10;
     const cat = category || "General";
 
-    const ai = getAiClient();
+    const ai = req.userAiClient!;
     
     const formatInstruction = (format && format !== "none") ? `Ensure the scenes and video prompts are strictly designed and described for a ${format === "16:9" ? "Horizontal (16:9) widescreen landscape" : format === "9:16" ? "Vertical (9:16) portrait format (for Shorts/Reels/TikTok)" : "Square (1:1) format"} aspect ratio. Incorporate appropriate framing, blocking, camera movement guidelines, and vertical/horizontal composition descriptions that match this specific format (e.g., center framing and close-ups for 9:16, wide panoramic views and cinematic horizon lines for 16:9).` : "";
 
@@ -397,7 +717,7 @@ You MUST output exactly ${count} scenes. Return the output as a JSON object matc
 }
 `;
 
-    const response = await generateContentWithRetry({
+    const response = await generateContentWithRetry(ai, {
 
 
       model: "gemini-3.1-flash-lite",
@@ -442,10 +762,10 @@ You MUST output exactly ${count} scenes. Return the output as a JSON object matc
 });
 
 // Regenerate single scene prompt
-app.post("/api/regenerate-scene", async (req, res) => {
+app.post("/api/regenerate-scene", verifyUserAuth as express.RequestHandler, async (req: AuthenticatedRequest, res) => {
   try {
     const { transcript, sceneNumber, totalScenes, category, previousPrompt, format } = req.body;
-    const ai = getAiClient();
+    const ai = req.userAiClient!;
 
     const formatInstruction = (format && format !== "none") ? `Ensure this scene is strictly designed and described for a ${format === "16:9" ? "Horizontal (16:9) widescreen landscape" : format === "9:16" ? "Vertical (9:16) portrait format (for Shorts/Reels/TikTok)" : "Square (1:1) format"} aspect ratio.` : "";
 
@@ -479,7 +799,7 @@ Please provide a fresh, significantly improved, highly detailed cinematic video 
 The prompt MUST be on a single contiguous line of text, containing ONLY the prompt description itself (no prepended "Scene X:" label or headers), with absolutely no commentary, introduction, or JSON. Just the direct prompt itself in English.
 `;
 
-    const response = await generateContentWithRetry({
+    const response = await generateContentWithRetry(ai, {
 
 
       model: "gemini-3.1-flash-lite",
@@ -496,7 +816,7 @@ The prompt MUST be on a single contiguous line of text, containing ONLY the prom
 });
 
 // YouTube & Social Media Growth Strategist Metadata API
-app.post("/api/generate-ctr", async (req, res) => {
+app.post("/api/generate-ctr", verifyUserAuth as express.RequestHandler, async (req: AuthenticatedRequest, res) => {
   try {
     const {
       transcript,
@@ -512,7 +832,7 @@ app.post("/api/generate-ctr", async (req, res) => {
       return res.status(400).json({ error: "Transcript is required." });
     }
 
-    const ai = getAiClient();
+    const ai = req.userAiClient!;
     
     // Construct dynamic prompt based on toggles
     const prompt = `
@@ -611,7 +931,7 @@ Return your response as a valid JSON object matching this schema:
       schemaRequired.push("tags");
     }
 
-    const response = await generateContentWithRetry({
+    const response = await generateContentWithRetry(ai, {
       model: "gemini-3.1-flash-lite",
       contents: prompt,
       config: {
@@ -639,7 +959,7 @@ Return your response as a valid JSON object matching this schema:
 });
 
 // YouTube & Social Media Thumbnail Director API
-app.post("/api/generate-thumbnail-prompt", async (req, res) => {
+app.post("/api/generate-thumbnail-prompt", verifyUserAuth as express.RequestHandler, async (req: AuthenticatedRequest, res) => {
   try {
     const {
       transcript,
@@ -658,7 +978,7 @@ app.post("/api/generate-thumbnail-prompt", async (req, res) => {
       return res.status(400).json({ error: "Transcript is required." });
     }
 
-    const ai = getAiClient();
+    const ai = req.userAiClient!;
 
     // Prepare multimodal inline data if character image is attached
     let inlineDataPart: any = null;
@@ -849,7 +1169,7 @@ Return your response as a valid JSON object matching this schema:
       }
       contentsArray.push({ text: prompt });
 
-      const response = await generateContentWithRetry({
+      const response = await generateContentWithRetry(ai, {
         model: "gemini-3.1-flash-lite",
         contents: contentsArray,
         config: {
@@ -987,7 +1307,7 @@ Return your response as a valid JSON object matching this schema:
       }
       contentsArray.push({ text: prompt });
 
-      const response = await generateContentWithRetry({
+      const response = await generateContentWithRetry(ai, {
         model: "gemini-3.1-flash-lite",
         contents: contentsArray,
         config: {
@@ -1031,14 +1351,14 @@ Return your response as a valid JSON object matching this schema:
 });
 
 // Granular segment/key level regeneration for CTR
-app.post("/api/regenerate-ctr-field", async (req, res) => {
+app.post("/api/regenerate-ctr-field", verifyUserAuth as express.RequestHandler, async (req: AuthenticatedRequest, res) => {
   try {
     const { transcript, field, videoDuration } = req.body;
     if (!transcript || !transcript.trim()) {
       return res.status(400).json({ error: "Transcript is required." });
     }
 
-    const ai = getAiClient();
+    const ai = req.userAiClient!;
     let fieldPrompt = "";
     let responseSchema: any = {};
 
@@ -1143,7 +1463,7 @@ Return the output in the "tags" array.`;
       return res.status(400).json({ error: "Invalid field requested." });
     }
 
-    const response = await generateContentWithRetry({
+    const response = await generateContentWithRetry(ai, {
 
 
       model: "gemini-3.1-flash-lite",

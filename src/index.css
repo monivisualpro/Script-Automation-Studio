@@ -17,11 +17,11 @@
   background: #020904;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(0, 255, 1, 0.25);
+  background: rgba(7, 7, 7, 0.25);
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 255, 0, 0.508);
+  background: rgba(43, 43, 43, 0.508);
 }
 
 /* Nastaliq Urdu style */
@@ -34,6 +34,6 @@
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .glow-on-hover:hover:not(:disabled) {
-  border-color: #00FF01 !important;
-  box-shadow: 0 0 15px rgba(0, 255, 1, 0.55), inset 0 0 5px rgba(0, 255, 1, 0.15) !important;
+  border-color: #ffffff !important;
+  box-shadow: 0 0 15px rgba(0, 115, 255, 0.55), inset 0 0 5px rgba(0, 255, 1, 0.15) !important;
 }

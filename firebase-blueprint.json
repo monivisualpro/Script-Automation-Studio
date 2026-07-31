@@ -1,0 +1,45 @@
+{
+  "entities": {
+    "users": {
+      "title": "User Profiles",
+      "description": "User account info and encrypted API keys",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "profilePhoto": { "type": "string" },
+        "provider": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "user"] },
+        "encryptedApiKey": { "type": "string" },
+        "apiKeyMasked": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["userId", "email"]
+    },
+    "admins": {
+      "title": "Admin Records",
+      "description": "Explicit admin privilege tracking for platform management",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["userId", "email"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "users",
+      "description": "User profiles collection"
+    },
+    "/admins/{userId}": {
+      "schema": "admins",
+      "description": "Admin collection for system administrators"
+    }
+  }
+}

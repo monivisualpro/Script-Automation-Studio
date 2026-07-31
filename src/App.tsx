@@ -1,5 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
+import { useAuth } from "./context/AuthContext";
+import { UserHeader } from "./components/UserHeader";
+import { AuthModal } from "./components/AuthModal";
+import { ApiKeyModal } from "./components/ApiKeyModal";
+import { SettingsModal } from "./components/SettingsModal";
+import { AdminModal } from "./components/AdminModal";
 import {
   Volume2,
   VolumeX,
@@ -24,7 +30,10 @@ import {
   MicOff,
   Calculator,
   Image,
-  User
+  User,
+  ShieldCheck,
+  Key,
+  LogIn
 } from "lucide-react";
 
 const CATEGORIES = [
@@ -95,6 +104,41 @@ const ALL_COUNTRIES = [
 ];
 
 export default function App() {
+  const {
+    user,
+    profile,
+    idToken,
+    isAuthModalOpen,
+    setIsAuthModalOpen,
+    isApiKeyModalOpen,
+    setIsApiKeyModalOpen,
+    isSettingsModalOpen,
+    setIsSettingsModalOpen,
+    isAdminModalOpen,
+    setIsAdminModalOpen,
+    modelSettings,
+  } = useAuth();
+
+  const [lastModelUsed, setLastModelUsed] = useState<string | null>(null);
+
+  // Access validation and auth header constructor
+  const checkAccessAndGetHeaders = (): Record<string, string> | null => {
+    if (!user) {
+      setIsAuthModalOpen(true);
+      setError("Authentication required: Please Sign Up or Log In first.");
+      return null;
+    }
+    if (!profile?.hasApiKey) {
+      setIsApiKeyModalOpen(true);
+      setError("Google AI API Key required: Please add your personal API key to continue.");
+      return null;
+    }
+    return {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${idToken}`,
+    };
+  };
+
   // Config States
   const [voicePersona, setVoicePersona] = useState<"female" | "male">("female");
   const [topicNiche, setTopicNiche] = useState("Medical & Health");
@@ -319,6 +363,9 @@ export default function App() {
       return;
     }
 
+    const headers = checkAccessAndGetHeaders();
+    if (!headers) return;
+
     setLoading(true);
     setError(null);
     setPolishedScript("");
@@ -335,10 +382,9 @@ export default function App() {
     try {
       const response = await fetch("/api/generate", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers,
         body: JSON.stringify({
+          model: modelSettings.scriptGeneration,
           rawScript,
           voicePersona,
           topicNiche,
@@ -359,6 +405,9 @@ export default function App() {
       }
 
       const data = await response.json();
+      if (data.modelUsed) {
+        setLastModelUsed(data.modelUsed);
+      }
       const scriptsMap = data.polishedScripts || {};
       setPolishedScripts(scriptsMap);
       setPolishedScript(scriptsMap[activeTransformation] || "");
@@ -429,13 +478,17 @@ export default function App() {
 
   const handleGenerateCtr = async () => {
     if (!videoTranscriptInput.trim()) return;
+    const headers = checkAccessAndGetHeaders();
+    if (!headers) return;
+
     setCtrLoading(true);
     setError(null);
     try {
       const response = await fetch("/api/generate-ctr", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
+          model: modelSettings.scriptGeneration,
           transcript: videoTranscriptInput,
           toggleTitle,
           toggleDescription,
@@ -462,13 +515,17 @@ export default function App() {
 
   const handleRegenerateCtrField = async (field: "titles" | "description" | "timestamps" | "hashtags" | "tags") => {
     if (!videoTranscriptInput.trim()) return;
+    const headers = checkAccessAndGetHeaders();
+    if (!headers) return;
+
     setCtrRegeneratingField(field);
     setError(null);
     try {
       const response = await fetch("/api/regenerate-ctr-field", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
+          model: modelSettings.scriptGeneration,
           transcript: videoTranscriptInput,
           field,
           videoDuration: ytVideoDuration,
@@ -497,13 +554,17 @@ export default function App() {
 
   const handleGenerateThumbnailPrompt = async () => {
     if (!thumbnailTranscriptInput.trim()) return;
+    const headers = checkAccessAndGetHeaders();
+    if (!headers) return;
+
     setThumbnailLoading(true);
     setError(null);
     try {
       const response = await fetch("/api/generate-thumbnail-prompt", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
+          model: modelSettings.promptGeneration,
           transcript: thumbnailTranscriptInput,
           bgColor: getActiveBgColor(),
           headline: thumbHeadline,
@@ -770,17 +831,25 @@ export default function App() {
       alert("Please enter a topic name first.");
       return;
     }
+    const headers = checkAccessAndGetHeaders();
+    if (!headers) return;
+
     setTopicGenerating(true);
     setError(null);
     try {
       const res = await fetch("/api/generate-topic", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topic: topicName, wordCount: topicWordLimit }),
+        headers,
+        body: JSON.stringify({
+          model: modelSettings.rewriteExpand,
+          topic: topicName,
+          wordCount: topicWordLimit,
+        }),
       });
       if (!res.ok) throw new Error("Failed to generate script from topic.");
       const data = await res.json();
       setRawScript(data.rawScript);
+      if (data.modelUsed) setLastModelUsed(data.modelUsed);
     } catch (err: any) {
       setError(err.message || "Error generating script from topic.");
     } finally {
@@ -793,6 +862,9 @@ export default function App() {
       alert("Please enter a video URL first.");
       return;
     }
+    const headers = checkAccessAndGetHeaders();
+    if (!headers) return;
+
     if (mode === "gemini") {
       setIsGeneratingWithGemini(true);
     } else {
@@ -802,8 +874,12 @@ export default function App() {
     try {
       const res = await fetch("/api/extract-transcript", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: videoUrl, mode }),
+        headers,
+        body: JSON.stringify({
+          model: modelSettings.youtubeTranscript,
+          url: videoUrl,
+          mode,
+        }),
       });
       if (!res.ok) throw new Error("Failed to extract transcript.");
       const data = await res.json();
@@ -834,12 +910,19 @@ export default function App() {
     } else if (file.name.endsWith(".pdf")) {
       reader.onload = async (event) => {
         const base64Data = (event.target?.result as string).split(",")[1];
+        const headers = checkAccessAndGetHeaders();
+        if (!headers) {
+          if (setLoadingState) setLoadingState(false);
+          else setLoading(false);
+          return;
+        }
+
         if (setLoadingState) setLoadingState(true);
         else setLoading(true);
         try {
           const res = await fetch("/api/parse-file", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers,
             body: JSON.stringify({
               fileName: file.name,
               fileType: file.type || "application/pdf",
@@ -920,13 +1003,17 @@ export default function App() {
       alert("Please paste a transcript first.");
       return;
     }
+    const headers = checkAccessAndGetHeaders();
+    if (!headers) return;
+
     setScenesLoading(true);
     setError(null);
     try {
       const res = await fetch("/api/generate-scenes", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
+          model: modelSettings.promptGeneration,
           transcript: transcriptInput,
           numScenes,
           category: contentCategory,
@@ -1017,6 +1104,9 @@ export default function App() {
   };
 
   const handleRegenerateSingleScene = async (id: number) => {
+    const headers = checkAccessAndGetHeaders();
+    if (!headers) return;
+
     const previous = scenes.find((s) => s.id === id)?.text || "";
     setScenes((prev) =>
       prev.map((s) => (s.id === id ? { ...s, loading: true } : s))
@@ -1025,7 +1115,7 @@ export default function App() {
     try {
       const res = await fetch("/api/regenerate-scene", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           transcript: transcriptInput,
           sceneNumber: id,
@@ -1055,8 +1145,55 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#031d0a] via-[#011105] to-[#000401] text-gray-200 font-sans p-3 md:p-6 overflow-x-hidden selection:bg-[#00FF01] selection:text-black">
-      
+    <div className="min-h-screen bg-gradient-to-br from-[#031d0a] via-[#011105] to-[#000401] text-gray-200 font-sans overflow-x-hidden selection:bg-[#00FF01] selection:text-black">
+      {/* Top User Navigation Header */}
+      <UserHeader />
+
+      {/* Authentication & API Key Modals */}
+      <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
+      <ApiKeyModal
+        isOpen={isApiKeyModalOpen}
+        onClose={() => setIsApiKeyModalOpen(false)}
+        canDismiss={true}
+      />
+      <SettingsModal isOpen={isSettingsModalOpen} onClose={() => setIsSettingsModalOpen(false)} />
+      <AdminModal isOpen={isAdminModalOpen} onClose={() => setIsAdminModalOpen(false)} />
+
+      {/* Unauthenticated / Missing API Key Alert Banners */}
+      {!user && (
+        <div className="bg-[#051a0b] border-b border-green-800/80 px-4 py-3 text-center text-xs font-mono text-gray-300 flex flex-col sm:flex-row items-center justify-center gap-3">
+          <span className="text-[#00FF01] font-bold flex items-center gap-1.5">
+            <Lock className="h-4 w-4" />
+            <span>Authentication Required:</span>
+          </span>
+          <span>Sign up or log in with Google / Email to generate scripts using your own personal Google AI API Key.</span>
+          <button
+            onClick={() => setIsAuthModalOpen(true)}
+            className="px-3 py-1.5 rounded-xl bg-[#00FF01] text-black font-extrabold text-xs hover:bg-white transition-all shadow-[0_0_10px_rgba(0,255,1,0.3)] cursor-pointer flex items-center gap-1.5"
+          >
+            <LogIn className="h-3.5 w-3.5" />
+            <span>Sign In / Register</span>
+          </button>
+        </div>
+      )}
+
+      {user && !profile?.hasApiKey && (
+        <div className="bg-amber-950/90 border-b border-amber-600/80 px-4 py-3 text-center text-xs font-mono text-amber-200 flex flex-col sm:flex-row items-center justify-center gap-3">
+          <span className="text-amber-400 font-bold flex items-center gap-1.5 animate-pulse">
+            <Key className="h-4 w-4" />
+            <span>Personal API Key Needed:</span>
+          </span>
+          <span>Your account requires a Google AI Studio API Key before script generation can run.</span>
+          <button
+            onClick={() => setIsApiKeyModalOpen(true)}
+            className="px-3 py-1.5 rounded-xl bg-amber-400 text-black font-extrabold text-xs hover:bg-white transition-all shadow-[0_0_10px_rgba(245,158,11,0.4)] cursor-pointer flex items-center gap-1.5"
+          >
+            <Key className="h-3.5 w-3.5" />
+            <span>Configure Key Now</span>
+          </button>
+        </div>
+      )}
+
       {/* Super high-tech radiant green laser effects in background */}
       <div className="absolute top-10 right-10 w-80 h-80 bg-[#00FF01]/5 rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute bottom-20 left-10 w-96 h-96 bg-[#00FF01]/3 rounded-full blur-[150px] pointer-events-none" />
@@ -2448,14 +2585,24 @@ export default function App() {
                         ✨ <strong>देवनागरी लिपि में उर्दू एहसास (अस्सलामु अलैकुम):</strong> यह पूरी तरह से देवनागरी (हिंदी) अक्षरों में लिखा गया है, लेकिन इसके शब्द, वाक्य और उच्चारण शैली (लहज़ा) पूरी तरह से उर्दू और हिंदुस्तानी बातचीत पर आधारित हैं, ताकि जब इसे पढ़ा जाए तो यह मुकम्मल उर्दू लहज़े में लगे!
                       </p>
                     </div>
-                  )}��या है, लेकिन इसके शब्द, वाक्य और उच्चारण शैली (लहज़ा) पूरी तरह से उर्दू और हिंदुस्तानी बातचीत पर आधारित हैं, ताकि जब इसे पढ़ा जाए तो यह मुकम्मल उर्दू लहज़े में लगे!
-                      </p>
-                    </div>
                   )}
                 </div>
 
                 {/* SCRIPT TEXT BOX / CONTAINER */}
                 <div className="flex-1 overflow-y-auto p-5 relative font-sans text-xs md:text-sm leading-relaxed text-gray-100 selection:bg-[#00FF01] selection:text-black">
+                  {polishedScript && (
+                    <div className="mb-3 flex items-center justify-between border-b border-green-800/40 pb-2.5">
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-mono font-bold bg-[#00FF01]/10 border border-[#00FF01]/30 text-[#00FF01]">
+                        <Sparkles className="h-3 w-3 text-[#00FF01] animate-pulse" />
+                        Generated with {lastModelUsed || modelSettings.scriptGeneration}
+                      </span>
+                      {plagiarismCheck === "verified" && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-mono text-emerald-400 font-semibold">
+                          <CheckCircle className="h-3 w-3" /> 100% Plagiarism Free ({plagiarismScore.toFixed(1)}%)
+                        </span>
+                      )}
+                    </div>
+                  )}
                   {loading ? (
                     <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/85 space-y-4">
                       <Loader2 className="h-10 w-10 text-[#00FF01] animate-spin" />

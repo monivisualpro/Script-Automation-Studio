@@ -1,0 +1,12 @@
+{ 
+
+"projectId": "script-automation-studio",
+"appId": "1:213799464433:web:2970fd36cbd56d7460a850",
+"apiKey": "AIzaSyCf4GIuPVF53dNYzFGV59tebGzNcPpJXJQ",
+"authDomain": "script-automation-studio.firebaseapp.com", 
+"firestoreDatabaseId": "(default)", 
+"storageBucket": "script-automation-studio.firebasestorage.app", 
+"messagingSenderId": "213799464433", 
+"measurementId": "G-4WGL2LCRYB" 
+
+}
