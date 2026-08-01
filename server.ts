@@ -596,7 +596,7 @@ Strict rules for formatting and content:
 7. Structure and Hooks:
    - Custom Hook requested: "${customHook || "None"}"
    - Greetings Prefix: "${greetingsPrefix || "None"}"
-   - Structure format: ${includeHooksBodyConclusion ? "Structure explicitly into Hook, Body, and Conclusion sections with brief markdown labels (e.g., **[Hook]**, **[Body - Section]**, **[Conclusion]**) so the speaker can easily segment their performance." : "Structure naturally as a single contiguous, smooth-flowing script with elegant paragraph breaks, but without section headers."}
+   - Structure format: ${includeHooksBodyConclusion ? "Structure into Hook, Body, and Conclusion using clean plain text headers like Hook, Section 1, Conclusion without markdown bold or square brackets." : "Structure naturally without section headers."}
    - Incorporate the custom hook "${customHook || ""}" and greeting "${greetingsPrefix && greetingsPrefix !== "None" ? greetingsPrefix : ""}" beautifully at the very beginning of the script to hook the listener instantly.
    - At the very end of the Conclusion/outro section (or as the final block of the script output), you MUST always include the following call-to-action subscription text adapted to the selected language:
      * If the selected transformation option is "urdu-writing": "دوستو اگر ویڈیو پسند آئی ہو تو اسے لائک کریں اور ایسی مزید معلوماتی ویڈیوز کے لیے ہمارے چینل کو سبسکرائب ضرور کریں اور بیل آئیکن دبانا مت بھولیے گا۔"
@@ -735,17 +735,25 @@ Return ONLY the clean, word-by-word spoken transcript text with NO speaker tags,
       transcript = (interaction.output_text || "").trim();
     } catch (apiError: any) {
       console.warn("Antigravity agent failed or not allowed, falling back to gemini-3.1-flash-lite:", apiError);
-      const response = await generateContentWithRetry(ai, {
-        model: "gemini-3.1-flash-lite",
-        contents: prompt
-      });
-      transcript = (response.text || "").trim();
+      try {
+        const response = await generateContentWithRetry(ai, {
+          model: "gemini-3.1-flash-lite",
+          contents: prompt
+        });
+        transcript = (response.text || "").trim();
+      } catch (fallbackErr) {
+        console.error("Transcript fallback failed:", fallbackErr);
+      }
+    }
+
+    if (!transcript || transcript.length < 5) {
+      return res.status(400).json({ error: "Out of credits or unable to extract YouTube transcript. Please check your URL or API credits." });
     }
 
     res.json({ transcript });
   } catch (error: any) {
     console.error("Error in /api/extract-transcript:", error);
-    res.status(500).json({ error: error.message || "An error occurred extracting transcript." });
+    res.status(400).json({ error: "Out of credits or unable to extract YouTube transcript. Please check your URL or API credits." });
   }
 });
 
@@ -828,7 +836,7 @@ You are an award-winning cinematic director and AI prompt engineer specializing 
 Your task is to:
 1. Read the provided TRANSCRIPT below.
 2. Divide it logically into exactly ${count} chronological scenes.
-3. For each scene, write one highly cinematic, extremely detailed, and professional Text-to-Video generation prompt in English.
+3. For each scene, write one highly cinematic, extremely detailed, and professional Text-to-Video generation prompt in English. Each prompt MUST be very thorough and rich (nearly 10 to 15 sentences long, exhaustively detailing every visual aspect of the scene including precise subject action, exquisite camera work, dramatic lighting, atmospheric haze/effects, textures, color grading, and environmental depth).
 4. Each prompt must:
    - Be optimized for modern video generators like Veo 3 and Wan 2.2.
    - Be EXACTLY aligned with the category field: "${cat}". Do not deviate or add unrelated themes.

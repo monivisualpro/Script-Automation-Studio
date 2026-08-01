@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useAuth } from "../context/AuthContext";
+import { getThemeConfig } from "../lib/themeConfig";
 import { Key, ExternalLink, ShieldCheck, AlertCircle, CheckCircle2, Lock, Eye, EyeOff, Sparkles, X } from "lucide-react";
 
 interface ApiKeyModalProps {
@@ -9,7 +10,8 @@ interface ApiKeyModalProps {
 }
 
 export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, canDismiss = true }) => {
-  const { idToken, refreshProfile, profile } = useAuth();
+  const { idToken, refreshProfile, profile, currentTheme } = useAuth();
+  const theme = getThemeConfig(currentTheme);
   const [apiKeyInput, setApiKeyInput] = useState<string>("");
   const [showKey, setShowKey] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
@@ -66,14 +68,21 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, canDi
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md p-4 sm:p-6 overflow-y-auto">
-      <div className="w-full max-w-lg bg-[#051408] border border-green-800 rounded-3xl shadow-[0_0_60px_rgba(0,255,1,0.2)] p-6 sm:p-8 relative my-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-2xl p-4 sm:p-6 overflow-y-auto animate-[fadeIn_0.2s_ease-out]">
+      {/* Floating Liquid Background Blob behind ApiKey Modal */}
+      <div 
+        className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 rounded-full blur-[120px] pointer-events-none opacity-30 animate-liquid-blob-1"
+        style={{ backgroundColor: theme.accentColor }} 
+      />
+
+      <div className="w-full max-w-lg glass-panel rounded-3xl shadow-2xl p-6 sm:p-8 relative my-auto border border-white/20 backdrop-blur-2xl" style={{ color: theme.textColor }}>
         {/* Close / Cross (X) Button */}
         {onClose && (
           <button
             type="button"
             onClick={onClose}
-            className="absolute top-5 right-5 p-2 rounded-xl text-gray-400 hover:text-white hover:bg-green-950/60 transition-all cursor-pointer z-10"
+            className="absolute top-5 right-5 p-2.5 rounded-2xl glass-button transition-transform duration-200 hover:scale-110 active:scale-90 z-10 cursor-pointer border border-white/20"
+            style={{ color: theme.textColor }}
             title="Cancel / Close"
           >
             <X className="h-5 w-5" />
@@ -81,78 +90,83 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, canDi
         )}
 
         {/* Glow Effects */}
-        <div className="absolute top-0 right-0 w-32 h-32 bg-[#00FF01]/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute top-0 right-0 w-32 h-32 rounded-full blur-3xl pointer-events-none opacity-20 animate-pulse" style={{ backgroundColor: theme.accentColor }} />
 
         {/* Modal Header */}
-        <div className="flex items-start gap-4 mb-6">
-          <div className="p-3 rounded-2xl bg-green-950 border border-[#00FF01]/50 text-[#00FF01] shrink-0 shadow-[0_0_15px_rgba(0,255,1,0.2)]">
-            <Key className="h-6 w-6" />
+        <div className="flex items-start gap-4 mb-6 relative z-10">
+          <div className="p-3.5 rounded-2xl glass-card border shrink-0 shadow-lg flex items-center justify-center" style={{ borderColor: `${theme.accentColor}60`, color: theme.accentColor }}>
+            <Key className="h-6 w-6 animate-pulse" />
           </div>
           <div>
-            <h3 className="text-xl font-extrabold text-white font-sans tracking-tight">
+            <h3 className="text-xl font-extrabold font-sans tracking-tight" style={{ color: theme.accentColor }}>
               {profile?.hasApiKey ? "Update Personal Google AI API Key" : "Set Up Your Personal Google AI API Key"}
             </h3>
-            <p className="text-xs text-gray-400 font-mono mt-1 leading-relaxed">
+            <p className="text-xs font-mono mt-1 leading-relaxed opacity-80" style={{ color: theme.textColor }}>
               Script Automation Studio operates strictly with your own personal Google AI Key. Your key is stored with AES-256 encryption and is never shared.
             </p>
           </div>
         </div>
 
         {/* Step-by-Step Box */}
-        <div className="mb-6 p-4 rounded-2xl bg-black/60 border border-green-900/60 space-y-3">
+        <div className="mb-6 p-4 rounded-2xl glass-card border space-y-3 relative z-10" style={{ borderColor: `${theme.accentColor}40` }}>
           <div className="flex items-center justify-between text-xs font-mono">
-            <span className="text-gray-300 font-semibold flex items-center gap-1.5">
-              <span className="w-5 h-5 rounded-full bg-[#00FF01] text-black font-bold flex items-center justify-center text-[10px]">1</span>
+            <span className="font-semibold flex items-center gap-1.5" style={{ color: theme.textColor }}>
+              <span className="w-5 h-5 rounded-full font-bold flex items-center justify-center text-[10px] shadow-sm" style={{ backgroundColor: theme.accentColor, color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000" }}>1</span>
               Get your free API Key from Google AI Studio:
             </span>
             <a
               href="https://aistudio.google.com/app/apikey"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#00FF01] text-black font-bold text-xs hover:bg-white transition-all shadow-[0_0_10px_rgba(0,255,1,0.3)] hover:scale-105 active:scale-95 cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-extrabold text-xs glass-button hover:scale-105 active:scale-95 transition-all shadow-md cursor-pointer border"
+              style={{
+                backgroundColor: theme.accentColor,
+                color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000",
+                borderColor: `${theme.accentColor}80`
+              }}
             >
               <span>Get API Key</span>
               <ExternalLink className="h-3.5 w-3.5" />
             </a>
           </div>
 
-          <div className="pt-2 border-t border-green-950 text-xs font-mono text-gray-400 flex items-center gap-1.5">
-            <span className="w-5 h-5 rounded-full bg-green-900/80 text-[#00FF01] font-bold flex items-center justify-center text-[10px]">2</span>
+          <div className="pt-2 border-t text-xs font-mono opacity-80 flex items-center gap-1.5" style={{ borderColor: `${theme.accentColor}25`, color: theme.textColor }}>
+            <span className="w-5 h-5 rounded-full font-bold flex items-center justify-center text-[10px]" style={{ backgroundColor: `${theme.accentColor}30`, color: theme.accentColor }}>2</span>
             <span>Paste your key below to validate and activate your studio.</span>
           </div>
         </div>
 
         {/* Feedback messages */}
         {error && (
-          <div className="mb-5 p-3.5 rounded-2xl bg-red-950/80 border border-red-800/80 text-red-200 text-xs font-mono flex items-start gap-2.5 animate-[fadeIn_0.2s_ease]">
+          <div className="mb-5 p-3.5 rounded-2xl glass-card border border-red-500/80 text-red-200 text-xs font-mono flex items-start gap-2.5 animate-[fadeIn_0.2s_ease]" style={{ backgroundColor: "rgba(127,29,29,0.4)" }}>
             <AlertCircle className="h-4 w-4 text-red-400 shrink-0 mt-0.5" />
             <span className="flex-1 leading-snug">{error}</span>
           </div>
         )}
 
         {success && (
-          <div className="mb-5 p-3.5 rounded-2xl bg-green-950/90 border border-[#00FF01] text-[#00FF01] text-xs font-mono flex items-center gap-2.5 animate-[fadeIn_0.2s_ease]">
-            <CheckCircle2 className="h-4 w-4 text-[#00FF01] shrink-0" />
+          <div className="mb-5 p-3.5 rounded-2xl glass-card border text-xs font-mono flex items-center gap-2.5 animate-[fadeIn_0.2s_ease]" style={{ backgroundColor: `${theme.accentColor}25`, borderColor: theme.accentColor, color: theme.textColor }}>
+            <CheckCircle2 className="h-4 w-4 shrink-0" style={{ color: theme.accentColor }} />
             <span className="font-bold">API Key validated and saved successfully!</span>
           </div>
         )}
 
         {/* Current Key Masked Display if existing */}
         {profile?.hasApiKey && profile.apiKeyMasked && (
-          <div className="mb-4 px-3.5 py-2.5 rounded-xl bg-green-950/30 border border-green-900/40 text-xs font-mono flex items-center justify-between">
-            <span className="text-gray-400">Current Saved Key:</span>
-            <span className="text-[#00FF01] font-bold">{profile.apiKeyMasked}</span>
+          <div className="mb-4 px-4 py-3 rounded-2xl glass-card border text-xs font-mono flex items-center justify-between" style={{ borderColor: `${theme.accentColor}40` }}>
+            <span className="opacity-80" style={{ color: theme.textColor }}>Current Saved Key:</span>
+            <span className="font-bold" style={{ color: theme.accentColor }}>{profile.apiKeyMasked}</span>
           </div>
         )}
 
         {/* Form */}
-        <form onSubmit={handleSaveKey} className="space-y-4">
+        <form onSubmit={handleSaveKey} className="space-y-4 relative z-10">
           <div>
-            <label className="block text-xs font-mono text-gray-300 mb-2 font-medium">
+            <label className="block text-xs font-mono mb-2 font-medium opacity-80" style={{ color: theme.textColor }}>
               Google AI Studio API Key (AIzaSy...)
             </label>
             <div className="relative">
-              <Lock className="absolute left-3.5 top-3.5 h-4 w-4 text-gray-500" />
+              <Lock className="absolute left-3.5 top-3.5 h-4 w-4 opacity-50" style={{ color: theme.textColor }} />
               <input
                 type={showKey ? "text" : "password"}
                 required
@@ -162,12 +176,17 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, canDi
                   setApiKeyInput(e.target.value);
                   setError(null);
                 }}
-                className="w-full bg-black/80 border border-green-900/80 rounded-2xl py-3 pl-10 pr-12 text-sm text-white font-mono placeholder-gray-600 focus:outline-none focus:border-[#00FF01] focus:ring-1 focus:ring-[#00FF01] transition-all"
+                className="w-full border rounded-2xl py-3 pl-10 pr-12 text-sm font-mono glass-input focus:outline-none transition-all"
+                style={{
+                  borderColor: `${theme.accentColor}40`,
+                  color: theme.textColor
+                }}
               />
               <button
                 type="button"
                 onClick={() => setShowKey(!showKey)}
-                className="absolute right-3.5 top-3 text-gray-500 hover:text-gray-300 transition-colors p-1"
+                className="absolute right-3.5 top-3 opacity-60 hover:opacity-100 transition-colors p-1 cursor-pointer"
+                style={{ color: theme.textColor }}
                 title={showKey ? "Hide key" : "Show key"}
               >
                 {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -175,12 +194,17 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, canDi
             </div>
           </div>
 
-          <div className="flex items-center gap-3 pt-1">
+          <div className="flex items-center gap-3 pt-2">
             {onClose && (
               <button
                 type="button"
                 onClick={onClose}
-                className="py-3.5 px-4 rounded-2xl bg-black/60 border border-green-900/80 text-gray-300 font-mono font-bold text-xs hover:bg-green-950 hover:text-white transition-all cursor-pointer"
+                className="py-3.5 px-5 rounded-2xl glass-button border font-mono font-bold text-xs transition-all cursor-pointer"
+                style={{
+                  backgroundColor: `${theme.accentColor}15`,
+                  borderColor: `${theme.accentColor}40`,
+                  color: theme.textColor
+                }}
               >
                 Cancel
               </button>
@@ -188,11 +212,17 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, canDi
             <button
               type="submit"
               disabled={loading || !apiKeyInput.trim()}
-              className="flex-1 py-3.5 px-4 rounded-2xl bg-[#00FF01] text-black font-extrabold text-sm hover:bg-white transition-all cursor-pointer shadow-[0_0_20px_rgba(0,255,1,0.3)] flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-50"
+              className="flex-1 py-3.5 px-4 rounded-2xl font-extrabold text-sm glass-button transition-all cursor-pointer shadow-xl flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-50 border"
+              style={{
+                backgroundColor: theme.accentColor,
+                color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000",
+                borderColor: `${theme.accentColor}90`,
+                boxShadow: `0 8px 30px ${theme.accentColor}60`
+              }}
             >
               {loading ? (
                 <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                  <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
                   <span>Testing Key with Gemini API...</span>
                 </div>
               ) : (
@@ -206,8 +236,8 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, canDi
         </form>
 
         {/* Security Assurance */}
-        <div className="mt-6 pt-4 border-t border-green-950/80 text-[11px] font-mono text-gray-500 flex items-center justify-center gap-1.5">
-          <ShieldCheck className="h-3.5 w-3.5 text-green-500 shrink-0" />
+        <div className="mt-6 pt-4 border-t text-[11px] font-mono opacity-60 flex items-center justify-center gap-1.5 relative z-10" style={{ borderColor: `${theme.accentColor}25`, color: theme.textColor }}>
+          <ShieldCheck className="h-3.5 w-3.5 shrink-0" style={{ color: theme.accentColor }} />
           <span>Encrypted with AES-256. Strictly tied to user ID {profile?.userId.slice(0, 8)}...</span>
         </div>
       </div>

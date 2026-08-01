@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
+import { getThemeConfig } from "../lib/themeConfig";
 import { 
   ShieldCheck, 
   Crown, 
@@ -38,7 +39,8 @@ interface AdminModalProps {
 }
 
 export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
-  const { idToken, profile } = useAuth();
+  const { idToken, profile, currentTheme } = useAuth();
+  const theme = getThemeConfig(currentTheme);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -121,36 +123,44 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
   const adminsCount = users.filter((u) => u.isAdmin || u.role === "admin").length;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/80 backdrop-blur-md animate-[fadeIn_0.15s_ease-out]">
-      <div className="relative w-full max-w-4xl max-h-[92vh] flex flex-col bg-[#020d05] border border-green-800/80 rounded-3xl shadow-[0_0_50px_rgba(0,255,1,0.2)] overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/80 backdrop-blur-2xl animate-[fadeIn_0.15s_ease-out]">
+      {/* Floating Liquid Background Blob behind Admin Modal */}
+      <div 
+        className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[32rem] h-[32rem] rounded-full blur-[140px] pointer-events-none opacity-25 animate-liquid-blob-1"
+        style={{ backgroundColor: theme.accentColor }} 
+      />
+
+      <div className="relative w-full max-w-4xl max-h-[92vh] flex flex-col glass-panel rounded-3xl shadow-2xl overflow-hidden border border-white/20 backdrop-blur-2xl" style={{ color: theme.textColor }}>
         {/* Glow Effects */}
-        <div className="absolute top-0 right-0 w-80 h-80 bg-[#00FF01]/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute top-0 right-0 w-80 h-80 rounded-full blur-3xl pointer-events-none opacity-20 animate-pulse" style={{ backgroundColor: theme.accentColor }} />
 
         {/* Modal Header */}
-        <div className="flex items-center justify-between p-5 border-b border-green-900/80 bg-green-950/40">
+        <div className="flex items-center justify-between p-5 border-b border-white/10 glass-card relative z-10">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-2xl bg-[#00FF01]/20 border border-[#00FF01] text-[#00FF01] shadow-[0_0_15px_rgba(0,255,1,0.3)]">
-              <Crown className="h-6 w-6" />
+            <div className="p-3 rounded-2xl glass-card border shadow-lg flex items-center justify-center" style={{ borderColor: `${theme.accentColor}60`, color: theme.accentColor }}>
+              <Crown className="h-6 w-6 animate-pulse" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-xl font-extrabold text-white font-sans tracking-tight">
+                <h2 className="text-xl font-extrabold font-sans tracking-tight" style={{ color: theme.textColor }}>
                   Admin Command Console
                 </h2>
-                <span className="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/50 text-[10px] font-mono font-bold flex items-center gap-1">
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold flex items-center gap-1 border shadow-sm" style={{ backgroundColor: `${theme.accentColor}25`, borderColor: `${theme.accentColor}60`, color: theme.accentColor }}>
                   <ShieldCheck className="h-3 w-3" />
                   Primary Admin Active
                 </span>
               </div>
-              <p className="text-xs text-gray-400 font-mono mt-0.5">
-                Full platform control for <span className="text-[#00FF01] font-bold">{profile?.email}</span>
+              <p className="text-xs font-mono mt-0.5 opacity-80" style={{ color: theme.textColor }}>
+                Full platform control for <span className="font-bold" style={{ color: theme.accentColor }}>{profile?.email}</span>
               </p>
             </div>
           </div>
 
           <button
             onClick={onClose}
-            className="p-2 rounded-2xl bg-black/40 border border-green-900/60 text-gray-400 hover:text-white hover:border-green-600 transition-all cursor-pointer"
+            className="p-2.5 rounded-2xl glass-button border transition-transform duration-200 hover:scale-110 active:scale-90 cursor-pointer"
+            style={{ backgroundColor: `${theme.accentColor}15`, borderColor: `${theme.accentColor}40`, color: theme.textColor }}
+            title="Close admin console"
           >
             <X className="h-5 w-5" />
           </button>
@@ -160,58 +170,68 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
         <div className="p-5 space-y-5 overflow-y-auto custom-scrollbar flex-1">
           {/* Admin Stats Grid */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="p-4 rounded-2xl bg-green-950/30 border border-green-900/60 flex flex-col">
-              <div className="flex items-center justify-between text-gray-400 mb-1">
+            <div className="p-4 rounded-2xl border flex flex-col" style={{ backgroundColor: theme.cardBg.includes("bg-white") ? "#f1f5f9" : "rgba(0,0,0,0.4)", borderColor: `${theme.accentColor}30` }}>
+              <div className="flex items-center justify-between mb-1 opacity-70" style={{ color: theme.textColor }}>
                 <span className="text-[11px] font-mono uppercase tracking-wider">Total Users</span>
-                <Users className="h-4 w-4 text-[#00FF01]" />
+                <Users className="h-4 w-4" style={{ color: theme.accentColor }} />
               </div>
-              <span className="text-2xl font-black text-white font-mono">{totalUsers}</span>
+              <span className="text-2xl font-black font-mono" style={{ color: theme.textColor }}>{totalUsers}</span>
             </div>
 
-            <div className="p-4 rounded-2xl bg-green-950/30 border border-green-900/60 flex flex-col">
-              <div className="flex items-center justify-between text-gray-400 mb-1">
+            <div className="p-4 rounded-2xl border flex flex-col" style={{ backgroundColor: theme.cardBg.includes("bg-white") ? "#f1f5f9" : "rgba(0,0,0,0.4)", borderColor: `${theme.accentColor}30` }}>
+              <div className="flex items-center justify-between mb-1 opacity-70" style={{ color: theme.textColor }}>
                 <span className="text-[11px] font-mono uppercase tracking-wider">API Keys Set</span>
-                <Key className="h-4 w-4 text-emerald-400" />
+                <Key className="h-4 w-4" style={{ color: theme.accentColor }} />
               </div>
-              <span className="text-2xl font-black text-emerald-400 font-mono">{activeKeysCount}</span>
+              <span className="text-2xl font-black font-mono" style={{ color: theme.accentColor }}>{activeKeysCount}</span>
             </div>
 
-            <div className="p-4 rounded-2xl bg-green-950/30 border border-green-900/60 flex flex-col">
-              <div className="flex items-center justify-between text-gray-400 mb-1">
+            <div className="p-4 rounded-2xl border flex flex-col" style={{ backgroundColor: theme.cardBg.includes("bg-white") ? "#f1f5f9" : "rgba(0,0,0,0.4)", borderColor: `${theme.accentColor}30` }}>
+              <div className="flex items-center justify-between mb-1 opacity-70" style={{ color: theme.textColor }}>
                 <span className="text-[11px] font-mono uppercase tracking-wider">Admins</span>
-                <Crown className="h-4 w-4 text-amber-400" />
+                <Crown className="h-4 w-4" style={{ color: theme.accentColor }} />
               </div>
-              <span className="text-2xl font-black text-amber-300 font-mono">{adminsCount}</span>
+              <span className="text-2xl font-black font-mono" style={{ color: theme.accentColor }}>{adminsCount}</span>
             </div>
 
-            <div className="p-4 rounded-2xl bg-green-950/30 border border-green-900/60 flex flex-col">
-              <div className="flex items-center justify-between text-gray-400 mb-1">
+            <div className="p-4 rounded-2xl border flex flex-col" style={{ backgroundColor: theme.cardBg.includes("bg-white") ? "#f1f5f9" : "rgba(0,0,0,0.4)", borderColor: `${theme.accentColor}30` }}>
+              <div className="flex items-center justify-between mb-1 opacity-70" style={{ color: theme.textColor }}>
                 <span className="text-[11px] font-mono uppercase tracking-wider">Encryption</span>
-                <Lock className="h-4 w-4 text-[#00FF01]" />
+                <Lock className="h-4 w-4" style={{ color: theme.accentColor }} />
               </div>
-              <span className="text-xs font-bold text-[#00FF01] font-mono mt-2">AES-256-GCM</span>
+              <span className="text-xs font-bold font-mono mt-2" style={{ color: theme.accentColor }}>AES-256-GCM</span>
             </div>
           </div>
 
           {/* Directory Toolbar */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
             <div className="relative w-full sm:w-80">
-              <Search className="absolute left-3.5 top-3 h-4 w-4 text-gray-500" />
+              <Search className="absolute left-3.5 top-3 h-4 w-4 opacity-50" style={{ color: theme.textColor }} />
               <input
                 type="text"
                 placeholder="Search user by name, email..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-black/60 border border-green-900/80 rounded-2xl py-2 pl-10 pr-4 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-[#00FF01] font-mono"
+                className="w-full border rounded-2xl py-2 pl-10 pr-4 text-xs font-mono focus:outline-none"
+                style={{
+                  backgroundColor: theme.cardBg.includes("bg-white") ? "#ffffff" : "rgba(0,0,0,0.6)",
+                  borderColor: `${theme.accentColor}40`,
+                  color: theme.textColor
+                }}
               />
             </div>
 
             <button
               onClick={fetchUsers}
               disabled={loading}
-              className="w-full sm:w-auto px-4 py-2 rounded-2xl bg-green-950/80 border border-green-800 text-gray-200 hover:text-white hover:border-[#00FF01] transition-all text-xs font-mono font-bold flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              className="w-full sm:w-auto px-4 py-2 rounded-2xl border transition-all text-xs font-mono font-bold flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              style={{
+                backgroundColor: theme.accentColor,
+                borderColor: theme.accentColor,
+                color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000"
+              }}
             >
-              <RefreshCw className={`h-3.5 w-3.5 text-[#00FF01] ${loading ? "animate-spin" : ""}`} />
+              <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
               <span>Refresh Directory</span>
             </button>
           </div>
@@ -224,10 +244,10 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
             </div>
           )}
 
-          <div className="border border-green-900/80 rounded-2xl overflow-x-auto bg-black/40">
+          <div className="border rounded-2xl overflow-x-auto" style={{ borderColor: `${theme.accentColor}30`, backgroundColor: theme.cardBg.includes("bg-white") ? "#ffffff" : "rgba(0,0,0,0.4)" }}>
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-green-900/80 bg-green-950/50 text-[11px] font-mono text-gray-400 uppercase tracking-wider">
+                <tr className="border-b text-[11px] font-mono uppercase tracking-wider" style={{ borderColor: `${theme.accentColor}30`, backgroundColor: `${theme.accentColor}10`, color: theme.textColor }}>
                   <th className="py-3 px-4">User</th>
                   <th className="py-3 px-4">Auth Method</th>
                   <th className="py-3 px-4">API Key Status</th>
@@ -235,19 +255,19 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
                   <th className="py-3 px-4 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-green-900/40 text-xs font-mono">
+              <tbody className="divide-y text-xs font-mono" style={{ borderColor: `${theme.accentColor}20` }}>
                 {loading && users.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="py-8 text-center text-gray-400">
+                    <td colSpan={5} className="py-8 text-center opacity-60" style={{ color: theme.textColor }}>
                       <div className="flex items-center justify-center gap-2">
-                        <RefreshCw className="h-4 w-4 text-[#00FF01] animate-spin" />
+                        <RefreshCw className="h-4 w-4 animate-spin" style={{ color: theme.accentColor }} />
                         <span>Fetching user records...</span>
                       </div>
                     </td>
                   </tr>
                 ) : filteredUsers.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="py-8 text-center text-gray-500">
+                    <td colSpan={5} className="py-8 text-center opacity-60" style={{ color: theme.textColor }}>
                       No users found matching query.
                     </td>
                   </tr>
@@ -255,28 +275,28 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
                   filteredUsers.map((u) => {
                     const isPrimary = u.email.toLowerCase() === "tahsinirshad7370@gmail.com";
                     return (
-                      <tr key={u.userId} className="hover:bg-green-950/20 transition-colors">
+                      <tr key={u.userId} className="transition-colors hover:opacity-90">
                         <td className="py-3.5 px-4">
                           <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-xl bg-green-950 border border-green-800 flex items-center justify-center font-bold text-[#00FF01]">
+                            <div className="w-8 h-8 rounded-xl border flex items-center justify-center font-bold" style={{ backgroundColor: `${theme.accentColor}20`, borderColor: `${theme.accentColor}40`, color: theme.accentColor }}>
                               {u.name.substring(0, 1).toUpperCase()}
                             </div>
                             <div>
-                              <div className="font-bold text-white flex items-center gap-1.5">
+                              <div className="font-bold flex items-center gap-1.5" style={{ color: theme.textColor }}>
                                 <span>{u.name}</span>
                                 {isPrimary && (
-                                  <span className="px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 text-[9px] font-extrabold border border-amber-500/40">
+                                  <span className="px-1.5 py-0.2 rounded border text-[9px] font-extrabold" style={{ backgroundColor: `${theme.accentColor}30`, borderColor: theme.accentColor, color: theme.accentColor }}>
                                     Primary Admin
                                   </span>
                                 )}
                               </div>
-                              <div className="text-gray-400 text-[11px]">{u.email}</div>
+                              <div className="text-[11px] opacity-70" style={{ color: theme.textColor }}>{u.email}</div>
                             </div>
                           </div>
                         </td>
 
                         <td className="py-3.5 px-4">
-                          <span className="px-2.5 py-1 rounded-xl bg-black/60 border border-green-900/60 text-gray-300 text-[11px] capitalize inline-flex items-center gap-1">
+                          <span className="px-2.5 py-1 rounded-xl border text-[11px] capitalize inline-flex items-center gap-1" style={{ backgroundColor: `${theme.accentColor}10`, borderColor: `${theme.accentColor}30`, color: theme.textColor }}>
                             {u.provider === "google.com" ? (
                               <Mail className="h-3 w-3 text-blue-400" />
                             ) : u.provider === "anonymous" ? (
@@ -290,12 +310,12 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
 
                         <td className="py-3.5 px-4">
                           {u.hasApiKey ? (
-                            <span className="text-emerald-400 font-bold flex items-center gap-1">
+                            <span className="font-bold flex items-center gap-1" style={{ color: theme.accentColor }}>
                               <CheckCircle2 className="h-3.5 w-3.5" />
                               <span>Configured ({u.apiKeyMasked || "Active"})</span>
                             </span>
                           ) : (
-                            <span className="text-gray-500 flex items-center gap-1">
+                            <span className="opacity-50 flex items-center gap-1" style={{ color: theme.textColor }}>
                               <X className="h-3.5 w-3.5 text-red-400" />
                               <span>Not set</span>
                             </span>
@@ -304,12 +324,12 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
 
                         <td className="py-3.5 px-4">
                           {u.isAdmin || u.role === "admin" ? (
-                            <span className="px-2.5 py-1 rounded-xl bg-amber-950/80 border border-amber-500/80 text-amber-300 font-bold text-[10px] inline-flex items-center gap-1">
-                              <Crown className="h-3 w-3 text-amber-400" />
+                            <span className="px-2.5 py-1 rounded-xl border font-bold text-[10px] inline-flex items-center gap-1" style={{ backgroundColor: `${theme.accentColor}20`, borderColor: theme.accentColor, color: theme.accentColor }}>
+                              <Crown className="h-3 w-3" />
                               <span>Admin</span>
                             </span>
                           ) : (
-                            <span className="px-2.5 py-1 rounded-xl bg-black/60 border border-green-900/60 text-gray-400 text-[10px]">
+                            <span className="px-2.5 py-1 rounded-xl border text-[10px] opacity-70" style={{ borderColor: `${theme.accentColor}20`, color: theme.textColor }}>
                               User
                             </span>
                           )}
@@ -317,16 +337,17 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
 
                         <td className="py-3.5 px-4 text-right">
                           {isPrimary ? (
-                            <span className="text-gray-600 text-[10px] italic">Owner</span>
+                            <span className="text-[10px] italic opacity-60" style={{ color: theme.textColor }}>Owner</span>
                           ) : (
                             <button
                               onClick={() => handleToggleRole(u.userId, u.role)}
                               disabled={updatingUser === u.userId}
-                              className={`px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all cursor-pointer inline-flex items-center gap-1.5 ${
-                                u.role === "admin"
-                                  ? "bg-red-950/60 border border-red-800 text-red-300 hover:bg-red-900"
-                                  : "bg-green-950/80 border border-[#00FF01]/60 text-[#00FF01] hover:bg-white hover:text-black"
-                              }`}
+                              className="px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all cursor-pointer inline-flex items-center gap-1.5 border"
+                              style={{
+                                backgroundColor: u.role === "admin" ? "rgba(153,27,27,0.3)" : theme.accentColor,
+                                borderColor: u.role === "admin" ? "#b91c1c" : theme.accentColor,
+                                color: u.role === "admin" ? "#fca5a5" : (theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000")
+                              }}
                             >
                               {u.role === "admin" ? (
                                 <>
@@ -352,14 +373,18 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
         </div>
 
         {/* Modal Footer */}
-        <div className="p-4 border-t border-green-900/80 bg-green-950/30 flex items-center justify-between text-xs font-mono text-gray-400">
+        <div className="p-4 border-t flex items-center justify-between text-xs font-mono" style={{ borderColor: `${theme.accentColor}30`, backgroundColor: `${theme.accentColor}08`, color: theme.textColor }}>
           <div className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-[#00FF01]" />
+            <Sparkles className="h-4 w-4" style={{ color: theme.accentColor }} />
             <span>Script Automation Studio Admin System</span>
           </div>
           <button
             onClick={onClose}
-            className="px-4 py-2 rounded-xl bg-green-900/50 hover:bg-green-800 text-white font-bold transition-all cursor-pointer"
+            className="px-4 py-2 rounded-xl font-bold transition-all cursor-pointer"
+            style={{
+              backgroundColor: theme.accentColor,
+              color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000"
+            }}
           >
             Close Dashboard
           </button>

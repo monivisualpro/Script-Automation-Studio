@@ -47,6 +47,8 @@ interface AuthContextType {
   updateModelSettings: (newSettings: Partial<FeatureModelConfig>) => Promise<void>;
   availableModels: Array<{ id: string; displayName: string }>;
   fetchAvailableModels: () => Promise<void>;
+  currentTheme: string;
+  setCurrentTheme: (theme: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -73,6 +75,8 @@ const AuthContext = createContext<AuthContextType>({
   updateModelSettings: async () => {},
   availableModels: [],
   fetchAvailableModels: async () => {},
+  currentTheme: "Neon Green",
+  setCurrentTheme: () => {},
 });
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -86,6 +90,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isAdminModalOpen, setIsAdminModalOpen] = useState<boolean>(false);
   const [isImageStudioOpen, setIsImageStudioOpen] = useState<boolean>(false);
   const [initialImagePrompt, setInitialImagePrompt] = useState<string>("");
+  const [currentTheme, setCurrentThemeState] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem("script_automation_app_theme");
+      if (saved) return saved;
+    } catch {}
+    return "Neon Green";
+  });
+
+  const setCurrentTheme = (theme: string) => {
+    setCurrentThemeState(theme);
+    try {
+      localStorage.setItem("script_automation_app_theme", theme);
+    } catch {}
+  };
 
   const openImageStudioWithPrompt = (prompt: string = "") => {
     setInitialImagePrompt(prompt);
@@ -275,6 +293,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         updateModelSettings,
         availableModels,
         fetchAvailableModels,
+        currentTheme,
+        setCurrentTheme,
       }}
     >
       {children}

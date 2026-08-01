@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { useAuth } from "./context/AuthContext";
+import { getThemeConfig } from "./lib/themeConfig";
 import { UserHeader } from "./components/UserHeader";
 import { AuthModal } from "./components/AuthModal";
 import { ApiKeyModal } from "./components/ApiKeyModal";
@@ -34,36 +35,45 @@ import {
   User,
   ShieldCheck,
   Key,
-  LogIn
+  LogIn,
+  Youtube,
+  Instagram,
+  Facebook,
+  Linkedin,
+  MessageCircle
 } from "lucide-react";
 
 const CATEGORIES = [
-  "Islamic",
-  "Medical & Health",
-  "Software Engineering",
-  "Computer Science",
-  "Information Technology (IT)",
+  "Animation & Motion Graphics",
   "Artificial Intelligence",
-  "Technology",
+  "Automotive",
+  "CGI",
+  "Civil Engineering",
+  "Computer Science",
+  "Documentary",
+  "Education",
+  "Electrical Engineering",
+  "Finance & Business",
+  "Fitness",
   "Food & Cooking",
   "Food Vlogging",
-  "Mechanical Engineering",
-  "Electrical Engineering",
-  "Civil Engineering",
-  "Finance & Business",
-  "Education",
-  "History",
-  "Travel",
-  "Documentary",
-  "Motivation",
-  "Lifestyle",
-  "Fitness",
-  "Real Estate",
-  "Automotive",
   "Gaming",
-  "Science",
+  "General",
+  "Graphic design",
+  "History",
+  "Information Technology (IT)",
+  "Islamic",
+  "Lifestyle",
+  "Mechanical Engineering",
+  "Medical & Health",
+  "Motivation",
   "Nature",
-  "General"
+  "Real Estate",
+  "Science",
+  "Software Engineering",
+  "Technology",
+  "Travel",
+  "Visual effects VFX"
 ];
 
 const ALL_COUNTRIES = [
@@ -122,7 +132,10 @@ export default function App() {
     initialImagePrompt,
     openImageStudioWithPrompt,
     modelSettings,
+    currentTheme,
   } = useAuth();
+
+  const theme = getThemeConfig(currentTheme);
 
   const [lastModelUsed, setLastModelUsed] = useState<string | null>(null);
 
@@ -146,7 +159,19 @@ export default function App() {
 
   // Config States
   const [voicePersona, setVoicePersona] = useState<"female" | "male">("female");
-  const [topicNiche, setTopicNiche] = useState("Medical & Health");
+  const [topicNiche, setTopicNiche] = useState(() => {
+    try {
+      return localStorage.getItem("script_automation_topic_niche") || "Medical & Health";
+    } catch {
+      return "Medical & Health";
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("script_automation_topic_niche", topicNiche);
+    } catch {}
+  }, [topicNiche]);
   const [transformation, setTransformation] = useState("urdu-roman");
   const [targetAudience, setTargetAudience] = useState("adults");
   const [wordCount, setWordCount] = useState<number>(300);
@@ -590,6 +615,12 @@ export default function App() {
 
       const data = await response.json();
       setThumbnailOutput(data);
+      try {
+        const promptToSave = data?.fluxPrompt || data?.thumbnailPrompt;
+        if (promptToSave) {
+          localStorage.setItem("script_automation_last_thumbnail_prompt", promptToSave);
+        }
+      } catch {}
     } catch (err: any) {
       setError(err.message || "An error occurred generating thumbnail prompt.");
     } finally {
@@ -1150,7 +1181,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#031d0a] via-[#011105] to-[#000401] text-gray-200 font-sans overflow-x-hidden selection:bg-[#00FF01] selection:text-black">
+    <div className={`min-h-screen ${theme.rootBg} ${theme.textColor} font-sans overflow-x-hidden transition-colors duration-300`}>
       {/* Top User Navigation Header */}
       <UserHeader />
 
@@ -1171,15 +1202,26 @@ export default function App() {
 
       {/* Unauthenticated / Missing API Key Alert Banners */}
       {!user && (
-        <div className="bg-[#051a0b] border-b border-green-800/80 px-4 py-3 text-center text-xs font-mono text-gray-300 flex flex-col sm:flex-row items-center justify-center gap-3">
-          <span className="text-[#00FF01] font-bold flex items-center gap-1.5">
+        <div
+          className="border-b px-4 py-3 text-center text-xs font-mono flex flex-col sm:flex-row items-center justify-center gap-3 backdrop-blur-md shadow-sm transition-colors duration-300"
+          style={{
+            backgroundColor: theme.cardBg.includes("bg-white") ? "#f8fafc" : `${theme.accentColor}12`,
+            borderColor: `${theme.accentColor}40`,
+            color: theme.textColor
+          }}
+        >
+          <span className="font-bold flex items-center gap-1.5" style={{ color: theme.accentColor }}>
             <Lock className="h-4 w-4" />
             <span>Authentication Required:</span>
           </span>
-          <span>Sign up or log in with Google / Email to generate scripts using your own personal Google AI API Key.</span>
+          <span className="opacity-90">Sign up or log in with Google / Email to generate scripts using your own personal Google AI API Key.</span>
           <button
             onClick={() => setIsAuthModalOpen(true)}
-            className="px-3 py-1.5 rounded-xl bg-[#00FF01] text-black font-extrabold text-xs hover:bg-white transition-all shadow-[0_0_10px_rgba(0,255,1,0.3)] cursor-pointer flex items-center gap-1.5"
+            className="px-3.5 py-1.5 rounded-xl font-extrabold text-xs transition-all shadow-md hover:scale-105 active:scale-95 cursor-pointer flex items-center gap-1.5 shrink-0"
+            style={{
+              backgroundColor: theme.accentColor,
+              color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000"
+            }}
           >
             <LogIn className="h-3.5 w-3.5" />
             <span>Sign In / Register</span>
@@ -1196,7 +1238,7 @@ export default function App() {
           <span>Your account requires a Google AI Studio API Key before script generation can run.</span>
           <button
             onClick={() => setIsApiKeyModalOpen(true)}
-            className="px-3 py-1.5 rounded-xl bg-amber-400 text-black font-extrabold text-xs hover:bg-white transition-all shadow-[0_0_10px_rgba(245,158,11,0.4)] cursor-pointer flex items-center gap-1.5"
+            className="px-3.5 py-1.5 rounded-xl bg-amber-400 text-black font-extrabold text-xs hover:bg-white transition-all shadow-[0_0_10px_rgba(245,158,11,0.4)] cursor-pointer flex items-center gap-1.5 shrink-0"
           >
             <Key className="h-3.5 w-3.5" />
             <span>Configure Key Now</span>
@@ -1204,48 +1246,64 @@ export default function App() {
         </div>
       )}
 
-      {/* Super high-tech radiant green laser effects in background */}
-      <div className="absolute top-10 right-10 w-80 h-80 bg-[#00FF01]/5 rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-20 left-10 w-96 h-96 bg-[#00FF01]/3 rounded-full blur-[150px] pointer-events-none" />
-      <div className="absolute inset-0 bg-[linear-gradient(rgba(0,255,1,0.015)_1px,transparent_1px),linear-gradient(90deg,rgba(0,255,1,0.015)_1px,transparent_1px)] bg-[size:35px_35px] pointer-events-none z-0" />
+      {/* Super high-tech radiant liquid morphing ambient background canvas */}
+      <div className="fixed top-10 -left-20 w-[550px] h-[550px] rounded-full blur-[140px] pointer-events-none opacity-25 animate-liquid-blob-1 transition-colors duration-1000 z-0" style={{ backgroundColor: theme.accentColor }} />
+      <div className="fixed top-1/3 -right-24 w-[600px] h-[600px] rounded-full blur-[160px] pointer-events-none opacity-20 animate-liquid-blob-2 transition-colors duration-1000 z-0" style={{ backgroundColor: theme.accentColor === "#00E5FF" ? "#8E44FF" : theme.accentColor === "#39FF14" ? "#00E5FF" : "#FF6F00" }} />
+      <div className="fixed -bottom-20 left-1/3 w-[650px] h-[650px] rounded-full blur-[180px] pointer-events-none opacity-20 animate-liquid-blob-3 transition-colors duration-1000 z-0" style={{ backgroundColor: theme.accentColor }} />
+      <div className="fixed inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:32px_32px] pointer-events-none z-0" />
 
       <div className="relative z-10 max-w-7xl mx-auto space-y-5">
         
-        {/* UPPER HEADER WITH GLOW EFFECTS */}
-        <header className="flex flex-col lg:flex-row items-center justify-between gap-4 border-b border-green-800/50 pb-4">
-          <div className="flex items-center gap-3">
-            <div className="h-11 w-11 rounded-xl bg-green-900/40 border border-[#00FF01]/30 flex items-center justify-center text-[#00FF01] shadow-[0_0_15px_rgba(0,255,1,0.25)] hover:shadow-[0_0_25px_rgba(0,255,1,0.6)] hover:scale-105 active:scale-95 transition-all duration-300">
-              <Sparkles className="h-5 w-5 animate-pulse" />
+        {/* UPPER HEADER WITH GLASSMORPHISM LIQUID GLOW EFFECTS */}
+        <header className={`glass-panel p-4 sm:p-5 rounded-3xl border border-white/15 backdrop-blur-2xl shadow-2xl flex flex-col lg:flex-row items-center justify-between gap-4 transition-all duration-300 hover:border-white/25`}>
+          <div className="flex items-center gap-3.5">
+            <div className="h-12 w-12 rounded-2xl glass-card border flex items-center justify-center shadow-lg transition-transform duration-300 hover:scale-105" style={{ borderColor: `${theme.accentColor}60`, color: theme.accentColor }}>
+              <Sparkles className="h-6 w-6 animate-pulse" />
             </div>
             <div>
-              <h1 className="text-xl md:text-2xl font-display font-bold tracking-tight text-[#00FF01] flex items-center gap-2">
-                Script Automation Studio
+              <h1 className="text-xl md:text-2xl font-display font-extrabold tracking-tight flex items-center gap-2" style={{ color: theme.accentColor }}>
+                <span>Script Automation Studio</span>
+                <span className="text-[10px] font-mono px-2.5 py-0.5 rounded-full border font-bold glass-card" style={{ borderColor: `${theme.accentColor}60`, color: theme.accentColor }}>
+                  v2.5
+                </span>
               </h1>
-              <p className="text-xs text-gray-400 font-mono">
+              <p className="text-xs text-gray-400 font-mono mt-0.5">
                 Elite Anti-plagiarism rephrasing · Dynamic unique output generator
               </p>
             </div>
           </div>
 
-          {/* MAIN CENTER ARCHITECT LOGO BADGE */}
-          <a
-            href="https://www.youtube.com/@monivisualpro"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="px-6 py-2.5 rounded-xl border-[3px] border-[#00FF01] bg-[#073011]/90 text-center shadow-[0_0_20px_rgba(0,255,1,0.35)] hover:shadow-[0_0_30px_rgba(0,255,1,0.65)] hover:border-[#00FF01] hover:scale-102 transition-all duration-300 glow-on-hover cursor-pointer block"
-          >
-            <span className="text-[9px] font-mono text-gray-300 uppercase tracking-widest block font-bold">Script Automation Architect</span>
-            <span className="text-xs md:text-sm font-display font-black text-[#00FF01] tracking-wider block">
+          {/* Simple text block, right-aligned opposite to title, no border, no stroke, no url button */}
+          <div className="text-center lg:text-right space-y-1">
+            <p className="text-[10px] font-mono text-gray-400 uppercase tracking-widest">
+              Script Automation Architect
+            </p>
+            <p className="text-xs md:text-sm font-display font-bold tracking-wide" style={{ color: theme.accentColor }}>
               MUHAMMAD TEHSEEN IRSHAD (MONI VISUAL PRO)
-            </span>
-          </a>
-
-          {/* RIGHT SHIELD INDICATOR */}
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-mono font-bold bg-green-900/40 border border-[#00FF01]/50 text-[#00FF01] shadow-[0_0_12px_rgba(0,255,1,0.15)] hover:shadow-[0_0_20px_rgba(0,255,1,0.3)] transition-all duration-300 glow-on-hover">
-              <span className="h-2 w-2 rounded-full bg-[#00FF01] animate-ping" />
-              PLAGIARISM SHIELD ACTIVE
-            </span>
+            </p>
+            {/* Clickable Social Icons under Muhammad Tehseen Irshad */}
+            <div className="flex items-center justify-center lg:justify-end gap-3 pt-1">
+              <a href="https://www.youtube.com/@monivisualpro" target="_blank" rel="noopener noreferrer" title="YouTube" className="p-1.5 rounded-xl glass-button border hover:scale-110 transition-transform" style={{ borderColor: `${theme.accentColor}30` }}>
+                <Youtube className="h-4 w-4" style={{ color: theme.iconColor }} />
+              </a>
+              <a href="https://www.instagram.com/monivisualpro" target="_blank" rel="noopener noreferrer" title="Instagram" className="p-1.5 rounded-xl glass-button border hover:scale-110 transition-transform" style={{ borderColor: `${theme.accentColor}30` }}>
+                <Instagram className="h-4 w-4" style={{ color: theme.iconColor }} />
+              </a>
+              <a href="https://web.facebook.com/monivisualpro" target="_blank" rel="noopener noreferrer" title="Facebook" className="p-1.5 rounded-xl glass-button border hover:scale-110 transition-transform" style={{ borderColor: `${theme.accentColor}30` }}>
+                <Facebook className="h-4 w-4" style={{ color: theme.iconColor }} />
+              </a>
+              <a href="https://www.tiktok.com/@monivisualpro" target="_blank" rel="noopener noreferrer" title="TikTok" className="p-1.5 rounded-xl glass-button border hover:scale-110 transition-transform" style={{ borderColor: `${theme.accentColor}30` }}>
+                <svg className="h-4 w-4 fill-current" viewBox="0 0 24 24" style={{ color: theme.iconColor }}>
+                  <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/>
+                </svg>
+              </a>
+              <a href="https://wa.me/923036557989" target="_blank" rel="noopener noreferrer" title="WhatsApp" className="p-1.5 rounded-xl glass-button border hover:scale-110 transition-transform" style={{ borderColor: `${theme.accentColor}30` }}>
+                <MessageCircle className="h-4 w-4" style={{ color: theme.iconColor }} />
+              </a>
+              <a href="https://www.linkedin.com/in/monivisualpro" target="_blank" rel="noopener noreferrer" title="LinkedIn" className="p-1.5 rounded-xl glass-button border hover:scale-110 transition-transform" style={{ borderColor: `${theme.accentColor}30` }}>
+                <Linkedin className="h-4 w-4" style={{ color: theme.iconColor }} />
+              </a>
+            </div>
           </div>
         </header>
 
@@ -1255,20 +1313,21 @@ export default function App() {
           {/* LEFT INTERACTIVE CONTROLS COLUMN (4 cols) */}
           <div className="lg:col-span-4 xl:col-span-4 space-y-4">
             
-            {/* VOICE PERSONA CARD - ROUNDED TABS */}
-            <div className="p-4 rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md space-y-3 shadow-md hover:border-[#00FF01]/30 hover:shadow-[0_0_15px_rgba(0,255,1,0.1)] transition-all duration-300">
-              <label className="text-xs font-mono text-[#00FF01] uppercase tracking-widest block font-bold">
+            {/* VOICE PERSONA CARD - ROUNDED GLASS TABS */}
+            <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-3 shadow-xl transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor }}>
+              <label className="text-xs font-mono uppercase tracking-widest block font-extrabold" style={{ color: theme.accentColor }}>
                 Voice Persona (Speaker)
               </label>
-              <div className="grid grid-cols-2 gap-2 bg-[#031d0a] p-1 rounded-xl border border-green-800">
+              <div className="grid grid-cols-2 gap-2 p-1.5 rounded-2xl glass-card border" style={{ backgroundColor: theme.inputBg, borderColor: `${theme.accentColor}50` }}>
                 <button
                   id="btn-voice-female"
                   onClick={() => setVoicePersona("female")}
-                  className={`py-2 px-4 font-display text-xs transition-all duration-300 flex items-center justify-center gap-2 border glow-on-hover ${
+                  className={`glass-button py-2 px-4 font-display text-xs transition-all duration-300 flex items-center justify-center gap-2 border ${
                     voicePersona === "female"
-                      ? "bg-[#00FF01] text-black border-[#00FF01] rounded-[17px] font-extrabold shadow-[0_0_15px_rgba(0,255,1,0.5)] scale-100"
-                      : "bg-transparent text-gray-300 border-transparent hover:text-white hover:bg-green-900/15 rounded-xl font-bold"
+                      ? "rounded-[17px] font-extrabold shadow-lg scale-100"
+                      : "bg-transparent border-transparent hover:opacity-100 opacity-70 rounded-xl font-bold"
                   } hover:scale-102 active:scale-95`}
+                  style={voicePersona === "female" ? { backgroundColor: theme.accentColor, color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000", borderColor: theme.accentColor } : { color: theme.textColor }}
                 >
                   <span className={`h-2.5 w-2.5 rounded-full ${voicePersona === "female" ? "bg-black" : "bg-purple-400 animate-pulse"}`} />
                   FEMALE
@@ -1276,11 +1335,12 @@ export default function App() {
                 <button
                   id="btn-voice-male"
                   onClick={() => setVoicePersona("male")}
-                  className={`py-2 px-4 font-display text-xs transition-all duration-300 flex items-center justify-center gap-2 border glow-on-hover ${
+                  className={`glass-button py-2 px-4 font-display text-xs transition-all duration-300 flex items-center justify-center gap-2 border ${
                     voicePersona === "male"
-                      ? "bg-[#00FF01] text-black border-[#00FF01] rounded-[17px] font-extrabold shadow-[0_0_15px_rgba(0,255,1,0.5)] scale-100"
-                      : "bg-transparent text-gray-300 border-transparent hover:text-white hover:bg-green-900/15 rounded-xl font-bold"
+                      ? "rounded-[17px] font-extrabold shadow-lg scale-100"
+                      : "bg-transparent border-transparent hover:opacity-100 opacity-70 rounded-xl font-bold"
                   } hover:scale-102 active:scale-95`}
+                  style={voicePersona === "male" ? { backgroundColor: theme.accentColor, color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000", borderColor: theme.accentColor } : { color: theme.textColor }}
                 >
                   <span className={`h-2.5 w-2.5 rounded-full ${voicePersona === "male" ? "bg-black" : "bg-sky-400 animate-pulse"}`} />
                   MALE
@@ -1289,9 +1349,9 @@ export default function App() {
             </div>
 
             {/* TOPIC DOMAIN / NICHE */}
-            <div className="p-4 rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md space-y-3 shadow-md hover:border-[#00FF01]/30 hover:shadow-[0_0_15px_rgba(0,255,1,0.1)] transition-all duration-300">
-              <label className="text-xs font-mono text-[#00FF01] uppercase tracking-widest flex items-center gap-1.5">
-                <TrendingUp className="h-3.5 w-3.5 text-[#00FF01]" />
+            <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-3 shadow-xl transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor }}>
+              <label className="text-xs font-mono uppercase tracking-widest flex items-center gap-1.5 font-extrabold" style={{ color: theme.accentColor }}>
+                <TrendingUp className="h-3.5 w-3.5" style={{ color: theme.accentColor }} />
                 Domain
               </label>
               <select
@@ -1301,105 +1361,111 @@ export default function App() {
                   setTopicNiche(e.target.value);
                   setContentCategory(e.target.value);
                 }}
-                className="w-full bg-[#05290e] border border-green-800 rounded-xl py-2.5 px-4 text-xs text-white focus:outline-none focus:border-[#00FF01] focus:shadow-[0_0_15px_rgba(0,255,1,0.25)] font-mono cursor-pointer transition-all duration-300 hover:border-[#00FF01] glow-on-hover"
+                className="glass-input w-full rounded-xl py-2.5 px-4 text-xs font-mono cursor-pointer transition-all duration-300 focus:outline-none"
+                style={{ backgroundColor: theme.inputBg, borderColor: theme.accentColor, borderWidth: '1px', borderStyle: 'solid', color: theme.textColor }}
               >
                 {CATEGORIES.map((cat) => (
-                  <option key={cat} value={cat} className="bg-[#05290e] text-white">{cat}</option>
+                  <option key={cat} value={cat} style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>{cat}</option>
                 ))}
               </select>
             </div>
 
-            {/* TUTORIAL & LITERATURE TONES - INCORPORATED ALL NEW TONAL STYLES */}
-            <div className="p-4 rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md space-y-3 shadow-md hover:border-[#00FF01]/30 hover:shadow-[0_0_15px_rgba(0,255,1,0.1)] transition-all duration-300">
-              <label className="text-xs font-mono text-[#00FF01] uppercase tracking-widest block">
+            {/* TUTORIAL & LITERATURE TONES */}
+            <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-3 shadow-xl transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor }}>
+              <label className="text-xs font-mono uppercase tracking-widest block font-extrabold" style={{ color: theme.accentColor }}>
                 Tutorial & Literature Tool
               </label>
               <select
                 id="select-tone"
                 value={tutorialTone}
                 onChange={(e) => setTutorialTone(e.target.value)}
-                className="w-full bg-[#05290e] border border-green-800 rounded-xl py-2.5 px-4 text-xs text-white focus:outline-none focus:border-[#00FF01] focus:shadow-[0_0_15px_rgba(0,255,1,0.25)] font-mono cursor-pointer transition-all duration-300 hover:border-[#00FF01] glow-on-hover"
+                className="glass-input w-full rounded-xl py-2.5 px-4 text-xs font-mono cursor-pointer transition-all duration-300 focus:outline-none"
+                style={{ backgroundColor: theme.inputBg, borderColor: theme.accentColor, borderWidth: '1px', borderStyle: 'solid', color: theme.textColor }}
               >
-                <option value="Warm Friendly Conversational">Warm Friendly Conversational</option>
-                <option value="Islamic / Religious Tone">Islamic / Religious Tone</option>
-                <option value="Engaging Food Blogger Vibe">Engaging Food Blogger Vibe</option>
-                <option value="Fast Paced Explainer (YouTube FB)">Fast Paced Explainer (YouTube FB)</option>
-                <option value="Informative Health Explainer">Informative Health Explainer</option>
-                <option value="Exciting Tech Enthusiast">Exciting Tech Enthusiast</option>
-                <option value="Passionate Story Teller">Passionate Story Teller</option>
-                <option value="Poetic Relatable (Shayari Vibe)">Poetic Relatable (Shayari Vibe)</option>
-                <option value="Funny and Entertaining">Funny and Entertaining</option>
-                <option value="Professional Clear Speaker">Professional Clear Speaker</option>
-                <option value="Science-Based Tutorial (Easy Explanation)">Science-Based Tutorial (Easy Explanation)</option>
-                <option value="Professional & Technical">Professional & Technical</option>
-                <option value="Casual & Conversational">Casual & Conversational</option>
-                <option value="Dramatic Narrative (Hyped)">Dramatic Narrative (Hyped)</option>
-                <option value="Deep Informative (Analytical)">Deep Informative (Analytical)</option>
+                <option value="Warm Friendly Conversational" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Warm Friendly Conversational</option>
+                <option value="Islamic / Religious Tone" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Islamic / Religious Tone</option>
+                <option value="Engaging Food Blogger Vibe" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Engaging Food Blogger Vibe</option>
+                <option value="Fast Paced Explainer (YouTube FB)" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Fast Paced Explainer (YouTube FB)</option>
+                <option value="Informative Health Explainer" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Informative Health Explainer</option>
+                <option value="Exciting Tech Enthusiast" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Exciting Tech Enthusiast</option>
+                <option value="Passionate Story Teller" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Passionate Story Teller</option>
+                <option value="Poetic Relatable (Shayari Vibe)" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Poetic Relatable (Shayari Vibe)</option>
+                <option value="Funny and Entertaining" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Funny and Entertaining</option>
+                <option value="Professional Clear Speaker" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Professional Clear Speaker</option>
+                <option value="Science-Based Tutorial (Easy Explanation)" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Science-Based Tutorial (Easy Explanation)</option>
+                <option value="Professional & Technical" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Professional & Technical</option>
+                <option value="Casual & Conversational" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Casual & Conversational</option>
+                <option value="Dramatic Narrative (Hyped)" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Dramatic Narrative (Hyped)</option>
+                <option value="Deep Informative (Analytical)" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Deep Informative (Analytical)</option>
               </select>
             </div>
 
             {/* TRANSFORMATION OPTIONS */}
-            <div className="p-4 rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md space-y-3 shadow-md hover:border-[#00FF01]/30 hover:shadow-[0_0_15px_rgba(0,255,1,0.1)] transition-all duration-300">
-              <label className="text-xs font-mono text-[#00FF01] uppercase tracking-widest flex items-center gap-1.5">
-                <Globe className="h-3.5 w-3.5 text-[#00FF01]" />
+            <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-3 shadow-xl transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor }}>
+              <label className="text-xs font-mono uppercase tracking-widest flex items-center gap-1.5 font-extrabold" style={{ color: theme.accentColor }}>
+                <Globe className="h-3.5 w-3.5" style={{ color: theme.accentColor }} />
                 Transformation Option
               </label>
               <select
                 id="select-transformation"
                 value={transformation}
                 onChange={(e) => handleSelectLanguage(e.target.value)}
-                className="w-full bg-[#05290e] border border-green-800 rounded-xl py-2.5 px-4 text-xs text-white focus:outline-none focus:border-[#00FF01] focus:shadow-[0_0_15px_rgba(0,255,1,0.25)] font-mono cursor-pointer transition-all duration-300 hover:border-[#00FF01] glow-on-hover"
+                className="glass-input w-full rounded-xl py-2.5 px-4 text-xs font-mono cursor-pointer transition-all duration-300 focus:outline-none"
+                style={{ backgroundColor: theme.inputBg, borderColor: theme.accentColor, borderWidth: '1px', borderStyle: 'solid', color: theme.textColor }}
               >
-                <option value="hindi">🇮🇳 Hindi Script (Urdu Wording & Accent)</option>
-                <option value="urdu-roman">🇵🇰 Convert to Urdu Roman (Latin Alphabet)</option>
-                <option value="english">🇬🇧 Convert to English (Polished/Fluent)</option>
-                <option value="urdu-writing" className="font-urdu">🇵🇰 اردو تحریر (Nastaliq Script)</option>
+                <option value="hindi" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>🇮🇳 Hindi Script (Urdu Wording & Accent)</option>
+                <option value="urdu-roman" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>🇵🇰 Convert to Urdu Roman (Latin Alphabet)</option>
+                <option value="english" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>🇬🇧 Convert to English (Polished/Fluent)</option>
+                <option value="urdu-writing" className="font-urdu" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>🇵🇰 اردو تحریر (Nastaliq Script)</option>
               </select>
             </div>
 
             {/* TARGET AUDIENCE */}
-            <div className="p-4 rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md space-y-3 shadow-md hover:border-[#00FF01]/30 hover:shadow-[0_0_15px_rgba(0,255,1,0.1)] transition-all duration-300">
-              <label className="text-xs font-mono text-[#00FF01] uppercase tracking-widest flex items-center gap-1.5">
-                <Lock className="h-3.5 w-3.5 text-[#00FF01]" />
+            <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-3 shadow-xl transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor }}>
+              <label className="text-xs font-mono uppercase tracking-widest flex items-center gap-1.5 font-extrabold" style={{ color: theme.accentColor }}>
+                <Lock className="h-3.5 w-3.5" style={{ color: theme.accentColor }} />
                 Target Audience
               </label>
               <select
                 id="select-audience"
                 value={targetAudience}
                 onChange={(e) => setTargetAudience(e.target.value)}
-                className="w-full bg-[#05290e] border border-green-800 rounded-xl py-2.5 px-4 text-xs text-white focus:outline-none focus:border-[#00FF01] focus:shadow-[0_0_15px_rgba(0,255,1,0.25)] font-mono cursor-pointer transition-all duration-300 hover:border-[#00FF01] glow-on-hover"
+                className="glass-input w-full rounded-xl py-2.5 px-4 text-xs font-mono cursor-pointer transition-all duration-300 focus:outline-none"
+                style={{ backgroundColor: theme.inputBg, borderColor: theme.accentColor, borderWidth: '1px', borderStyle: 'solid', color: theme.textColor }}
               >
-                <option value="children">👶 Children up to 10 years old</option>
-                <option value="adults">💼 Adults up to 40 years old</option>
-                <option value="seniors">👴 Men over 60 years old</option>
+                <option value="children" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>👶 Children up to 10 years old</option>
+                <option value="adults" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>💼 Adults up to 40 years old</option>
+                <option value="seniors" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>👴 Men over 60 years old</option>
               </select>
             </div>
 
             {/* TARGET REGIONS / COUNTRIES */}
-            <div className="p-4 rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md space-y-3 shadow-md hover:border-[#00FF01]/30 hover:shadow-[0_0_15px_rgba(0,255,1,0.1)] transition-all duration-300">
+            <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-3 shadow-xl transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor }}>
               <div className="flex items-center justify-between">
-                <label className="text-xs font-mono text-[#00FF01] uppercase tracking-widest flex items-center gap-1.5 font-bold">
-                  <Globe className="h-3.5 w-3.5 text-[#00FF01]" />
+                <label className="text-xs font-mono uppercase tracking-widest flex items-center gap-1.5 font-extrabold" style={{ color: theme.accentColor }}>
+                  <Globe className="h-3.5 w-3.5" style={{ color: theme.accentColor }} />
                   Target Regions / Countries
                 </label>
-                <span className="text-[10px] font-mono text-gray-500">{selectedCountries.length} selected</span>
+                <span className="text-[10px] font-mono opacity-80" style={{ color: theme.textColor }}>{selectedCountries.length} selected</span>
               </div>
               
               {/* Search Option above countries list */}
               <div className="relative">
-                <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-gray-400" />
+                <Search className="absolute left-3 top-2.5 h-3.5 w-3.5" style={{ color: theme.accentColor }} />
                 <input
                   type="text"
-                  placeholder="Search countries..."
+                  placeholder="Search countries (e.g. Pakistan)..."
                   value={countrySearchQuery}
                   onChange={(e) => setCountrySearchQuery(e.target.value)}
-                  className="w-full bg-[#05290e] border border-green-800 rounded-xl py-2 pl-9 pr-4 text-xs text-white focus:outline-none focus:border-[#00FF01] focus:shadow-[0_0_12px_rgba(0,255,1,0.2)] font-mono transition-all duration-300 hover:border-[#00FF01]"
+                  className="glass-input w-full rounded-xl py-2 pl-9 pr-4 text-xs font-mono transition-all duration-300 focus:outline-none"
+                  style={{ backgroundColor: theme.inputBg, borderColor: theme.accentColor, borderWidth: '1px', borderStyle: 'solid', color: theme.textColor }}
                 />
                 {countrySearchQuery && (
                   <button
                     type="button"
                     onClick={() => setCountrySearchQuery("")}
-                    className="absolute right-3 top-2 text-[10px] text-gray-400 hover:text-white cursor-pointer"
+                    className="absolute right-3 top-2 text-[10px] cursor-pointer font-bold"
+                    style={{ color: theme.accentColor }}
                   >
                     Clear
                   </button>
@@ -1407,11 +1473,12 @@ export default function App() {
               </div>
 
               {/* List of Countries (Filtered) */}
-              <div className="bg-[#031d0a] border border-green-800/60 rounded-xl max-h-[140px] overflow-y-auto p-1.5 space-y-1 scrollbar-thin scrollbar-thumb-green-800">
+              <div className="rounded-xl max-h-[140px] overflow-y-auto p-1.5 space-y-1 scrollbar-thin border glass-card" style={{ backgroundColor: theme.inputBg, borderColor: theme.accentColor }}>
                 {ALL_COUNTRIES.filter(country =>
                   country.toLowerCase().includes(countrySearchQuery.toLowerCase())
                 ).map((country) => {
                   const isSelected = selectedCountries.includes(country);
+                  const isPakistan = country.includes("Pakistan");
                   return (
                     <button
                       key={country}
@@ -1423,17 +1490,27 @@ export default function App() {
                           setSelectedCountries([...selectedCountries, country]);
                         }
                       }}
-                      className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-mono transition-all flex items-center justify-between cursor-pointer ${
+                      className={`glass-button w-full text-left px-2.5 py-1.5 rounded-xl text-xs font-mono transition-all flex items-center justify-between cursor-pointer border ${
                         isSelected
-                          ? "bg-[#00FF01]/20 text-[#00FF01] border border-[#00FF01]/40 font-bold"
-                          : "text-gray-300 hover:bg-green-900/15 border border-transparent"
+                          ? "font-extrabold shadow-md scale-[1.01]"
+                          : "border-transparent opacity-80 hover:opacity-100"
                       }`}
+                      style={isSelected ? {
+                        backgroundColor: isPakistan ? "rgba(16, 185, 129, 0.2)" : `${theme.accentColor}25`,
+                        borderColor: isPakistan ? "#10b981" : theme.accentColor,
+                        color: isPakistan ? "#34d399" : theme.accentColor
+                      } : { color: theme.textColor }}
                     >
-                      <span>{country}</span>
+                      <span className="flex items-center gap-1.5">
+                        {country}
+                        {isPakistan && <span className="text-[10px] px-1 py-0.2 rounded bg-emerald-950/60 text-emerald-300 border border-emerald-500/40">🇵 monolithic</span>}
+                      </span>
                       {isSelected ? (
-                        <span className="text-[9px] bg-[#00FF01] text-black px-1.5 py-0.5 rounded-full font-bold">Added</span>
+                        <span className="text-[9px] px-2 py-0.5 rounded-full font-bold shadow-sm" style={{ backgroundColor: isPakistan ? "#10b981" : theme.accentColor, color: "#ffffff" }}>
+                          ✓ Added
+                        </span>
                       ) : (
-                        <span className="text-[9px] text-gray-500 opacity-0 group-hover:opacity-100">+ Add</span>
+                        <span className="text-[9px] opacity-60">+ Add</span>
                       )}
                     </button>
                   );
@@ -1449,26 +1526,33 @@ export default function App() {
 
               {/* Selected Countries List Display */}
               {selectedCountries.length > 0 ? (
-                <div className="space-y-1.5 pt-1 border-t border-green-800/30">
+                <div className="space-y-1.5 pt-1 border-t" style={{ borderColor: `${theme.accentColor}30` }}>
                   <span className="text-[9px] font-mono text-gray-400 uppercase tracking-wider block">
                     Selected (V.O. Customizing):
                   </span>
                   <div className="flex flex-wrap gap-1">
-                    {selectedCountries.map((country) => (
-                      <span
-                        key={country}
-                        className="inline-flex items-center gap-1 bg-[#00FF01] text-black text-[9px] font-mono px-2 py-0.5 rounded-full font-bold animate-fade-in"
-                      >
-                        {country}
-                        <button
-                          type="button"
-                          onClick={() => setSelectedCountries(selectedCountries.filter(c => c !== country))}
-                          className="hover:bg-black/20 text-black rounded-full w-3 h-3 flex items-center justify-center font-black cursor-pointer text-[8px]"
+                    {selectedCountries.map((country) => {
+                      const isPakistan = country.includes("Pakistan");
+                      return (
+                        <span
+                          key={country}
+                          className="inline-flex items-center gap-1 text-[9px] font-mono px-2.5 py-1 rounded-full font-bold animate-fade-in glass-card shadow-md"
+                          style={{
+                            backgroundColor: isPakistan ? "#10b981" : theme.accentColor,
+                            color: "#ffffff"
+                          }}
                         >
-                          ×
-                        </button>
-                      </span>
-                    ))}
+                          {country}
+                          <button
+                            type="button"
+                            onClick={() => setSelectedCountries(selectedCountries.filter(c => c !== country))}
+                            className="hover:bg-black/30 text-white rounded-full w-3.5 h-3.5 flex items-center justify-center font-black cursor-pointer text-[9px]"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      );
+                    })}
                   </div>
                 </div>
               ) : (
@@ -1478,34 +1562,52 @@ export default function App() {
               )}
             </div>
 
-             {/* SCRIPT LENGTH TYPE & DETAILS */}
-            <div className="p-4 rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md space-y-4 shadow-md hover:border-[#00FF01]/30 hover:shadow-[0_0_15px_rgba(0,255,1,0.1)] transition-all duration-300">
+            {/* SCRIPT LENGTH TYPE & DETAILS */}
+            <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-4 shadow-xl transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor }}>
               <div>
-                <label className="text-xs font-mono text-[#00FF01] uppercase tracking-widest block mb-2">
+                <label className="text-xs font-mono uppercase tracking-widest block mb-2 font-extrabold" style={{ color: theme.accentColor }}>
                   Script Length
                 </label>
                 <div className="space-y-1.5 mb-2">
-                  <span className="text-[10px] font-mono text-[#00FF01] uppercase tracking-wider block">
+                  <span className="text-[10px] font-mono uppercase tracking-wider block opacity-80" style={{ color: theme.textColor }}>
                     Type
                   </span>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-2 gap-2 p-1 rounded-2xl glass-card border" style={{ backgroundColor: theme.inputBg, borderColor: `${theme.accentColor}30` }}>
                     <button
                       onClick={() => setScriptLengthType("word_count")}
-                      className={`py-2 px-3 text-xs font-mono transition-all duration-300 border text-center cursor-pointer ${
+                      className={`glass-button py-2 px-3 text-xs font-mono transition-all duration-300 border text-center cursor-pointer ${
                         scriptLengthType === "word_count"
-                          ? "bg-[#00FF01] text-black border-[#00FF01] rounded-[17px] font-extrabold shadow-[0_0_15px_rgba(0,255,1,0.4)]"
-                          : "bg-green-900/10 text-gray-400 border-green-800/40 hover:border-[#00FF01] hover:text-white rounded-xl"
+                          ? "rounded-[17px] font-extrabold shadow-md"
+                          : "hover:opacity-100 opacity-70 rounded-xl"
                       } hover:scale-102 active:scale-95`}
+                      style={scriptLengthType === "word_count" ? {
+                        backgroundColor: theme.accentColor,
+                        color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000",
+                        borderColor: theme.accentColor
+                      } : {
+                        backgroundColor: `${theme.accentColor}10`,
+                        borderColor: `${theme.accentColor}40`,
+                        color: theme.textColor
+                      }}
                     >
                       ○ By Word Count
                     </button>
                     <button
                       onClick={() => setScriptLengthType("video_duration")}
-                      className={`py-2 px-3 text-xs font-mono transition-all duration-300 border text-center cursor-pointer ${
+                      className={`glass-button py-2 px-3 text-xs font-mono transition-all duration-300 border text-center cursor-pointer ${
                         scriptLengthType === "video_duration"
-                          ? "bg-[#00FF01] text-black border-[#00FF01] rounded-[17px] font-extrabold shadow-[0_0_15px_rgba(0,255,1,0.4)]"
-                          : "bg-green-900/10 text-gray-400 border-green-800/40 hover:border-[#00FF01] hover:text-white rounded-xl"
+                          ? "rounded-[17px] font-extrabold shadow-md"
+                          : "hover:opacity-100 opacity-70 rounded-xl"
                       } hover:scale-102 active:scale-95`}
+                      style={scriptLengthType === "video_duration" ? {
+                        backgroundColor: theme.accentColor,
+                        color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000",
+                        borderColor: theme.accentColor
+                      } : {
+                        backgroundColor: `${theme.accentColor}10`,
+                        borderColor: `${theme.accentColor}40`,
+                        color: theme.textColor
+                      }}
                     >
                       ○ By Video Duration
                     </button>
@@ -1516,10 +1618,10 @@ export default function App() {
               {scriptLengthType === "word_count" ? (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs font-mono text-[#00FF01] uppercase tracking-widest block">
+                    <label className="text-xs font-mono uppercase tracking-widest block font-extrabold" style={{ color: theme.accentColor }}>
                       Target Word Volume
                     </label>
-                    <span className="text-xs text-[#00FF01] font-mono font-bold animate-pulse">{wordCount} words</span>
+                    <span className="text-xs font-mono font-bold animate-pulse px-2 py-0.5 rounded-full glass-card border" style={{ borderColor: `${theme.accentColor}40`, color: theme.accentColor }}>{wordCount} words</span>
                   </div>
                   
                   {/* Pill buttons for presets */}
@@ -1528,11 +1630,20 @@ export default function App() {
                       <button
                         key={preset}
                         onClick={() => handleWordPreset(preset)}
-                        className={`py-1.5 text-[10px] font-mono transition-all duration-300 border glow-on-hover cursor-pointer ${
+                        className={`glass-button py-1.5 text-[10px] font-mono transition-all duration-300 border cursor-pointer ${
                           wordCount === preset
-                            ? "bg-[#00FF01] text-black border-[#00FF01] rounded-[17px] font-extrabold shadow-[0_0_12px_rgba(0,255,1,0.4)]"
-                            : "bg-green-900/10 text-gray-400 border-green-800/50 hover:border-[#00FF01] hover:text-white rounded-xl"
+                            ? "rounded-[17px] font-extrabold shadow-md"
+                            : "hover:opacity-100 opacity-70 rounded-xl"
                         } hover:scale-105 active:scale-95`}
+                        style={wordCount === preset ? {
+                          backgroundColor: theme.accentColor,
+                          color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000",
+                          borderColor: theme.accentColor
+                        } : {
+                          backgroundColor: `${theme.accentColor}10`,
+                          borderColor: `${theme.accentColor}40`,
+                          color: theme.textColor
+                        }}
                       >
                         {preset >= 1000 ? `${preset / 1000}k` : preset} words
                       </button>
@@ -1547,10 +1658,17 @@ export default function App() {
                       max="20000"
                       value={wordCount}
                       onChange={(e) => setWordCount(Math.min(20000, Math.max(0, parseInt(e.target.value) || 0)))}
-                      className="w-full bg-[#05290e] border border-green-800 rounded-xl py-2 px-4 text-xs text-white focus:outline-none focus:border-[#00FF01] focus:shadow-[0_0_12px_rgba(0,255,1,0.25)] font-mono transition-all duration-300 hover:border-[#00FF01] glow-on-hover"
+                      className="glass-input w-full rounded-xl py-2 px-4 text-xs font-mono transition-all duration-300 focus:outline-none"
+                      style={{
+                        backgroundColor: theme.inputBg,
+                        borderColor: theme.accentColor,
+                        borderWidth: "1px",
+                        borderStyle: "solid",
+                        color: theme.textColor
+                      }}
                       placeholder="Custom word length (e.g. 20000)..."
                     />
-                    <span className="text-[10px] text-gray-500 font-mono block">
+                    <span className="text-[10px] opacity-60 font-mono block" style={{ color: theme.textColor }}>
                       Volume is adjustable from 0 to 20,000 words.
                     </span>
                   </div>
@@ -1558,10 +1676,10 @@ export default function App() {
               ) : (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs font-mono text-[#00FF01] uppercase tracking-widest block">
+                    <label className="text-xs font-mono uppercase tracking-widest block font-extrabold" style={{ color: theme.accentColor }}>
                       Video Duration (Minutes)
                     </label>
-                    <span className="text-xs text-[#00FF01] font-mono font-bold animate-pulse">~{Math.round(videoDuration * 145)} words</span>
+                    <span className="text-xs font-mono font-bold animate-pulse px-2 py-0.5 rounded-full glass-card border" style={{ borderColor: `${theme.accentColor}40`, color: theme.accentColor }}>~{Math.round(videoDuration * 145)} words</span>
                   </div>
 
                   <div className="space-y-1">
@@ -1572,10 +1690,17 @@ export default function App() {
                       max="120"
                       value={videoDuration}
                       onChange={(e) => setVideoDuration(Math.max(1, parseInt(e.target.value) || 1))}
-                      className="w-full bg-[#05290e] border border-green-800 rounded-xl py-2.5 px-4 text-xs text-white focus:outline-none focus:border-[#00FF01] focus:shadow-[0_0_12px_rgba(0,255,1,0.25)] font-mono transition-all duration-300 hover:border-[#00FF01] glow-on-hover"
+                      className="glass-input w-full rounded-xl py-2.5 px-4 text-xs font-mono transition-all duration-300 focus:outline-none"
+                      style={{
+                        backgroundColor: theme.inputBg,
+                        borderColor: theme.accentColor,
+                        borderWidth: "1px",
+                        borderStyle: "solid",
+                        color: theme.textColor
+                      }}
                       placeholder="e.g., 15"
                     />
-                    <span className="text-[10px] text-gray-500 font-mono block">
+                    <span className="text-[10px] opacity-60 font-mono block" style={{ color: theme.textColor }}>
                       Converts to words at approximately 140–150 words per minute.
                     </span>
                   </div>
@@ -1584,12 +1709,12 @@ export default function App() {
             </div>
 
             {/* GREETINGS PREFIX / BEGINNING - ASSALAMU ALAIKUM FIRST */}
-            <div className="p-4 rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md space-y-3 shadow-md hover:border-[#00FF01]/30 hover:shadow-[0_0_15px_rgba(0,255,1,0.1)] transition-all duration-300">
+            <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-3 shadow-xl transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor }}>
               <div className="flex justify-between items-center">
-                <label className="text-xs font-mono text-[#00FF01] uppercase tracking-widest block">
+                <label className="text-xs font-mono uppercase tracking-widest block font-extrabold" style={{ color: theme.accentColor }}>
                   Greeting
                 </label>
-                <span className="text-[10px] font-mono text-[#00FF01] uppercase tracking-wider block">
+                <span className="text-[10px] font-mono uppercase tracking-wider block opacity-85" style={{ color: theme.textColor }}>
                   Prefix
                 </span>
               </div>
@@ -1598,12 +1723,21 @@ export default function App() {
                   <button
                     key={p}
                     onClick={() => handleGreetingsPreset(p)}
-                    className={`py-1 px-2 text-[9px] font-mono transition-all duration-300 border truncate glow-on-hover ${
+                    className={`glass-button py-1.5 px-2 text-[9px] font-mono transition-all duration-300 border truncate cursor-pointer ${
                       greetingsPrefix === p
-                        ? "bg-[#00FF01] text-black border-[#00FF01] rounded-[17px] font-extrabold shadow-[0_0_12px_rgba(0,255,1,0.4)]"
-                        : "bg-green-900/10 text-gray-400 border-green-800/40 hover:border-[#00FF01] hover:text-white rounded-xl"
+                        ? "rounded-[17px] font-extrabold shadow-md"
+                        : "hover:opacity-100 opacity-70 rounded-xl"
                     } hover:scale-102 active:scale-95`}
                     title={p}
+                    style={greetingsPrefix === p ? {
+                      backgroundColor: theme.accentColor,
+                      color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000",
+                      borderColor: theme.accentColor
+                    } : {
+                      backgroundColor: `${theme.accentColor}10`,
+                      borderColor: `${theme.accentColor}40`,
+                      color: theme.textColor
+                    }}
                   >
                     {p}
                   </button>
@@ -1614,15 +1748,22 @@ export default function App() {
                 type="text"
                 value={greetingsPrefix}
                 onChange={(e) => setGreetingsPrefix(e.target.value)}
-                className="w-full bg-[#05290e] border border-green-800 rounded-xl py-2 px-4 text-xs text-white focus:outline-none focus:border-[#00FF01] focus:shadow-[0_0_12px_rgba(0,255,1,0.25)] font-mono transition-all duration-300 hover:border-[#00FF01] glow-on-hover"
+                className="glass-input w-full rounded-xl py-2 px-4 text-xs font-mono transition-all duration-300 focus:outline-none"
+                style={{
+                  backgroundColor: theme.inputBg,
+                  borderColor: theme.accentColor,
+                  borderWidth: "1px",
+                  borderStyle: "solid",
+                  color: theme.textColor
+                }}
                 placeholder="Custom greeting prefix..."
               />
             </div>
 
             {/* CUSTOM HOOK & STRUCTURING - DEFAULT WHAT DO YOU KNOW? */}
-            <div className="p-4 rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md space-y-3 shadow-md hover:border-[#00FF01]/30 hover:shadow-[0_0_15px_rgba(0,255,1,0.1)] transition-all duration-300">
+            <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-3 shadow-xl transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor }}>
               <div className="space-y-1">
-                <label className="text-xs font-mono text-[#00FF01] uppercase tracking-widest block font-bold">
+                <label className="text-xs font-mono uppercase tracking-widest block font-extrabold" style={{ color: theme.accentColor }}>
                   Custom Hook Input
                 </label>
                 <input
@@ -1630,48 +1771,58 @@ export default function App() {
                   type="text"
                   value={customHook}
                   onChange={(e) => setCustomHook(e.target.value)}
-                  className="w-full bg-[#05290e] border border-green-800 rounded-xl py-2 px-4 text-xs text-white focus:outline-none focus:border-[#00FF01] focus:shadow-[0_0_12px_rgba(0,255,1,0.25)] font-mono transition-all duration-300 hover:border-[#00FF01] glow-on-hover"
+                  className="glass-input w-full rounded-xl py-2 px-4 text-xs font-mono transition-all duration-300 focus:outline-none"
+                  style={{
+                    backgroundColor: theme.inputBg,
+                    borderColor: theme.accentColor,
+                    borderWidth: "1px",
+                    borderStyle: "solid",
+                    color: theme.textColor
+                  }}
                   placeholder="e.g. What do you know?..."
                 />
               </div>
 
-              <div className="flex items-center justify-between pt-2.5 border-t border-green-800/50">
+              <div className="flex items-center justify-between pt-2.5 border-t" style={{ borderColor: `${theme.accentColor}30` }}>
                 <div className="space-y-0.5 pr-2">
-                  <span className="text-xs font-semibold text-[#00FF01] block font-bold">Include Hooks, Body & Conclusion</span>
-                  <span className="text-[10px] text-gray-500 font-mono block">Structured sectional output</span>
+                  <span className="text-xs font-semibold block font-extrabold" style={{ color: theme.accentColor }}>Include Hooks, Body & Conclusion</span>
+                  <span className="text-[10px] opacity-60 font-mono block" style={{ color: theme.textColor }}>Structured sectional output</span>
                 </div>
                 <button
                   id="toggle-hooks-structure"
                   onClick={() => setIncludeHooksBodyConclusion(!includeHooksBodyConclusion)}
-                  className={`w-11 h-6 rounded-xl p-1 transition-all duration-300 ${
-                    includeHooksBodyConclusion ? "bg-[#00FF01]" : "bg-gray-800"
-                  } hover:scale-105`}
+                  className={`glass-button w-11 h-6 rounded-xl p-1 transition-all duration-300 hover:scale-105 border`}
+                  style={{
+                    backgroundColor: includeHooksBodyConclusion ? theme.accentColor : "rgba(120,120,120,0.2)",
+                    borderColor: includeHooksBodyConclusion ? theme.accentColor : "transparent"
+                  }}
                 >
                   <div
-                    className={`bg-black w-4 h-4 rounded-xl shadow-md transition-all duration-300 transform ${
+                    className={`w-4 h-4 rounded-xl shadow-md transition-all duration-300 transform ${
                       includeHooksBodyConclusion ? "translate-x-5" : "translate-x-0"
                     }`}
+                    style={{ backgroundColor: theme.cardBg.includes("bg-white") && includeHooksBodyConclusion ? "#ffffff" : "#000000" }}
                   />
                 </button>
               </div>
 
               {/* Added line at the bottom of the "Custom Hook Input" */}
-              <div className="border-t border-green-800/40 pt-1 mt-2" />
+              <div className="border-t pt-1 mt-2" style={{ borderColor: `${theme.accentColor}30` }} />
             </div>
 
             {/* Added line right under the Custom Hook Input div */}
-            <div className="border-b border-green-800/30 my-4" />
+            <div className="border-b my-4" style={{ borderColor: `${theme.accentColor}20` }} />
 
             {/* MOVED: YouTube and social media growth strategist */}
-            <div className="p-4 rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md space-y-4 shadow-md hover:border-[#00FF01]/30 hover:shadow-[0_0_15px_rgba(0,255,1,0.1)] transition-all duration-300">
-              <div className="border-b border-green-800/50 pb-2 flex items-center justify-between">
-                <span className="text-xs font-mono text-[#00FF01] uppercase tracking-wider block font-bold">
+            <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-4 shadow-xl transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor }}>
+              <div className="border-b pb-2 flex items-center justify-between" style={{ borderColor: `${theme.accentColor}30` }}>
+                <span className="text-xs font-mono uppercase tracking-wider block font-extrabold" style={{ color: theme.accentColor }}>
                   YouTube and social media growth strategist
                 </span>
-                <Sparkle className="h-4 w-4 text-[#00FF01] animate-spin" style={{ animationDuration: '8s' }} />
+                <Sparkle className="h-4 w-4 animate-spin" style={{ animationDuration: '8s', color: theme.accentColor }} />
               </div>
 
-              <p className="text-[10px] text-gray-400 font-mono leading-relaxed">
+              <p className="text-[10px] opacity-80 font-mono leading-relaxed" style={{ color: theme.textColor }}>
                 Toggle metadata elements to include in the CTR generation stream. Click elements to scroll to their output blocks.
               </p>
 
@@ -1680,16 +1831,23 @@ export default function App() {
                 <div className="flex items-center justify-between">
                   <button
                     onClick={() => scrollToSection("ctr-section-title")}
-                    className="text-xs font-semibold text-gray-300 hover:text-[#00FF01] cursor-pointer transition-colors flex items-center gap-1.5 font-sans"
+                    className="text-xs font-semibold cursor-pointer transition-colors flex items-center gap-1.5 font-sans hover:opacity-80"
+                    style={{ color: theme.textColor }}
                   >
-                    <span className="h-1 w-1 bg-[#00FF01] rounded-full" />
+                    <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: theme.accentColor }} />
                     Title Option
                   </button>
                   <button
                     onClick={() => setToggleTitle(!toggleTitle)}
-                    className={`w-10 h-5.5 rounded-xl p-0.5 transition-all duration-300 ${toggleTitle ? "bg-[#00FF01]" : "bg-gray-800"}`}
+                    className="glass-button w-10 h-5.5 rounded-xl p-0.5 transition-all duration-300 cursor-pointer border"
+                    style={{ backgroundColor: toggleTitle ? theme.accentColor : "rgba(120,120,120,0.2)", borderColor: toggleTitle ? theme.accentColor : "transparent" }}
                   >
-                    <div className={`bg-black w-4.5 h-4.5 rounded-xl shadow-md transition-all duration-300 transform ${toggleTitle ? "translate-x-4.5" : "translate-x-0"}`} />
+                    <div className="w-4 h-4 rounded-xl shadow-md transition-all duration-300 transform"
+                      style={{
+                        backgroundColor: theme.cardBg.includes("bg-white") && toggleTitle ? "#ffffff" : "#000000",
+                        transform: toggleTitle ? "translateX(1.125rem)" : "translateX(0)"
+                      }}
+                    />
                   </button>
                 </div>
 
@@ -1697,16 +1855,23 @@ export default function App() {
                 <div className="flex items-center justify-between">
                   <button
                     onClick={() => scrollToSection("ctr-section-description")}
-                    className="text-xs font-semibold text-gray-300 hover:text-[#00FF01] cursor-pointer transition-colors flex items-center gap-1.5 font-sans"
+                    className="text-xs font-semibold cursor-pointer transition-colors flex items-center gap-1.5 font-sans hover:opacity-80"
+                    style={{ color: theme.textColor }}
                   >
-                    <span className="h-1 w-1 bg-[#00FF01] rounded-full" />
+                    <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: theme.accentColor }} />
                     SEO Description
                   </button>
                   <button
                     onClick={() => setToggleDescription(!toggleDescription)}
-                    className={`w-10 h-5.5 rounded-xl p-0.5 transition-all duration-300 ${toggleDescription ? "bg-[#00FF01]" : "bg-gray-800"}`}
+                    className="glass-button w-10 h-5.5 rounded-xl p-0.5 transition-all duration-300 cursor-pointer border"
+                    style={{ backgroundColor: toggleDescription ? theme.accentColor : "rgba(120,120,120,0.2)", borderColor: toggleDescription ? theme.accentColor : "transparent" }}
                   >
-                    <div className={`bg-black w-4.5 h-4.5 rounded-xl shadow-md transition-all duration-300 transform ${toggleDescription ? "translate-x-4.5" : "translate-x-0"}`} />
+                    <div className="w-4 h-4 rounded-xl shadow-md transition-all duration-300 transform"
+                      style={{
+                        backgroundColor: theme.cardBg.includes("bg-white") && toggleDescription ? "#ffffff" : "#000000",
+                        transform: toggleDescription ? "translateX(1.125rem)" : "translateX(0)"
+                      }}
+                    />
                   </button>
                 </div>
 
@@ -1714,29 +1879,43 @@ export default function App() {
                 <div className="flex items-center justify-between">
                   <button
                     onClick={() => scrollToSection("ctr-section-timestamps")}
-                    className="text-xs font-semibold text-gray-300 hover:text-[#00FF01] cursor-pointer transition-colors flex items-center gap-1.5 font-sans"
+                    className="text-xs font-semibold cursor-pointer transition-colors flex items-center gap-1.5 font-sans hover:opacity-80"
+                    style={{ color: theme.textColor }}
                   >
-                    <span className="h-1 w-1 bg-[#00FF01] rounded-full" />
+                    <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: theme.accentColor }} />
                     Chronological Timestamps
                   </button>
                   <button
                     onClick={() => setToggleTimestamps(!toggleTimestamps)}
-                    className={`w-10 h-5.5 rounded-xl p-0.5 transition-all duration-300 ${toggleTimestamps ? "bg-[#00FF01]" : "bg-gray-800"}`}
+                    className="glass-button w-10 h-5.5 rounded-xl p-0.5 transition-all duration-300 cursor-pointer border"
+                    style={{ backgroundColor: toggleTimestamps ? theme.accentColor : "rgba(120,120,120,0.2)", borderColor: toggleTimestamps ? theme.accentColor : "transparent" }}
                   >
-                    <div className={`bg-black w-4.5 h-4.5 rounded-xl shadow-md transition-all duration-300 transform ${toggleTimestamps ? "translate-x-4.5" : "translate-x-0"}`} />
+                    <div className="w-4 h-4 rounded-xl shadow-md transition-all duration-300 transform"
+                      style={{
+                        backgroundColor: theme.cardBg.includes("bg-white") && toggleTimestamps ? "#ffffff" : "#000000",
+                        transform: toggleTimestamps ? "translateX(1.125rem)" : "translateX(0)"
+                      }}
+                    />
                   </button>
                 </div>
 
                 {/* Video Duration Input for Timestamps */}
                 {toggleTimestamps && (
-                  <div className="pl-4 py-1 border-l border-green-800/50 space-y-1">
-                    <label className="text-[9px] font-mono text-gray-400 block">TIME ESTIMATOR (DURATION):</label>
+                  <div className="pl-4 py-1 border-l space-y-1" style={{ borderColor: `${theme.accentColor}30` }}>
+                    <label className="text-[9px] font-mono opacity-80 block" style={{ color: theme.textColor }}>TIME ESTIMATOR (DURATION):</label>
                     <input
                       type="text"
                       value={ytVideoDuration}
                       onChange={(e) => setYtVideoDuration(e.target.value)}
                       placeholder="e.g. 10:00 or 15:30"
-                      className="w-full bg-[#05290e] border border-green-800 rounded-lg py-1 px-2.5 text-xs text-white focus:outline-none focus:border-[#00FF01] font-mono"
+                      className="glass-input w-full rounded-lg py-1 px-2.5 text-xs font-mono focus:outline-none"
+                      style={{
+                        backgroundColor: theme.inputBg,
+                        borderColor: theme.accentColor,
+                        borderWidth: "1px",
+                        borderStyle: "solid",
+                        color: theme.textColor
+                      }}
                     />
                   </div>
                 )}
@@ -1745,16 +1924,23 @@ export default function App() {
                 <div className="flex items-center justify-between">
                   <button
                     onClick={() => scrollToSection("ctr-section-hashtags")}
-                    className="text-xs font-semibold text-gray-300 hover:text-[#00FF01] cursor-pointer transition-colors flex items-center gap-1.5 font-sans"
+                    className="text-xs font-semibold cursor-pointer transition-colors flex items-center gap-1.5 font-sans hover:opacity-80"
+                    style={{ color: theme.textColor }}
                   >
-                    <span className="h-1 w-1 bg-[#00FF01] rounded-full" />
+                    <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: theme.accentColor }} />
                     Hashtags
                   </button>
                   <button
                     onClick={() => setToggleHashtags(!toggleHashtags)}
-                    className={`w-10 h-5.5 rounded-xl p-0.5 transition-all duration-300 ${toggleHashtags ? "bg-[#00FF01]" : "bg-gray-800"}`}
+                    className="glass-button w-10 h-5.5 rounded-xl p-0.5 transition-all duration-300 cursor-pointer border"
+                    style={{ backgroundColor: toggleHashtags ? theme.accentColor : "rgba(120,120,120,0.2)", borderColor: toggleHashtags ? theme.accentColor : "transparent" }}
                   >
-                    <div className={`bg-black w-4.5 h-4.5 rounded-xl shadow-md transition-all duration-300 transform ${toggleHashtags ? "translate-x-4.5" : "translate-x-0"}`} />
+                    <div className="w-4 h-4 rounded-xl shadow-md transition-all duration-300 transform"
+                      style={{
+                        backgroundColor: theme.cardBg.includes("bg-white") && toggleHashtags ? "#ffffff" : "#000000",
+                        transform: toggleHashtags ? "translateX(1.125rem)" : "translateX(0)"
+                      }}
+                    />
                   </button>
                 </div>
 
@@ -1762,32 +1948,39 @@ export default function App() {
                 <div className="flex items-center justify-between">
                   <button
                     onClick={() => scrollToSection("ctr-section-tags")}
-                    className="text-xs font-semibold text-gray-300 hover:text-[#00FF01] cursor-pointer transition-colors flex items-center gap-1.5 font-sans"
+                    className="text-xs font-semibold cursor-pointer transition-colors flex items-center gap-1.5 font-sans hover:opacity-80"
+                    style={{ color: theme.textColor }}
                   >
-                    <span className="h-1 w-1 bg-[#00FF01] rounded-full" />
+                    <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: theme.accentColor }} />
                     SEO Keywords Tags
                   </button>
                   <button
                     onClick={() => setToggleTags(!toggleTags)}
-                    className={`w-10 h-5.5 rounded-xl p-0.5 transition-all duration-300 ${toggleTags ? "bg-[#00FF01]" : "bg-gray-800"}`}
+                    className="glass-button w-10 h-5.5 rounded-xl p-0.5 transition-all duration-300 cursor-pointer border"
+                    style={{ backgroundColor: toggleTags ? theme.accentColor : "rgba(120,120,120,0.2)", borderColor: toggleTags ? theme.accentColor : "transparent" }}
                   >
-                    <div className={`bg-black w-4.5 h-4.5 rounded-xl shadow-md transition-all duration-300 transform ${toggleTags ? "translate-x-4.5" : "translate-x-0"}`} />
+                    <div className="w-4 h-4 rounded-xl shadow-md transition-all duration-300 transform"
+                      style={{
+                        backgroundColor: theme.cardBg.includes("bg-white") && toggleTags ? "#ffffff" : "#000000",
+                        transform: toggleTags ? "translateX(1.125rem)" : "translateX(0)"
+                      }}
+                    />
                   </button>
                 </div>
               </div>
             </div>
 
             {/* MOVED: thumbnail director and Tagline */}
-            <div className="p-4 rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md space-y-4 shadow-md hover:border-[#00FF01]/30 hover:shadow-[0_0_15px_rgba(0,255,1,0.1)] transition-all duration-300">
-              <div className="border-b border-green-800/50 pb-2 flex items-center justify-between">
-                <span className="text-xs font-mono text-[#00FF01] uppercase tracking-wider block font-bold">
+            <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-4 shadow-xl transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor }}>
+              <div className="border-b pb-2 flex items-center justify-between" style={{ borderColor: `${theme.accentColor}30` }}>
+                <span className="text-xs font-mono uppercase tracking-wider block font-extrabold" style={{ color: theme.accentColor }}>
                   thumbnail director & Tagline
                 </span>
               </div>
 
               {/* Niche dropdown synced with Domain */}
               <div className="space-y-1">
-                <label className="text-[10px] font-mono text-gray-400 uppercase tracking-widest block">
+                <label className="text-[10px] font-mono uppercase tracking-widest block opacity-75" style={{ color: theme.textColor }}>
                   Target Niche (Synced)
                 </label>
                 <select
@@ -1796,17 +1989,24 @@ export default function App() {
                     setTopicNiche(e.target.value);
                     setContentCategory(e.target.value);
                   }}
-                  className="w-full bg-[#05290e] border border-green-800 rounded-xl py-1.5 px-3 text-xs text-white focus:outline-none focus:border-[#00FF01] font-mono cursor-pointer"
+                  className="glass-input w-full rounded-xl py-1.5 px-3 text-xs font-mono cursor-pointer focus:outline-none"
+                  style={{
+                    backgroundColor: theme.inputBg,
+                    borderColor: theme.accentColor,
+                    borderWidth: "1px",
+                    borderStyle: "solid",
+                    color: theme.textColor
+                  }}
                 >
                   {CATEGORIES.map((cat) => (
-                    <option key={cat} value={cat}>{cat}</option>
+                    <option key={cat} value={cat} style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>{cat}</option>
                   ))}
                 </select>
               </div>
 
               {/* Optional Headline input */}
               <div className="space-y-1">
-                <label className="text-[10px] font-mono text-gray-400 uppercase tracking-widest block">
+                <label className="text-[10px] font-mono uppercase tracking-widest block opacity-75" style={{ color: theme.textColor }}>
                   Prompt text Headline (Optional)
                 </label>
                 <input
@@ -1814,13 +2014,20 @@ export default function App() {
                   value={thumbHeadline}
                   onChange={(e) => setThumbHeadline(e.target.value)}
                   placeholder="e.g. SECRET REVEALED"
-                  className="w-full bg-[#05290e] border border-green-800 rounded-xl py-1.5 px-3 text-xs text-white focus:outline-none focus:border-[#00FF01] font-mono"
+                  className="glass-input w-full rounded-xl py-1.5 px-3 text-xs font-mono focus:outline-none"
+                  style={{
+                    backgroundColor: theme.inputBg,
+                    borderColor: theme.accentColor,
+                    borderWidth: "1px",
+                    borderStyle: "solid",
+                    color: theme.textColor
+                  }}
                 />
               </div>
 
               {/* Optional Small Tagline input */}
               <div className="space-y-1">
-                <label className="text-[10px] font-mono text-gray-400 uppercase tracking-widest block">
+                <label className="text-[10px] font-mono uppercase tracking-widest block opacity-75" style={{ color: theme.textColor }}>
                   Prompt Small Tagline (Optional)
                 </label>
                 <input
@@ -1828,28 +2035,40 @@ export default function App() {
                   value={thumbSmallTagline}
                   onChange={(e) => setThumbSmallTagline(e.target.value)}
                   placeholder="e.g. 99% of people miss this"
-                  className="w-full bg-[#05290e] border border-green-800 rounded-xl py-1.5 px-3 text-xs text-white focus:outline-none focus:border-[#00FF01] font-mono"
+                  className="glass-input w-full rounded-xl py-1.5 px-3 text-xs font-mono focus:outline-none"
+                  style={{
+                    backgroundColor: theme.inputBg,
+                    borderColor: theme.accentColor,
+                    borderWidth: "1px",
+                    borderStyle: "solid",
+                    color: theme.textColor
+                  }}
                 />
               </div>
 
               {/* Background Color tab/label */}
-              <div className="space-y-2 border-t border-green-900/40 pt-3">
-                <label className="text-[10px] font-mono text-gray-400 uppercase tracking-widest block font-bold">
+              <div className="space-y-2 border-t pt-3" style={{ borderColor: `${theme.accentColor}30` }}>
+                <label className="text-[10px] font-mono uppercase tracking-widest block font-extrabold" style={{ color: theme.accentColor }}>
                   🎨 Thumbnail Background Color & Gradient
                 </label>
                 
                 {/* Background Selector Type Tabs */}
-                <div className="grid grid-cols-3 gap-1 bg-[#031d0a] p-1 rounded-xl border border-green-850">
+                <div className="grid grid-cols-3 gap-1 p-1 rounded-2xl border glass-card" style={{ backgroundColor: `${theme.accentColor}08`, borderColor: `${theme.accentColor}20` }}>
                   {(["preset", "custom_solid", "custom_gradient"] as const).map((type) => (
                     <button
                       key={type}
                       type="button"
                       onClick={() => setBgType(type)}
-                      className={`py-1 px-1.5 text-[9px] font-mono font-bold transition-all duration-300 rounded-lg cursor-pointer ${
-                        bgType === type
-                          ? "bg-[#00FF01] text-black font-black"
-                          : "text-gray-400 hover:text-white"
+                      className={`glass-button py-1.5 px-1.5 text-[9px] font-mono font-extrabold transition-all duration-300 rounded-xl cursor-pointer border ${
+                        bgType === type ? "shadow-md scale-100" : "border-transparent opacity-70"
                       }`}
+                      style={bgType === type ? {
+                        backgroundColor: theme.accentColor,
+                        color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000",
+                        borderColor: theme.accentColor
+                      } : {
+                        color: theme.textColor
+                      }}
                     >
                       {type === "preset" ? "PRESET" : type === "custom_solid" ? "SOLID" : "GRADIENT"}
                     </button>
@@ -1861,19 +2080,26 @@ export default function App() {
                   <select
                     value={thumbBgColor}
                     onChange={(e) => setThumbBgColor(e.target.value)}
-                    className="w-full bg-[#05290e] border border-green-800 rounded-xl py-1.5 px-3 text-xs text-white focus:outline-none focus:border-[#00FF01] font-mono cursor-pointer"
+                    className="glass-input w-full rounded-xl py-1.5 px-3 text-xs font-mono cursor-pointer focus:outline-none"
+                    style={{
+                      backgroundColor: theme.inputBg,
+                      borderColor: theme.accentColor,
+                      borderWidth: "1px",
+                      borderStyle: "solid",
+                      color: theme.textColor
+                    }}
                   >
-                    <option value="Dark Green & Black">Dark Green & Black</option>
-                    <option value="Neon Green & Deep Charcoal">Neon Green & Deep Charcoal</option>
-                    <option value="Neon Blue & Dark Purple">Neon Blue & Dark Purple</option>
-                    <option value="Sunset Orange & Crimson">Sunset Orange & Crimson</option>
-                    <option value="Neon Red & Charcoal">Neon Red & Charcoal</option>
+                    <option value="Dark Green & Black" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Dark Green & Black</option>
+                    <option value="Neon Green & Deep Charcoal" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Neon Green & Deep Charcoal</option>
+                    <option value="Neon Blue & Dark Purple" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Neon Blue & Dark Purple</option>
+                    <option value="Sunset Orange & Crimson" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Sunset Orange & Crimson</option>
+                    <option value="Neon Red & Charcoal" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Neon Red & Charcoal</option>
                   </select>
                 )}
 
                 {bgType === "custom_solid" && (
-                  <div className="flex items-center gap-3 bg-[#031d0a] p-2 rounded-xl border border-green-800/60">
-                    <div className="relative w-8 h-8 rounded-lg overflow-hidden border border-green-700 shrink-0">
+                  <div className="flex items-center gap-3 p-2 rounded-xl border glass-card" style={{ backgroundColor: `${theme.accentColor}08`, borderColor: `${theme.accentColor}25` }}>
+                    <div className="relative w-8 h-8 rounded-lg overflow-hidden shrink-0 border" style={{ borderColor: `${theme.accentColor}40` }}>
                       <input
                         type="color"
                         value={customBgSolid}
@@ -1882,8 +2108,8 @@ export default function App() {
                       />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <span className="text-[8px] font-mono text-gray-400 uppercase tracking-wider block">Background Color</span>
-                      <span className="text-xs font-mono text-[#00FF01] font-bold">{customBgSolid}</span>
+                      <span className="text-[8px] font-mono uppercase tracking-wider block opacity-70" style={{ color: theme.textColor }}>Background Color</span>
+                      <span className="text-xs font-mono font-bold" style={{ color: theme.accentColor }}>{customBgSolid}</span>
                     </div>
                   </div>
                 )}
@@ -1891,7 +2117,7 @@ export default function App() {
                 {bgType === "custom_gradient" && (
                   <div className="space-y-2">
                     <div className="grid grid-cols-2 gap-2">
-                      <div className="flex items-center gap-2 bg-[#031d0a] p-1.5 rounded-xl border border-green-800/60">
+                      <div className="flex items-center gap-2 p-1.5 rounded-xl border glass-card" style={{ backgroundColor: `${theme.accentColor}08`, borderColor: `${theme.accentColor}25` }}>
                         <input
                           type="color"
                           value={customBgGrad1}
@@ -1899,11 +2125,11 @@ export default function App() {
                           className="w-6 h-6 rounded cursor-pointer p-0 border-0 bg-transparent shrink-0"
                         />
                         <div className="overflow-hidden">
-                          <span className="text-[8px] font-mono text-gray-400 block truncate">Color A</span>
-                          <span className="text-[9px] font-mono text-[#00FF01] font-semibold block">{customBgGrad1}</span>
+                          <span className="text-[8px] font-mono block truncate opacity-70" style={{ color: theme.textColor }}>Color A</span>
+                          <span className="text-[9px] font-mono font-semibold block" style={{ color: theme.accentColor }}>{customBgGrad1}</span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 bg-[#031d0a] p-1.5 rounded-xl border border-green-800/60">
+                      <div className="flex items-center gap-2 p-1.5 rounded-xl border glass-card" style={{ backgroundColor: `${theme.accentColor}08`, borderColor: `${theme.accentColor}25` }}>
                         <input
                           type="color"
                           value={customBgGrad2}
@@ -1911,16 +2137,19 @@ export default function App() {
                           className="w-6 h-6 rounded cursor-pointer p-0 border-0 bg-transparent shrink-0"
                         />
                         <div className="overflow-hidden">
-                          <span className="text-[8px] font-mono text-gray-400 block truncate">Color B</span>
-                          <span className="text-[9px] font-mono text-[#00FF01] font-semibold block">{customBgGrad2}</span>
+                          <span className="text-[8px] font-mono block truncate opacity-70" style={{ color: theme.textColor }}>Color B</span>
+                          <span className="text-[9px] font-mono font-semibold block" style={{ color: theme.accentColor }}>{customBgGrad2}</span>
                         </div>
                       </div>
                     </div>
                     
                     {/* Live preview gradient bar */}
                     <div
-                      className="h-5 rounded-lg border border-green-700/50 shadow-inner"
-                      style={{ background: `linear-gradient(to right, ${customBgGrad1}, ${customBgGrad2})` }}
+                      className="h-5 rounded-lg border shadow-inner"
+                      style={{
+                        background: `linear-gradient(to right, ${customBgGrad1}, ${customBgGrad2})`,
+                        borderColor: `${theme.accentColor}30`
+                      }}
                       title="Live Gradient Preview"
                     />
                   </div>
@@ -1928,23 +2157,28 @@ export default function App() {
               </div>
 
               {/* Text Color tab/label */}
-              <div className="space-y-2 border-t border-green-900/40 pt-3">
-                <label className="text-[10px] font-mono text-gray-400 uppercase tracking-widest block font-bold">
+              <div className="space-y-2 border-t pt-3" style={{ borderColor: `${theme.accentColor}30` }}>
+                <label className="text-[10px] font-mono uppercase tracking-widest block font-extrabold" style={{ color: theme.accentColor }}>
                   ✍️ Thumbnail Text Color Overlay
                 </label>
                 
                 {/* Text Selector Type Tabs */}
-                <div className="grid grid-cols-2 gap-1 bg-[#031d0a] p-1 rounded-xl border border-green-850">
+                <div className="grid grid-cols-2 gap-1 p-1 rounded-2xl border glass-card" style={{ backgroundColor: `${theme.accentColor}08`, borderColor: `${theme.accentColor}20` }}>
                   {(["preset", "custom"] as const).map((type) => (
                     <button
                       key={type}
                       type="button"
                       onClick={() => setTextType(type)}
-                      className={`py-1 px-1.5 text-[9px] font-mono font-bold transition-all duration-300 rounded-lg cursor-pointer ${
-                        textType === type
-                          ? "bg-[#00FF01] text-black font-black"
-                          : "text-gray-400 hover:text-white"
+                      className={`glass-button py-1.5 px-1.5 text-[9px] font-mono font-extrabold transition-all duration-300 rounded-xl cursor-pointer border ${
+                        textType === type ? "shadow-md scale-100" : "border-transparent opacity-70"
                       }`}
+                      style={textType === type ? {
+                        backgroundColor: theme.accentColor,
+                        color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000",
+                        borderColor: theme.accentColor
+                      } : {
+                        color: theme.textColor
+                      }}
                     >
                       {type === "preset" ? "PRESETS" : "CUSTOM COLOR"}
                     </button>
@@ -1960,11 +2194,20 @@ export default function App() {
                       <button
                         key={item.name}
                         onClick={() => setThumbTextColor(item.name)}
-                        className={`py-1 px-1.5 text-[9px] font-mono border text-center cursor-pointer transition-all ${
-                          thumbTextColor === item.name
-                            ? "bg-[#00FF01] text-black border-[#00FF01] rounded-[17px] font-extrabold"
-                            : "bg-green-900/10 text-gray-400 border-green-800/40 hover:border-[#00FF01] hover:text-white rounded-xl"
-                        }`}
+                        className={`py-1 px-1.5 text-[9px] font-mono border text-center cursor-pointer transition-all`}
+                        style={thumbTextColor === item.name ? {
+                          backgroundColor: theme.accentColor,
+                          color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000",
+                          borderColor: theme.accentColor,
+                          borderRadius: "17px",
+                          fontWeight: "bold"
+                        } : {
+                          backgroundColor: `${theme.accentColor}08`,
+                          borderColor: `${theme.accentColor}20`,
+                          color: theme.textColor,
+                          borderRadius: "12px",
+                          opacity: 0.75
+                        }}
                         type="button"
                       >
                         {item.label}
@@ -1976,7 +2219,7 @@ export default function App() {
                 {textType === "custom" && (
                   <div className="space-y-2">
                     <div className="grid grid-cols-2 gap-2">
-                      <div className="flex items-center gap-2 bg-[#031d0a] p-1.5 rounded-xl border border-green-800/60">
+                      <div className="flex items-center gap-2 p-1.5 rounded-xl border" style={{ backgroundColor: `${theme.accentColor}08`, borderColor: `${theme.accentColor}20` }}>
                         <input
                           type="color"
                           value={customTextCol1}
@@ -1984,11 +2227,11 @@ export default function App() {
                           className="w-6 h-6 rounded cursor-pointer p-0 border-0 bg-transparent shrink-0"
                         />
                         <div className="overflow-hidden">
-                          <span className="text-[8px] font-mono text-gray-400 block truncate">Primary Text</span>
-                          <span className="text-[9px] font-mono text-[#00FF01] font-semibold block">{customTextCol1}</span>
+                          <span className="text-[8px] font-mono block truncate opacity-70" style={{ color: theme.textColor }}>Primary Text</span>
+                          <span className="text-[9px] font-mono font-semibold block" style={{ color: theme.accentColor }}>{customTextCol1}</span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 bg-[#031d0a] p-1.5 rounded-xl border border-[#00FF01]/20">
+                      <div className="flex items-center gap-2 p-1.5 rounded-xl border" style={{ backgroundColor: `${theme.accentColor}08`, borderColor: `${theme.accentColor}20` }}>
                         <input
                           type="color"
                           value={customTextCol2}
@@ -1996,15 +2239,15 @@ export default function App() {
                           className="w-6 h-6 rounded cursor-pointer p-0 border-0 bg-transparent shrink-0"
                         />
                         <div className="overflow-hidden">
-                          <span className="text-[8px] font-mono text-gray-400 block truncate">Accent/Shadow</span>
-                          <span className="text-[9px] font-mono text-[#00FF01] font-semibold block">{customTextCol2}</span>
+                          <span className="text-[8px] font-mono block truncate opacity-70" style={{ color: theme.textColor }}>Accent/Shadow</span>
+                          <span className="text-[9px] font-mono font-semibold block" style={{ color: theme.accentColor }}>{customTextCol2}</span>
                         </div>
                       </div>
                     </div>
                     
                     {/* Custom Color Palette Swatches */}
                     <div className="space-y-1 pt-1.5">
-                      <span className="text-[8px] font-mono text-gray-400 uppercase tracking-wider block">
+                      <span className="text-[8px] font-mono uppercase tracking-wider block opacity-75" style={{ color: theme.textColor }}>
                         Quick Custom Palette Swatches:
                       </span>
                       <div className="grid grid-cols-2 gap-1.5">
@@ -2015,33 +2258,41 @@ export default function App() {
                           { primary: "#FF5722", accent: "#FEF3C7", label: "Sunset Orange & Cream" },
                           { primary: "#FF2E93", accent: "#F9FAFB", label: "Electric Pink & Cool White" },
                           { primary: "#A855F7", accent: "#FFFFFF", label: "Vivid Purple & Pure White" }
-                        ].map((swatch, idx) => (
-                          <button
-                            key={idx}
-                            type="button"
-                            onClick={() => {
-                              setCustomTextCol1(swatch.primary);
-                              setCustomTextCol2(swatch.accent);
-                            }}
-                            className={`p-1 rounded bg-black/40 border transition-all text-left flex items-center gap-1.5 cursor-pointer text-[8px] font-mono ${
-                              customTextCol1 === swatch.primary && customTextCol2 === swatch.accent
-                                ? "border-[#00FF01] bg-[#00FF01]/5 text-white"
-                                : "border-green-900/60 hover:border-[#00FF01] text-gray-400 hover:text-white"
-                            }`}
-                          >
-                            <span className="flex gap-0.5 shrink-0">
-                              <span style={{ backgroundColor: swatch.primary }} className="w-2.5 h-2.5 rounded-full border border-black/35" />
-                              <span style={{ backgroundColor: swatch.accent }} className="w-2.5 h-2.5 rounded-full border border-black/35" />
-                            </span>
-                            <span className="truncate">{swatch.label}</span>
-                          </button>
-                        ))}
+                        ].map((swatch, idx) => {
+                          const isSelected = customTextCol1 === swatch.primary && customTextCol2 === swatch.accent;
+                          return (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => {
+                                setCustomTextCol1(swatch.primary);
+                                setCustomTextCol2(swatch.accent);
+                              }}
+                              className="p-1 rounded border transition-all text-left flex items-center gap-1.5 cursor-pointer text-[8px] font-mono"
+                              style={isSelected ? {
+                                borderColor: theme.accentColor,
+                                backgroundColor: `${theme.accentColor}12`,
+                                color: theme.textColor
+                              } : {
+                                borderColor: `${theme.accentColor}15`,
+                                color: theme.textColor,
+                                opacity: 0.75
+                              }}
+                            >
+                              <span className="flex gap-0.5 shrink-0">
+                                <span style={{ backgroundColor: swatch.primary }} className="w-2.5 h-2.5 rounded-full border border-black/35" />
+                                <span style={{ backgroundColor: swatch.accent }} className="w-2.5 h-2.5 rounded-full border border-black/35" />
+                              </span>
+                              <span className="truncate">{swatch.label}</span>
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
-
+ 
                     {/* Live Preview Text Overlay */}
-                    <div className="py-1.5 px-3 rounded-lg border border-green-850 bg-black/40 text-center">
-                      <span className="text-[8px] font-mono text-gray-500 block mb-1">Live Text Color Contrast Preview:</span>
+                    <div className="py-1.5 px-3 rounded-lg border text-center" style={{ backgroundColor: `${theme.accentColor}05`, borderColor: `${theme.accentColor}20` }}>
+                      <span className="text-[8px] font-mono block mb-1 opacity-70" style={{ color: theme.textColor }}>Live Text Color Contrast Preview:</span>
                       <span style={{ color: customTextCol1 }} className="text-xs font-black">Main Headline (Primary Blue/Highlight)</span>
                       {" "}
                       <span style={{ color: customTextCol2 }} className="text-[10px] font-medium">Tagline (Accent/Secondary)</span>
@@ -2057,22 +2308,27 @@ export default function App() {
           <div className="lg:col-span-8 xl:col-span-8 space-y-5">
             
             {/* INPUT SOURCE EXTRACTOR & GENERATOR TABS */}
-            <div className="p-5 rounded-2xl border border-green-800 bg-black/60 backdrop-blur-md space-y-4 hover:border-[#00FF01]/30 hover:shadow-[0_0_20px_rgba(0,255,1,0.05)] transition-all duration-300">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-green-800/40 pb-3">
+            <div className="glass-card p-5 rounded-2xl backdrop-blur-xl space-y-4 shadow-2xl transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor }}>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-3" style={{ borderColor: `${theme.accentColor}30` }}>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-mono font-semibold tracking-wider text-[#00FF01] uppercase">Input Source:</span>
-                  <div className="flex items-center gap-1.5 bg-green-950/40 p-1 rounded-xl border border-green-900/60">
+                  <span className="text-xs font-mono font-extrabold tracking-wider uppercase" style={{ color: theme.accentColor }}>Input Source:</span>
+                  <div className="flex items-center gap-1.5 p-1 rounded-2xl border glass-card" style={{ backgroundColor: `${theme.accentColor}08`, borderColor: `${theme.accentColor}25` }}>
                     {(["topic", "url", "files"] as const).map((source) => (
                       <button
                         key={source}
                         onClick={() => setInputSource(source)}
-                        className={`px-3 py-1.5 rounded-lg text-[10px] font-mono tracking-wider transition-all duration-300 uppercase cursor-pointer ${
-                          inputSource === source
-                            ? "bg-[#00FF01] text-black font-extrabold shadow-[0_0_10px_rgba(0,255,1,0.3)]"
-                            : "text-gray-400 hover:text-white hover:bg-green-900/20"
+                        className={`glass-button px-3 py-1.5 rounded-xl text-[10px] font-mono tracking-wider transition-all duration-300 uppercase cursor-pointer border ${
+                          inputSource === source ? "font-extrabold shadow-md scale-100" : "border-transparent opacity-70"
                         }`}
+                        style={inputSource === source ? {
+                          backgroundColor: theme.accentColor,
+                          color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000",
+                          borderColor: theme.accentColor
+                        } : {
+                          color: theme.textColor
+                        }}
                       >
-                        {source === "topic" ? "● Topic (Type)" : source === "url" ? "● Video URL" : "● Files (.txt/.pdf)"}
+                        {source === "topic" ? "● Topic" : source === "url" ? "● Video URL" : "● Files"}
                       </button>
                     ))}
                   </div>
@@ -2081,7 +2337,12 @@ export default function App() {
                 <button
                   id="btn-prefill"
                   onClick={prefillSample}
-                  className="text-xs text-[#00FF01] hover:text-white font-bold flex items-center justify-center gap-1 cursor-pointer bg-green-900/30 hover:bg-[#00FF01]/10 px-4 py-1.5 rounded-xl border border-green-800 hover:border-[#00FF01] transition-all duration-300 hover:shadow-[0_0_12px_rgba(0,255,1,0.2)] active:scale-95"
+                  className="glass-button text-xs font-extrabold flex items-center justify-center gap-1.5 cursor-pointer px-4 py-2 rounded-xl border transition-all duration-300 active:scale-95 shadow-md"
+                  style={{
+                    borderColor: theme.accentColor,
+                    backgroundColor: `${theme.accentColor}18`,
+                    color: theme.textColor
+                  }}
                 >
                   <Plus className="h-3.5 w-3.5" /> Insert Sample Script
                 </button>
@@ -2092,14 +2353,21 @@ export default function App() {
                 {inputSource === "topic" && (
                   <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
                     <div className="md:col-span-6 space-y-1.5 relative">
-                      <label className="text-[10px] font-mono text-[#00FF01] uppercase tracking-wider block">Topic</label>
+                      <label className="text-[10px] font-mono uppercase tracking-wider block opacity-75" style={{ color: theme.textColor }}>Topic</label>
                       <div className="relative flex items-center">
                         <input
                           type="text"
                           value={topicName}
                           onChange={(e) => setTopicName(e.target.value)}
                           placeholder="e.g. Benefits of Intermittent Fasting, Quantum Physics Explained..."
-                          className="w-full bg-[#05290e] border border-green-800 rounded-xl py-2 pl-4 pr-10 text-xs text-white focus:outline-none focus:border-[#00FF01] focus:shadow-[0_0_10px_rgba(0,255,1,0.25)] font-mono transition-all duration-300"
+                          className="glass-input w-full rounded-xl py-2 pl-4 pr-10 text-xs font-mono focus:outline-none transition-all duration-300"
+                          style={{
+                            backgroundColor: theme.inputBg,
+                            borderColor: theme.accentColor,
+                            borderWidth: "1px",
+                            borderStyle: "solid",
+                            color: theme.textColor
+                          }}
                         />
                         
                         {/* Mic Icon / STT button */}
@@ -2108,16 +2376,21 @@ export default function App() {
                             <button
                               type="button"
                               onClick={stopSpeechToText}
-                              className="p-1 rounded-lg bg-red-950/40 text-red-400 border border-red-900/40 hover:bg-red-900 hover:text-white transition-all cursor-pointer"
+                              className="glass-button p-1 rounded-lg bg-red-950/40 text-red-400 border border-red-900/40 hover:bg-red-900 hover:text-white transition-all cursor-pointer"
                               title="Stop listening"
                             >
-                              <MicOff className="h-3.5 w-3.5 animate-pulse text-[#00FF00]" />
+                              <MicOff className="h-3.5 w-3.5 animate-pulse text-red-400" />
                             </button>
                           ) : (
                             <button
                               type="button"
                               onClick={() => startSpeechToText("topic")}
-                              className="p-1 rounded-lg bg-green-950/40 text-gray-400 border border-green-900/40 hover:border-[#00FF01] hover:text-[#00FF01] transition-all cursor-pointer"
+                              className="glass-button p-1 rounded-lg transition-all cursor-pointer border"
+                              style={{
+                                backgroundColor: `${theme.accentColor}08`,
+                                borderColor: `${theme.accentColor}25`,
+                                color: theme.textColor
+                              }}
                               title="Speech to Text"
                             >
                               <Mic className="h-3.5 w-3.5" />
@@ -2133,26 +2406,27 @@ export default function App() {
                             initial={{ opacity: 0, scale: 0.95 }}
                             animate={{ opacity: 1, scale: 1 }}
                             exit={{ opacity: 0, scale: 0.95 }}
-                            className="absolute inset-x-0 bottom-0 top-[18px] bg-black/95 border border-[#00FF01]/60 rounded-xl flex items-center justify-between px-3 z-20"
+                            className="absolute inset-x-0 bottom-0 top-[18px] bg-black/95 rounded-xl flex items-center justify-between px-3 z-20 border glass-card"
+                            style={{ borderColor: theme.accentColor }}
                           >
-                            <span className="text-[10px] font-mono text-[#00FF01] uppercase tracking-wider animate-pulse flex items-center gap-1">
-                              <span className="h-2 w-2 rounded-full bg-[#00FF00] animate-ping" />
+                            <span className="text-[10px] font-mono uppercase tracking-wider animate-pulse flex items-center gap-1" style={{ color: theme.accentColor }}>
+                              <span className="h-2 w-2 rounded-full bg-red-500 animate-ping" />
                               Listening...
                             </span>
                             
                             {/* Gemini Waveform */}
                             <div className="flex items-end gap-1 h-5 mr-2">
-                              <motion.div className="w-1 bg-[#00FF00] rounded-full" animate={{ height: ["20%", "80%", "20%"] }} transition={{ duration: 0.6, repeat: Infinity, ease: "easeInOut" }} />
-                              <motion.div className="w-1 bg-[#00FF00] rounded-full" animate={{ height: ["40%", "100%", "40%"] }} transition={{ duration: 0.5, repeat: Infinity, ease: "easeInOut", delay: 0.1 }} />
-                              <motion.div className="w-1 bg-[#00FF00] rounded-full" animate={{ height: ["15%", "75%", "15%"] }} transition={{ duration: 0.7, repeat: Infinity, ease: "easeInOut", delay: 0.25 }} />
-                              <motion.div className="w-1 bg-[#00FF00] rounded-full" animate={{ height: ["50%", "90%", "50%"] }} transition={{ duration: 0.4, repeat: Infinity, ease: "easeInOut", delay: 0.15 }} />
-                              <motion.div className="w-1 bg-[#00FF00] rounded-full" animate={{ height: ["25%", "60%", "25%"] }} transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut", delay: 0.3 }} />
+                              <motion.div className="w-1 rounded-full" style={{ backgroundColor: theme.accentColor }} animate={{ height: ["20%", "80%", "20%"] }} transition={{ duration: 0.6, repeat: Infinity, ease: "easeInOut" }} />
+                              <motion.div className="w-1 rounded-full" style={{ backgroundColor: theme.accentColor }} animate={{ height: ["40%", "100%", "40%"] }} transition={{ duration: 0.5, repeat: Infinity, ease: "easeInOut", delay: 0.1 }} />
+                              <motion.div className="w-1 rounded-full" style={{ backgroundColor: theme.accentColor }} animate={{ height: ["15%", "75%", "15%"] }} transition={{ duration: 0.7, repeat: Infinity, ease: "easeInOut", delay: 0.25 }} />
+                              <motion.div className="w-1 rounded-full" style={{ backgroundColor: theme.accentColor }} animate={{ height: ["50%", "90%", "50%"] }} transition={{ duration: 0.4, repeat: Infinity, ease: "easeInOut", delay: 0.15 }} />
+                              <motion.div className="w-1 rounded-full" style={{ backgroundColor: theme.accentColor }} animate={{ height: ["25%", "60%", "25%"] }} transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut", delay: 0.3 }} />
                             </div>
 
                             <button
                               type="button"
                               onClick={stopSpeechToText}
-                              className="text-[9px] font-mono text-white hover:text-[#00FF01] px-1.5 py-0.5 rounded bg-red-950/40 border border-red-900/40 transition-all hover:bg-red-900"
+                              className="glass-button text-[9px] font-mono text-white hover:opacity-90 px-1.5 py-0.5 rounded bg-red-950/40 border border-red-900/40 transition-all hover:bg-red-900"
                             >
                               Stop
                             </button>
@@ -2161,25 +2435,39 @@ export default function App() {
                       </AnimatePresence>
                     </div>
                     <div className="md:col-span-3 space-y-1.5">
-                      <label className="text-[10px] font-mono text-[#00FF01] uppercase tracking-wider block">Word Count Limit</label>
+                      <label className="text-[10px] font-mono uppercase tracking-wider block opacity-75" style={{ color: theme.textColor }}>Word Count Limit</label>
                       <input
                         type="number"
                         min="100"
                         max="20000"
                         value={topicWordLimit}
                         onChange={(e) => setTopicWordLimit(Math.max(100, parseInt(e.target.value) || 100))}
-                        className="w-full bg-[#05290e] border border-green-800 rounded-xl py-2 px-4 text-xs text-white focus:outline-none focus:border-[#00FF01] focus:shadow-[0_0_10px_rgba(0,255,1,0.25)] font-mono transition-all duration-300"
+                        className="glass-input w-full rounded-xl py-2 px-4 text-xs font-mono focus:outline-none transition-all duration-300"
+                        style={{
+                          backgroundColor: theme.inputBg,
+                          borderColor: theme.accentColor,
+                          borderWidth: "1px",
+                          borderStyle: "solid",
+                          color: theme.textColor
+                        }}
                       />
                     </div>
                     <div className="md:col-span-3">
                       <button
                         onClick={handleGenerateFromTopic}
                         disabled={topicGenerating || !topicName.trim()}
-                        className={`w-full py-2 px-4 rounded-xl font-mono text-xs font-bold uppercase transition-all duration-300 flex items-center justify-center gap-2 border cursor-pointer ${
-                          topicName.trim() && !topicGenerating
-                            ? "bg-[#00FF01] text-black border-[#00FF01] hover:shadow-[0_0_15px_rgba(0,255,1,0.3)] active:scale-95"
-                            : "bg-green-900/10 text-gray-500 border-green-800/40 cursor-not-allowed"
-                        }`}
+                        className={`glass-button w-full py-2 px-4 rounded-xl font-mono text-xs font-extrabold uppercase transition-all duration-300 flex items-center justify-center gap-2 border cursor-pointer shadow-lg`}
+                        style={topicName.trim() && !topicGenerating ? {
+                          backgroundColor: theme.accentColor,
+                          borderColor: theme.accentColor,
+                          color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000"
+                        } : {
+                          backgroundColor: `${theme.accentColor}08`,
+                          borderColor: `${theme.accentColor}25`,
+                          color: theme.textColor,
+                          opacity: 0.5,
+                          cursor: "not-allowed"
+                        }}
                       >
                         {topicGenerating ? (
                           <>
@@ -2198,53 +2486,46 @@ export default function App() {
                 {inputSource === "url" && (
                   <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
                     <div className="md:col-span-6 space-y-1.5">
-                      <label className="text-[10px] font-mono text-gray-400 uppercase tracking-wider block">Paste URL (YouTube / Facebook / TikTok / Instagram)</label>
+                      <label className="text-[10px] font-mono uppercase tracking-wider block opacity-75" style={{ color: theme.textColor }}>Paste URL (YouTube / Facebook / TikTok / Instagram)</label>
                       <input
                         type="url"
                         value={videoUrl}
                         onChange={(e) => setVideoUrl(e.target.value)}
                         placeholder="https://www.youtube.com/watch?v=..."
-                        className="w-full bg-[#05290e] border border-green-800 rounded-xl py-2 px-4 text-xs text-white focus:outline-none focus:border-[#00FF01] focus:shadow-[0_0_10px_rgba(0,255,1,0.25)] font-mono transition-all duration-300"
+                        className="glass-input w-full rounded-xl py-2 px-4 text-xs font-mono focus:outline-none transition-all duration-300"
+                        style={{
+                          backgroundColor: theme.inputBg,
+                          borderColor: theme.accentColor,
+                          borderWidth: "1px",
+                          borderStyle: "solid",
+                          color: theme.textColor
+                        }}
                       />
                     </div>
-                    <div className="md:col-span-3">
+                    <div className="md:col-span-6">
                       <button
                         onClick={() => handleExtractTranscript("direct")}
-                        disabled={isExtractingUrl || isGeneratingWithGemini || !videoUrl.trim()}
-                        className={`w-full py-2 px-4 rounded-xl font-mono text-xs font-bold uppercase transition-all duration-300 flex items-center justify-center gap-2 border cursor-pointer ${
-                          videoUrl.trim() && !isExtractingUrl && !isGeneratingWithGemini
-                            ? "bg-[#00FF01] text-black border-[#00FF01] hover:shadow-[0_0_15px_rgba(0,255,1,0.3)] active:scale-95"
-                            : "bg-green-900/10 text-gray-500 border-green-800/40 cursor-not-allowed"
-                        }`}
+                        disabled={isExtractingUrl || !videoUrl.trim()}
+                        className={`glass-button w-full py-2 px-4 rounded-xl font-mono text-xs font-extrabold uppercase transition-all duration-300 flex items-center justify-center gap-2 border cursor-pointer shadow-lg`}
+                        style={videoUrl.trim() && !isExtractingUrl ? {
+                          backgroundColor: theme.accentColor,
+                          borderColor: theme.accentColor,
+                          color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000"
+                        } : {
+                          backgroundColor: `${theme.accentColor}08`,
+                          borderColor: `${theme.accentColor}25`,
+                          color: theme.textColor,
+                          opacity: 0.5,
+                          cursor: "not-allowed"
+                        }}
                       >
                         {isExtractingUrl ? (
                           <>
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" /> EXTRACTING...
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" /> EXTRACTING TRANSCRIPT...
                           </>
                         ) : (
                           <>
-                            <RefreshCw className="h-3.5 w-3.5" /> GET TRANSCRIPT
-                          </>
-                        )}
-                      </button>
-                    </div>
-                    <div className="md:col-span-3">
-                      <button
-                        onClick={() => handleExtractTranscript("gemini")}
-                        disabled={isExtractingUrl || isGeneratingWithGemini || !videoUrl.trim()}
-                        className={`w-full py-2 px-4 rounded-xl font-mono text-xs font-bold uppercase transition-all duration-300 flex items-center justify-center gap-2 border cursor-pointer ${
-                          videoUrl.trim() && !isExtractingUrl && !isGeneratingWithGemini
-                            ? "bg-gradient-to-r from-[#00FF01] to-emerald-400 text-black border-[#00FF01] hover:shadow-[0_0_20px_rgba(0,255,1,0.4)] hover:scale-105 active:scale-95"
-                            : "bg-green-900/10 text-gray-500 border-green-800/40 cursor-not-allowed"
-                        }`}
-                      >
-                        {isGeneratingWithGemini ? (
-                          <>
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" /> GENERATING...
-                          </>
-                        ) : (
-                          <>
-                            <Sparkles className="h-3.5 w-3.5" /> ASK GEMINI
+                            <RefreshCw className="h-3.5 w-3.5" /> GET YOUTUBE TRANSCRIPT
                           </>
                         )}
                       </button>
@@ -2253,7 +2534,7 @@ export default function App() {
                 )}
 
                 {inputSource === "files" && (
-                  <div className="flex flex-col items-center justify-center border-2 border-dashed border-green-800/60 rounded-2xl p-6 bg-[#031d0a]/20 hover:border-[#00FF01]/40 transition-all duration-300 group">
+                  <div className="flex flex-col items-center justify-center border-2 border-dashed rounded-2xl p-6 transition-all duration-300 group glass-card" style={{ borderColor: `${theme.accentColor}40`, backgroundColor: `${theme.accentColor}05` }}>
                     <input
                       type="file"
                       id="file-source-upload"
@@ -2265,12 +2546,12 @@ export default function App() {
                       htmlFor="file-source-upload"
                       className="flex flex-col items-center gap-2.5 cursor-pointer text-center"
                     >
-                      <div className="h-10 w-10 rounded-full bg-green-950 border border-green-800 flex items-center justify-center text-[#00FF01] group-hover:scale-110 group-hover:border-[#00FF01] group-hover:shadow-[0_0_15px_rgba(0,255,1,0.2)] transition-all duration-300">
+                      <div className="h-10 w-10 rounded-full flex items-center justify-center transition-all duration-300 group-hover:scale-110 border glass-button" style={{ backgroundColor: `${theme.accentColor}12`, borderColor: theme.accentColor, color: theme.accentColor }}>
                         <Plus className="h-5 w-5" />
                       </div>
                       <div>
-                        <p className="text-xs font-mono font-semibold text-white">Click or Drag & Drop File</p>
-                        <p className="text-[10px] font-mono text-gray-400 mt-1">Accepts raw .txt or standard .pdf files</p>
+                        <p className="text-xs font-mono font-semibold" style={{ color: theme.textColor }}>Click or Drag & Drop File</p>
+                        <p className="text-[10px] font-mono opacity-70 mt-1" style={{ color: theme.textColor }}>Accepts raw .txt or standard .pdf files</p>
                       </div>
                     </label>
                   </div>
@@ -2282,15 +2563,15 @@ export default function App() {
                 "Place the 'fast light mood' and 'generative script' above the download tabs and the output Tab."
                 Here is the stunning, horizontal generation and options bar! Positioned prominently right on top of the workspaces.
             */}
-            <div className="p-4 rounded-2xl border border-[#00FF01]/30 bg-[#073011]/80 backdrop-blur-md shadow-[0_0_20px_rgba(0,255,1,0.1)] flex flex-col md:flex-row items-center justify-between gap-4 transition-all duration-300 hover:border-[#00FF01]/50 hover:shadow-[0_0_25px_rgba(0,255,1,0.2)]">
+            <div className="glass-card p-4 rounded-2xl backdrop-blur-xl flex flex-col md:flex-row items-center justify-between gap-4 transition-all duration-300 shadow-xl border border-white/20" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor }}>
               
               <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-xl bg-[#00FF01]/10 flex items-center justify-center text-[#00FF01] animate-pulse">
+                <div className="h-9 w-9 rounded-xl flex items-center justify-center animate-pulse glass-card" style={{ backgroundColor: `${theme.accentColor}15`, color: theme.accentColor }}>
                   <Sliders className="h-4.5 w-4.5" />
                 </div>
                 <div>
-                  <span className="text-[10px] font-mono text-[#00FF01] tracking-widest uppercase block font-bold">Automation Command Console</span>
-                  <p className="text-xs text-gray-400">Set options & trigger plagiarism-free script transformation</p>
+                  <span className="text-[10px] font-mono tracking-widest uppercase block font-extrabold" style={{ color: theme.accentColor }}>Automation Command Console</span>
+                  <p className="text-xs opacity-75" style={{ color: theme.textColor }}>Set options & trigger plagiarism-free script transformation</p>
                 </div>
               </div>
 
@@ -2298,17 +2579,22 @@ export default function App() {
               <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
                 
                 {/* FAST LITE MODE CAPULE TOGGLE */}
-                <div className="flex items-center gap-2 bg-[#031d0a] p-1.5 rounded-xl border border-green-800 hover:border-green-600 transition-all duration-300">
+                <div className="flex items-center gap-2 p-1.5 rounded-2xl border transition-all duration-300 glass-card" style={{ backgroundColor: theme.inputBg, borderColor: `${theme.accentColor}30` }}>
                   <button
                     id="toggle-fast-lite"
                     onClick={() => setFastLiteMode(!fastLiteMode)}
-                    className={`py-1.5 px-4 rounded-xl text-xs font-mono font-bold flex items-center gap-1.5 transition-all duration-300 hover:scale-103 active:scale-95 glow-on-hover ${
-                      fastLiteMode
-                        ? "bg-[#00FF01]/20 text-[#00FF01] border border-[#00FF01] shadow-[0_0_10px_rgba(0,255,1,0.2)]"
-                        : "bg-transparent text-gray-400 border border-transparent hover:text-white"
+                    className={`glass-button py-1.5 px-4 rounded-xl text-xs font-mono font-extrabold flex items-center gap-1.5 transition-all duration-300 hover:scale-103 active:scale-95 border ${
+                      fastLiteMode ? "shadow-md scale-100" : "border-transparent opacity-70"
                     }`}
+                    style={fastLiteMode ? {
+                      backgroundColor: `${theme.accentColor}25`,
+                      color: theme.accentColor,
+                      borderColor: theme.accentColor
+                    } : {
+                      color: theme.textColor
+                    }}
                   >
-                    <Zap className={`h-3.5 w-3.5 ${fastLiteMode ? "text-[#00FF01] fill-[#00FF01] animate-bounce" : "text-gray-500"}`} />
+                    <Zap className={`h-3.5 w-3.5 ${fastLiteMode ? "animate-bounce" : ""}`} style={{ color: fastLiteMode ? theme.accentColor : "inherit", fill: fastLiteMode ? theme.accentColor : "none" }} />
                     FAST LITE MOOD
                   </button>
                 </div>
@@ -2318,19 +2604,26 @@ export default function App() {
                   id="btn-generate-script"
                   onClick={() => handleGenerate()}
                   disabled={loading || !rawScript.trim()}
-                  className={`py-3 px-8 rounded-xl font-display text-xs font-extrabold tracking-widest uppercase transition-all duration-300 flex items-center justify-center gap-2 border cursor-pointer glow-on-hover ${
-                    rawScript.trim()
-                      ? "bg-[#00FF01] text-black border-[#00FF01] hover:shadow-[0_0_25px_rgba(0,255,1,0.5)] active:scale-95 transform scale-100 hover:scale-102"
-                      : "bg-green-900/10 text-gray-500 border-green-800/40 cursor-not-allowed"
-                  }`}
+                  className={`glass-button py-3 px-8 rounded-2xl font-display text-xs font-extrabold tracking-widest uppercase transition-all duration-300 flex items-center justify-center gap-2 border cursor-pointer shadow-xl hover:scale-105 active:scale-95`}
+                  style={rawScript.trim() ? {
+                    backgroundColor: theme.accentColor,
+                    borderColor: theme.accentColor,
+                    color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000"
+                  } : {
+                    backgroundColor: `${theme.accentColor}08`,
+                    borderColor: `${theme.accentColor}25`,
+                    color: theme.textColor,
+                    opacity: 0.5,
+                    cursor: "not-allowed"
+                  }}
                 >
                   {loading ? (
                     <>
-                      <Loader2 className="h-4 w-4 animate-spin text-black" /> REPHRASING...
+                      <Loader2 className="h-4 w-4 animate-spin" /> REPHRASING...
                     </>
                   ) : (
                     <>
-                      <Sparkles className="h-4 w-4 text-black animate-spin" /> GENERATE SCRIPT
+                      <Sparkles className="h-4 w-4 animate-spin" /> GENERATE SCRIPT
                     </>
                   )}
                 </button>
@@ -2342,13 +2635,13 @@ export default function App() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               
               {/* RAW SOURCE SCRIPT BOX */}
-              <div className="flex flex-col h-[480px] rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md overflow-hidden shadow-lg transition-all duration-300 hover:border-green-600 hover:shadow-[0_0_20px_rgba(0,255,1,0.05)]">
-                <div className="px-5 py-3 border-b border-green-800/80 bg-green-900/10 flex items-center justify-between">
-                  <span className="text-xs font-mono font-extrabold tracking-wider text-[#00FF01] flex items-center gap-2 animate-pulse">
-                    <FileText className="h-4 w-4 text-[#00FF01]" />
+              <div className="glass-card flex flex-col h-[480px] rounded-2xl overflow-hidden shadow-2xl transition-all duration-300 border hover:border-white/30 backdrop-blur-xl" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor }}>
+                <div className="px-5 py-3 border-b flex items-center justify-between glass-card" style={{ borderColor: `${theme.accentColor}30`, backgroundColor: `${theme.accentColor}08` }}>
+                  <span className="text-xs font-mono font-extrabold tracking-wider flex items-center gap-2 animate-pulse" style={{ color: theme.accentColor }}>
+                    <FileText className="h-4 w-4" style={{ color: theme.accentColor }} />
                     RAW SOURCE SCRIPT
                   </span>
-                  <span className="text-[10px] font-mono text-gray-400 bg-black/60 px-3 py-1 rounded-xl border border-green-800">
+                  <span className="glass-card text-[10px] font-mono px-3 py-1 rounded-xl border" style={{ backgroundColor: theme.inputBg, borderColor: `${theme.accentColor}30`, color: theme.textColor }}>
                     {rawScript.length} CHARACTERS
                   </span>
                 </div>
@@ -2359,7 +2652,8 @@ export default function App() {
                     value={rawScript}
                     onChange={(e) => setRawScript(e.target.value)}
                     placeholder="Provide your script, video notes, medical findings, or tech ideas here. Any input language is supported. The engine completely rewrites your ideas into highly fluent wording with no plagiarism..."
-                    className="w-full h-full bg-transparent resize-none p-5 text-xs md:text-sm text-gray-200 focus:outline-none placeholder-gray-600 leading-relaxed font-mono transition-all duration-300 hover:bg-[#00FF01]/2 focus:bg-[#031d0a]/30 pr-12"
+                    className="w-full h-full bg-transparent resize-none p-5 text-xs md:text-sm focus:outline-none placeholder-gray-500 leading-relaxed font-mono transition-all duration-300 pr-12"
+                    style={{ color: theme.textColor }}
                   />
                   
                   {/* Controls container in bottom right corner */}
@@ -2368,16 +2662,21 @@ export default function App() {
                       <button
                         type="button"
                         onClick={stopSpeechToText}
-                        className="p-2.5 rounded-full bg-red-950/80 text-red-400 border border-red-800/80 hover:bg-red-900 transition-all cursor-pointer shadow-lg flex items-center justify-center"
+                        className="glass-button p-2.5 rounded-full bg-red-950/80 text-red-400 border border-red-800/80 hover:bg-red-900 transition-all cursor-pointer shadow-lg flex items-center justify-center"
                         title="Stop speech-to-text"
                       >
-                        <MicOff className="h-4 w-4 animate-bounce text-[#00FF00]" />
+                        <MicOff className="h-4 w-4 animate-bounce text-red-400" />
                       </button>
                     ) : (
                       <button
                         type="button"
                         onClick={() => startSpeechToText("rawScript")}
-                        className="p-2.5 rounded-full bg-green-950/85 text-gray-300 border border-green-800/80 hover:border-[#00FF01] hover:text-[#00FF01] hover:bg-green-900/30 transition-all cursor-pointer shadow-lg flex items-center justify-center hover:scale-110 active:scale-95"
+                        className="glass-button p-2.5 rounded-full border transition-all cursor-pointer shadow-lg flex items-center justify-center hover:scale-110 active:scale-95"
+                        style={{
+                          backgroundColor: `${theme.accentColor}12`,
+                          borderColor: theme.accentColor,
+                          color: theme.textColor
+                        }}
                         title="Speak to enter script"
                       >
                         <Mic className="h-4 w-4" />
@@ -2388,7 +2687,7 @@ export default function App() {
                       <button
                         id="btn-clear-raw"
                         onClick={() => setRawScript("")}
-                        className="p-2 rounded-xl bg-red-950/30 text-red-400 border border-red-900/40 hover:bg-red-900 hover:text-white transition-all duration-300 cursor-pointer hover:scale-105 active:scale-95"
+                        className="glass-button p-2 rounded-xl bg-red-950/30 text-red-400 border border-red-900/40 hover:bg-red-900 hover:text-white transition-all duration-300 cursor-pointer hover:scale-105 active:scale-95"
                         title="Clear text"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -2403,11 +2702,12 @@ export default function App() {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="absolute inset-0 bg-black/95 backdrop-blur-md flex flex-col items-center justify-center p-6 space-y-5 z-20"
+                        className="absolute inset-0 bg-black/95 backdrop-blur-md flex flex-col items-center justify-center p-6 space-y-5 z-20 border glass-card"
+                        style={{ borderColor: theme.accentColor }}
                       >
                         <div className="flex items-center gap-2">
-                          <span className="h-3 w-3 rounded-full bg-[#00FF00] animate-ping" />
-                          <h3 className="text-sm font-mono text-[#00FF01] uppercase tracking-widest font-black">
+                          <span className="h-3 w-3 rounded-full bg-red-500 animate-ping" />
+                          <h3 className="text-sm font-mono uppercase tracking-widest font-black" style={{ color: theme.accentColor }}>
                             Gemini Voice Scriptwriter Active
                           </h3>
                         </div>
@@ -2416,19 +2716,19 @@ export default function App() {
                         </p>
                         
                         {/* Gemini Waveform */}
-                        <div className="flex items-end gap-1.5 h-10 px-6 py-2 bg-green-950/20 rounded-full border border-green-900/40">
-                          <motion.div className="w-1.5 bg-[#00FF00] rounded-full" animate={{ height: ["15%", "85%", "15%"] }} transition={{ duration: 0.6, repeat: Infinity, ease: "easeInOut" }} />
-                          <motion.div className="w-1.5 bg-[#00FF00] rounded-full" animate={{ height: ["40%", "100%", "40%"] }} transition={{ duration: 0.5, repeat: Infinity, ease: "easeInOut", delay: 0.08 }} />
-                          <motion.div className="w-1.5 bg-[#00FF00] rounded-full" animate={{ height: ["20%", "70%", "20%"] }} transition={{ duration: 0.7, repeat: Infinity, ease: "easeInOut", delay: 0.16 }} />
-                          <motion.div className="w-1.5 bg-[#00FF00] rounded-full" animate={{ height: ["50%", "95%", "50%"] }} transition={{ duration: 0.4, repeat: Infinity, ease: "easeInOut", delay: 0.12 }} />
-                          <motion.div className="w-1.5 bg-[#00FF00] rounded-full" animate={{ height: ["10%", "60%", "10%"] }} transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut", delay: 0.2 }} />
-                          <motion.div className="w-1.5 bg-[#00FF00] rounded-full" animate={{ height: ["35%", "80%", "35%"] }} transition={{ duration: 0.55, repeat: Infinity, ease: "easeInOut", delay: 0.14 }} />
+                        <div className="flex items-end gap-1.5 h-10 px-6 py-2 rounded-full border glass-card" style={{ backgroundColor: `${theme.accentColor}08`, borderColor: `${theme.accentColor}30` }}>
+                          <motion.div className="w-1.5 rounded-full" style={{ backgroundColor: theme.accentColor }} animate={{ height: ["15%", "85%", "15%"] }} transition={{ duration: 0.6, repeat: Infinity, ease: "easeInOut" }} />
+                          <motion.div className="w-1.5 rounded-full" style={{ backgroundColor: theme.accentColor }} animate={{ height: ["40%", "100%", "40%"] }} transition={{ duration: 0.5, repeat: Infinity, ease: "easeInOut", delay: 0.08 }} />
+                          <motion.div className="w-1.5 rounded-full" style={{ backgroundColor: theme.accentColor }} animate={{ height: ["20%", "70%", "20%"] }} transition={{ duration: 0.7, repeat: Infinity, ease: "easeInOut", delay: 0.16 }} />
+                          <motion.div className="w-1.5 rounded-full" style={{ backgroundColor: theme.accentColor }} animate={{ height: ["50%", "95%", "50%"] }} transition={{ duration: 0.4, repeat: Infinity, ease: "easeInOut", delay: 0.12 }} />
+                          <motion.div className="w-1.5 rounded-full" style={{ backgroundColor: theme.accentColor }} animate={{ height: ["10%", "60%", "10%"] }} transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut", delay: 0.2 }} />
+                          <motion.div className="w-1.5 rounded-full" style={{ backgroundColor: theme.accentColor }} animate={{ height: ["35%", "80%", "35%"] }} transition={{ duration: 0.55, repeat: Infinity, ease: "easeInOut", delay: 0.14 }} />
                         </div>
 
                         <button
                           type="button"
                           onClick={stopSpeechToText}
-                          className="px-5 py-2 rounded-xl bg-red-950/30 hover:bg-red-900 border border-red-900/60 text-red-200 text-xs font-mono transition-all cursor-pointer hover:scale-105"
+                          className="glass-button px-5 py-2 rounded-xl bg-red-950/30 hover:bg-red-900 border border-red-900/60 text-red-200 text-xs font-mono transition-all cursor-pointer hover:scale-105"
                         >
                           Finish & Save Script
                         </button>
@@ -2439,30 +2739,30 @@ export default function App() {
               </div>
 
               {/* POLISHED V.O. SCRIPT / OUTPUT BOX */}
-              <div className="flex flex-col h-[480px] rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md overflow-hidden shadow-lg relative transition-all duration-300 hover:border-green-600 hover:shadow-[0_0_25px_rgba(0,255,1,0.08)]">
+              <div className="glass-card flex flex-col h-[480px] rounded-2xl overflow-hidden shadow-2xl relative transition-all duration-300 border hover:border-white/30 backdrop-blur-xl" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor }}>
                 {/* Active glowing ambient frame segment */}
-                <div className="absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r from-transparent via-[#00FF01]/50 to-transparent" />
+                <div className="absolute top-0 left-0 right-0 h-[1.5px]" style={{ background: `linear-gradient(to right, transparent, ${theme.accentColor}80, transparent)` }} />
                 
-                <div className="px-4 py-3 border-b border-green-800/80 bg-green-900/15 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                  <span className="text-xs font-mono font-bold tracking-wider text-[#00FF01] flex items-center gap-1.5">
-                    <Sparkles className="h-4 w-4 text-[#00FF01] animate-pulse" />
+                <div className="px-4 py-3 border-b flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 glass-card" style={{ borderColor: `${theme.accentColor}30`, backgroundColor: `${theme.accentColor}08` }}>
+                  <span className="text-xs font-mono font-extrabold tracking-wider flex items-center gap-1.5" style={{ color: theme.accentColor }}>
+                    <Sparkles className="h-4 w-4 animate-pulse" style={{ color: theme.accentColor }} />
                     POLISHED V.O. SCRIPT
                   </span>
                   
                   {/* METADATA DOWNLOAD & LISTEN TABS (rounded-xl caps) */}
                   <div className="flex items-center gap-1.5 flex-wrap">
                     {polishedScript && getFilteredVoices().length > 0 && (
-                      <div className="flex items-center gap-1 bg-green-900/40 border border-green-800 rounded-xl px-2 py-1">
-                        <span className="text-[9px] text-green-400 font-mono font-bold">🎙️ VOICE:</span>
+                      <div className="glass-card flex items-center gap-1 border rounded-xl px-2 py-1" style={{ backgroundColor: `${theme.accentColor}12`, borderColor: `${theme.accentColor}30` }}>
+                        <span className="text-[9px] font-mono font-bold" style={{ color: theme.textColor }}>🎙️ VOICE:</span>
                         <select
                           id="select-voice-speaker"
                           value={selectedVoiceName}
                           onChange={(e) => setSelectedVoiceName(e.target.value)}
-                          className="bg-transparent border-none text-[10px] text-[#00FF01] font-mono font-bold focus:outline-none cursor-pointer max-w-[120px] sm:max-w-[160px] truncate outline-none"
-                          style={{ colorScheme: "dark" }}
+                          className="bg-transparent border-none text-[10px] font-mono font-bold focus:outline-none cursor-pointer max-w-[120px] sm:max-w-[160px] truncate outline-none"
+                          style={{ colorScheme: "dark", color: theme.accentColor }}
                         >
                           {getFilteredVoices().map((voice) => (
-                            <option key={voice.name} value={voice.name} className="bg-[#05290e] text-[#00FF01]">
+                            <option key={voice.name} value={voice.name} style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>
                               {voice.name} ({voice.lang})
                             </option>
                           ))}
@@ -2473,13 +2773,22 @@ export default function App() {
                       id="btn-listen-ai"
                       onClick={handleListen}
                       disabled={!polishedScript}
-                      className={`px-3 py-1 rounded-xl text-[10px] font-mono font-bold tracking-tight flex items-center gap-1 transition-all duration-300 cursor-pointer border glow-on-hover ${
-                        polishedScript
-                          ? isPlayingAudio
-                            ? "bg-red-950/40 border-red-500 text-red-400 shadow-[0_0_10px_rgba(239,68,68,0.3)] animate-pulse"
-                            : "bg-green-900/30 border-green-800 text-[#00FF01] hover:border-[#00FF01] hover:bg-[#00FF01]/10 hover:scale-105"
-                          : "opacity-40 cursor-not-allowed text-gray-500 border-transparent"
-                      } active:scale-95`}
+                      className="glass-button px-3 py-1 rounded-xl text-[10px] font-mono font-bold tracking-tight flex items-center gap-1 transition-all duration-300 cursor-pointer border active:scale-95"
+                      style={polishedScript ? (
+                        isPlayingAudio ? {
+                          backgroundColor: "rgba(127, 29, 29, 0.4)",
+                          borderColor: "#ef4444",
+                          color: "#f87171"
+                        } : {
+                          backgroundColor: `${theme.accentColor}15`,
+                          borderColor: theme.accentColor,
+                          color: theme.accentColor
+                        }
+                      ) : {
+                        color: "rgb(107, 114, 128)",
+                        borderColor: "transparent",
+                        opacity: 0.4
+                      }}
                     >
                       {isPlayingAudio ? (
                         <>
@@ -2487,7 +2796,7 @@ export default function App() {
                         </>
                       ) : (
                         <>
-                          <Volume2 className="h-3.5 w-3.5 text-[#00FF01]" /> LISTEN AI
+                          <Volume2 className="h-3.5 w-3.5" style={{ color: polishedScript ? theme.accentColor : "inherit" }} /> LISTEN AI
                         </>
                       )}
                     </button>
@@ -2499,11 +2808,16 @@ export default function App() {
                         }
                       }}
                       disabled={!polishedScript}
-                      className={`px-3 py-1 text-[10px] font-mono font-bold tracking-tight flex items-center gap-1 transition-all duration-300 cursor-pointer border glow-on-hover ${
-                        polishedScript
-                          ? "bg-[#00FF01] text-black border-[#00FF01] rounded-[17px] shadow-[0_0_15px_rgba(0,255,1,0.5)] scale-100 hover:scale-105"
-                          : "opacity-40 cursor-not-allowed text-gray-500 border-transparent rounded-xl"
-                      } active:scale-95`}
+                      className="glass-button px-3 py-1 text-[10px] font-mono font-bold tracking-tight flex items-center gap-1 transition-all duration-300 cursor-pointer border active:scale-95 rounded-xl"
+                      style={polishedScript ? {
+                        backgroundColor: theme.accentColor,
+                        color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000",
+                        borderColor: theme.accentColor
+                      } : {
+                        color: "rgb(107, 114, 128)",
+                        borderColor: "transparent",
+                        opacity: 0.4
+                      }}
                     >
                       <Plus className="h-3.5 w-3.5" /> INSERT
                     </button>
@@ -2511,11 +2825,16 @@ export default function App() {
                       id="btn-copy-script"
                       onClick={handleCopy}
                       disabled={!polishedScript}
-                      className={`px-3 py-1 rounded-xl text-[10px] font-mono font-bold tracking-tight flex items-center gap-1 transition-all duration-300 cursor-pointer border glow-on-hover ${
-                        polishedScript
-                          ? "bg-green-900/30 border-green-800 text-[#00FF01] hover:border-[#00FF01] hover:bg-[#00FF01]/10 hover:scale-105"
-                          : "opacity-40 cursor-not-allowed text-gray-500 border-transparent"
-                      } active:scale-95`}
+                      className="glass-button px-3 py-1 rounded-xl text-[10px] font-mono font-bold tracking-tight flex items-center gap-1 transition-all duration-300 cursor-pointer border active:scale-95"
+                      style={polishedScript ? {
+                        backgroundColor: `${theme.accentColor}15`,
+                        borderColor: theme.accentColor,
+                        color: theme.accentColor
+                      } : {
+                        color: "rgb(107, 114, 128)",
+                        borderColor: "transparent",
+                        opacity: 0.4
+                      }}
                     >
                       <Copy className="h-3.5 w-3.5" /> {copied ? "COPIED!" : "COPY TXT"}
                     </button>
@@ -2523,11 +2842,16 @@ export default function App() {
                       id="btn-download-script"
                       onClick={handleDownload}
                       disabled={!polishedScript}
-                      className={`px-3 py-1 rounded-xl text-[10px] font-mono font-bold tracking-tight flex items-center gap-1 transition-all duration-300 cursor-pointer border glow-on-hover ${
-                        polishedScript
-                          ? "bg-green-900/30 border-green-800 text-[#00FF01] hover:border-[#00FF01] hover:bg-[#00FF01]/10 hover:scale-105"
-                          : "opacity-40 cursor-not-allowed text-gray-500 border-transparent"
-                      } active:scale-95`}
+                      className="glass-button px-3 py-1 rounded-xl text-[10px] font-mono font-bold tracking-tight flex items-center gap-1 transition-all duration-300 cursor-pointer border active:scale-95"
+                      style={polishedScript ? {
+                        backgroundColor: `${theme.accentColor}15`,
+                        borderColor: theme.accentColor,
+                        color: theme.accentColor
+                      } : {
+                        color: "rgb(107, 114, 128)",
+                        borderColor: "transparent",
+                        opacity: 0.4
+                      }}
                     >
                       <Download className="h-3.5 w-3.5" /> DOWNLOAD
                     </button>
@@ -2535,8 +2859,9 @@ export default function App() {
                 </div>
 
                 {/* USER INSTRUCTION: "In the output box, add three buttons: one for Hindi with Urdu wording, second for Urdu with Roman writing, third for Urdu with urdu Writing, 4th with English."
-                    Let's place these extremely prominent language trigger buttons dire                <div className="bg-[#031d0a]/95 border-b border-green-800 p-2.5 space-y-2">
-                  <span className="text-[10px] text-[#00FF01] font-mono tracking-wider block text-center uppercase font-bold">
+                    Let's place these extremely prominent language trigger buttons directly on top */}
+                <div className="border-b p-2.5 space-y-2 glass-card" style={{ backgroundColor: `${theme.accentColor}08`, borderColor: `${theme.accentColor}25` }}>
+                  <span className="text-[10px] font-mono tracking-wider block text-center uppercase font-extrabold" style={{ color: theme.accentColor }}>
                     ⚡ Quick Instant Transformation Buttons
                   </span>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
@@ -2544,11 +2869,16 @@ export default function App() {
                       id="btn-quick-lang-hindi"
                       onClick={() => handleSelectLanguage("hindi")}
                       disabled={loading || !rawScript.trim()}
-                      className={`py-1.5 px-2 text-[9px] font-mono transition-all duration-300 border glow-on-hover ${
-                        transformation === "hindi" && polishedScript
-                          ? "bg-[#00FF01] text-black border-[#00FF01] rounded-[17px] font-extrabold shadow-[0_0_15px_rgba(0,255,1,0.5)]"
-                          : "bg-green-900/35 text-[#00FF01]/90 border-green-700/80 hover:border-[#00FF01] hover:bg-[#00FF01]/15 rounded-xl font-bold"
-                      } hover:scale-103 active:scale-95 disabled:opacity-45 disabled:cursor-not-allowed`}
+                      className="glass-button py-1.5 px-2 text-[9px] font-mono transition-all duration-300 border hover:scale-103 active:scale-95 disabled:opacity-45 disabled:cursor-not-allowed rounded-xl font-bold"
+                      style={transformation === "hindi" && polishedScript ? {
+                        backgroundColor: theme.accentColor,
+                        color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000",
+                        borderColor: theme.accentColor
+                      } : {
+                        backgroundColor: `${theme.accentColor}10`,
+                        color: theme.textColor,
+                        borderColor: `${theme.accentColor}30`
+                      }}
                     >
                       🇮🇳 Hindi (Urdu Wording/Accent)
                     </button>
@@ -2556,23 +2886,33 @@ export default function App() {
                       id="btn-quick-lang-roman"
                       onClick={() => handleSelectLanguage("urdu-roman")}
                       disabled={loading || !rawScript.trim()}
-                      className={`py-1.5 px-2 text-[9px] font-mono transition-all duration-300 border glow-on-hover ${
-                        transformation === "urdu-roman" && polishedScript
-                          ? "bg-[#00FF01] text-black border-[#00FF01] rounded-[17px] font-extrabold shadow-[0_0_15px_rgba(0,255,1,0.5)]"
-                          : "bg-green-900/35 text-[#00FF01]/90 border-green-700/80 hover:border-[#00FF01] hover:bg-[#00FF01]/15 rounded-xl font-bold"
-                      } hover:scale-103 active:scale-95 disabled:opacity-45 disabled:cursor-not-allowed`}
+                      className="glass-button py-1.5 px-2 text-[9px] font-mono transition-all duration-300 border hover:scale-103 active:scale-95 disabled:opacity-45 disabled:cursor-not-allowed rounded-xl font-bold"
+                      style={transformation === "urdu-roman" && polishedScript ? {
+                        backgroundColor: theme.accentColor,
+                        color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000",
+                        borderColor: theme.accentColor
+                      } : {
+                        backgroundColor: `${theme.accentColor}10`,
+                        color: theme.textColor,
+                        borderColor: `${theme.accentColor}30`
+                      }}
                     >
-                      🇵🇰 Urdu Roman
+                        🇵🇰 Urdu Roman
                     </button>
                     <button
                       id="btn-quick-lang-urdu"
                       onClick={() => handleSelectLanguage("urdu-writing")}
                       disabled={loading || !rawScript.trim()}
-                      className={`py-1.5 px-2 text-[11px] font-urdu transition-all duration-300 border glow-on-hover ${
-                        transformation === "urdu-writing" && polishedScript
-                          ? "bg-[#00FF01] text-black border-[#00FF01] rounded-[17px] font-extrabold shadow-[0_0_15px_rgba(0,255,1,0.5)]"
-                          : "bg-green-900/35 text-[#00FF01]/90 border-green-700/80 hover:border-[#00FF01] hover:bg-[#00FF01]/15 rounded-xl font-semibold"
-                      } hover:scale-103 active:scale-95 disabled:opacity-45 disabled:cursor-not-allowed`}
+                      className="glass-button py-1.5 px-2 text-[11px] font-urdu transition-all duration-300 border hover:scale-103 active:scale-95 disabled:opacity-45 disabled:cursor-not-allowed rounded-xl font-bold"
+                      style={transformation === "urdu-writing" && polishedScript ? {
+                        backgroundColor: theme.accentColor,
+                        color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000",
+                        borderColor: theme.accentColor
+                      } : {
+                        backgroundColor: `${theme.accentColor}10`,
+                        color: theme.textColor,
+                        borderColor: `${theme.accentColor}30`
+                      }}
                     >
                       🇵🇰 اردو تحریر
                     </button>
@@ -2580,30 +2920,35 @@ export default function App() {
                       id="btn-quick-lang-english"
                       onClick={() => handleSelectLanguage("english")}
                       disabled={loading || !rawScript.trim()}
-                      className={`py-1.5 px-2 text-[9px] font-mono transition-all duration-300 border glow-on-hover ${
-                        transformation === "english" && polishedScript
-                          ? "bg-[#00FF01] text-black border-[#00FF01] rounded-[17px] font-extrabold shadow-[0_0_15px_rgba(0,255,1,0.5)]"
-                          : "bg-green-900/35 text-[#00FF01]/90 border-green-700/80 hover:border-[#00FF01] hover:bg-[#00FF01]/15 rounded-xl font-bold"
-                      } hover:scale-103 active:scale-95 disabled:opacity-45 disabled:cursor-not-allowed`}
+                      className="glass-button py-1.5 px-2 text-[9px] font-mono transition-all duration-300 border hover:scale-103 active:scale-95 disabled:opacity-45 disabled:cursor-not-allowed rounded-xl font-bold"
+                      style={transformation === "english" && polishedScript ? {
+                        backgroundColor: theme.accentColor,
+                        color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000",
+                        borderColor: theme.accentColor
+                      } : {
+                        backgroundColor: `${theme.accentColor}10`,
+                        color: theme.textColor,
+                        borderColor: `${theme.accentColor}30`
+                      }}
                     >
                       🇬🇧 English
                     </button>
                   </div>
                   {transformation === "hindi" && polishedScript && (
-                    <div className="mx-2.5 mt-2.5 p-2 bg-[#05290e] border border-[#00FF01]/20 rounded-xl text-center">
-                      <p className="text-[11px] text-[#00FF01] font-sans leading-relaxed">
-                        ✨ <strong>देवनागरी लिपि में उर्दू एहसास (अस्सलामु अलैकुम):</strong> यह पूरी तरह से देवनागरी (हिंदी) अक्षरों में लिखा गया है, लेकिन इसके शब्द, वाक्य और उच्चारण शैली (लहज़ा) पूरी तरह से उर्दू और हिंदुस्तानी बातचीत पर आधारित हैं, ताकि जब इसे पढ़ा जाए तो यह मुकम्मल उर्दू लहज़े में लगे!
+                    <div className="mx-2.5 mt-2.5 p-2 border rounded-xl text-center glass-card" style={{ backgroundColor: `${theme.accentColor}08`, borderColor: `${theme.accentColor}30` }}>
+                      <p className="text-[11px] font-sans leading-relaxed" style={{ color: theme.textColor }}>
+                        ✨ <strong style={{ color: theme.accentColor }}>देवनागरी लिपि में उर्दू एहसास (अस्सलामु अलैकुम):</strong> यह पूरी तरह से देवनागरी (हिंदी) अक्षरों में लिखा गया है, लेकिन इसके शब्द, वाक्य और उच्चारण शैली (लहज़ा) पूरी तरह से उर्दू और हिंदुस्तानी बातचीत पर आधारित हैं, ताकि जब इसे पढ़ा जाए तो यह मुकम्मल उर्दू लहज़े में लगे!
                       </p>
                     </div>
                   )}
                 </div>
 
                 {/* SCRIPT TEXT BOX / CONTAINER */}
-                <div className="flex-1 overflow-y-auto p-5 relative font-sans text-xs md:text-sm leading-relaxed text-gray-100 selection:bg-[#00FF01] selection:text-black">
+                <div className="flex-1 overflow-y-auto p-5 relative font-sans text-xs md:text-sm leading-relaxed" style={{ color: theme.textColor }}>
                   {polishedScript && (
-                    <div className="mb-3 flex items-center justify-between border-b border-green-800/40 pb-2.5">
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-mono font-bold bg-[#00FF01]/10 border border-[#00FF01]/30 text-[#00FF01]">
-                        <Sparkles className="h-3 w-3 text-[#00FF01] animate-pulse" />
+                    <div className="mb-3 flex items-center justify-between border-b pb-2.5" style={{ borderColor: `${theme.accentColor}30` }}>
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-mono font-bold border glass-card" style={{ backgroundColor: `${theme.accentColor}15`, borderColor: `${theme.accentColor}30`, color: theme.accentColor }}>
+                        <Sparkles className="h-3 w-3 animate-pulse" style={{ color: theme.accentColor }} />
                         Generated with {lastModelUsed || modelSettings.scriptGeneration}
                       </span>
                       {plagiarismCheck === "verified" && (
@@ -2614,10 +2959,10 @@ export default function App() {
                     </div>
                   )}
                   {loading ? (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/85 space-y-4">
-                      <Loader2 className="h-10 w-10 text-[#00FF01] animate-spin" />
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/85 space-y-4 glass-card">
+                      <Loader2 className="h-10 w-10 animate-spin" style={{ color: theme.accentColor }} />
                       <div className="text-center space-y-1">
-                        <p className="text-xs font-mono text-[#00FF01] tracking-widest uppercase animate-pulse">
+                        <p className="text-xs font-mono tracking-widest uppercase animate-pulse" style={{ color: theme.accentColor }}>
                           DIVERSIFYING & REPHRASING...
                         </p>
                         <p className="text-[10px] text-gray-400 font-mono">
@@ -2634,14 +2979,14 @@ export default function App() {
                     </div>
                   ) : (
                     <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-3">
-                      <div className="h-14 w-14 rounded-xl border border-dashed border-green-800/60 flex items-center justify-center text-green-700 animate-pulse">
+                      <div className="h-14 w-14 rounded-2xl border border-dashed flex items-center justify-center text-gray-400 animate-pulse glass-card" style={{ borderColor: `${theme.accentColor}35`, color: theme.accentColor }}>
                         <Sparkles className="h-7 w-7" />
                       </div>
                       <div className="space-y-1.5">
-                        <p className="text-xs font-semibold text-gray-300 uppercase tracking-widest">
+                        <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: theme.textColor }}>
                           Output Screen Ready
                         </p>
-                        <p className="text-xs text-gray-500 max-w-sm mx-auto">
+                        <p className="text-xs text-gray-400 max-w-sm mx-auto">
                           Configure your options, paste your draft, and hit the generate command above or languages directly inside the tab.
                         </p>
                       </div>
@@ -2656,14 +3001,14 @@ export default function App() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
               
               {/* SECTION 1: TRANSCRIPT INPUT */}
-              <div className="flex flex-col h-[480px] rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md overflow-hidden shadow-lg transition-all duration-300 hover:border-green-600 hover:shadow-[0_0_20px_rgba(0,255,1,0.05)]">
-                <div className="px-5 py-3 border-b border-green-800/80 bg-green-900/10 flex flex-col xl:flex-row xl:items-start justify-between gap-3">
+              <div className="glass-card flex flex-col h-[480px] rounded-2xl overflow-hidden shadow-2xl transition-all duration-300 border hover:border-white/30 backdrop-blur-xl" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor }}>
+                <div className="px-5 py-3 border-b flex flex-col xl:flex-row xl:items-start justify-between gap-3 glass-card" style={{ borderColor: `${theme.accentColor}30`, backgroundColor: `${theme.accentColor}08` }}>
                   <div className="flex flex-col gap-1">
-                    <span className="text-xs font-mono font-bold tracking-wider text-[#00FF01] flex items-center gap-2">
+                    <span className="text-xs font-mono font-extrabold tracking-wider flex items-center gap-2" style={{ color: theme.accentColor }}>
                       <Sliders className="h-4 w-4" />
-                      TRANSCRIPT INPUT <Plus className="h-4 w-4 text-[#00FF01] animate-bounce" />
+                      TRANSCRIPT INPUT <Plus className="h-4 w-4 animate-bounce" style={{ color: theme.accentColor }} />
                     </span>
-                    <span className="text-[9px] text-gray-500 font-mono">Configure script parameters & aspect ratios</span>
+                    <span className="text-[9px] text-gray-400 font-mono">Configure script parameters & aspect ratios</span>
                   </div>
                   
                   {/* Controllers organized in sequential rows */}
@@ -2673,7 +3018,7 @@ export default function App() {
                     <div className="flex items-center gap-2 flex-wrap w-full xl:w-auto justify-start xl:justify-end">
                       
                       {/* Domain Category - First */}
-                      <div className="flex items-center gap-1.5 bg-black/40 px-2 py-1 rounded-xl border border-green-800/60">
+                      <div className="glass-card flex items-center gap-1.5 px-2 py-1 rounded-xl border" style={{ backgroundColor: `${theme.accentColor}08`, borderColor: `${theme.accentColor}30` }}>
                         <span className="text-[9px] text-gray-400 font-mono">CATEGORY:</span>
                         <select
                           value={contentCategory}
@@ -2681,17 +3026,17 @@ export default function App() {
                             setContentCategory(e.target.value);
                             setTopicNiche(e.target.value);
                           }}
-                          className="bg-transparent text-[10px] text-[#00FF01] font-mono focus:outline-none font-bold cursor-pointer"
-                          style={{ colorScheme: "dark" }}
+                          className="bg-transparent text-[10px] font-mono focus:outline-none font-bold cursor-pointer"
+                          style={{ colorScheme: "dark", color: theme.accentColor }}
                         >
                           {CATEGORIES.map((cat) => (
-                            <option key={cat} value={cat} className="bg-[#05290e] text-[#00FF01]">{cat}</option>
+                            <option key={cat} value={cat} style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>{cat}</option>
                           ))}
                         </select>
                       </div>
 
                       {/* Scenes with Shots Calculator toggle */}
-                      <div className="flex items-center gap-1 bg-black/40 px-2 py-1 rounded-xl border border-green-800/60">
+                      <div className="glass-card flex items-center gap-1 px-2 py-1 rounded-xl border" style={{ backgroundColor: `${theme.accentColor}08`, borderColor: `${theme.accentColor}30` }}>
                         <span className="text-[9px] text-gray-400 font-mono">SCENES:</span>
                         <input
                           type="number"
@@ -2699,12 +3044,17 @@ export default function App() {
                           max="100"
                           value={numScenes}
                           onChange={(e) => setNumScenes(Math.min(100, Math.max(1, parseInt(e.target.value) || 1)))}
-                          className="bg-transparent w-8 text-[10px] text-[#00FF01] font-mono focus:outline-none font-bold"
+                          className="bg-transparent w-8 text-[10px] font-mono focus:outline-none font-bold"
+                          style={{ color: theme.accentColor }}
                         />
                         <button
                           type="button"
                           onClick={() => setShowShotsCalculator(!showShotsCalculator)}
-                          className={`p-1 rounded hover:bg-green-900/40 text-xs transition-all flex items-center justify-center ${showShotsCalculator ? "text-[#00FF01] bg-green-950/50" : "text-gray-400"}`}
+                          className="glass-button p-1 rounded hover:opacity-85 text-xs transition-all flex items-center justify-center cursor-pointer"
+                          style={{
+                            color: showShotsCalculator ? "#ffffff" : theme.textColor,
+                            backgroundColor: showShotsCalculator ? theme.accentColor : "transparent"
+                          }}
                           title="Open Shots Calculator (duration-based)"
                         >
                           <Calculator className="h-3 w-3" />
@@ -2722,17 +3072,29 @@ export default function App() {
                           }
                         }}
                         disabled={!polishedScript}
-                        className={`py-1 px-3 rounded-[17px] font-mono text-[9px] font-extrabold tracking-wider uppercase transition-all duration-300 flex items-center gap-1 border cursor-pointer ${
-                          polishedScript
-                            ? "bg-[#00FF01] text-black border-[#00FF01] hover:shadow-[0_0_15px_rgba(0,255,1,0.4)] hover:scale-105"
-                            : "bg-green-900/10 text-gray-500 border-green-800/40 cursor-not-allowed"
-                        }`}
+                        className="glass-button py-1 px-3 rounded-xl font-mono text-[9px] font-extrabold tracking-wider uppercase transition-all duration-300 flex items-center gap-1 border cursor-pointer"
+                        style={polishedScript ? {
+                          backgroundColor: theme.accentColor,
+                          color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000",
+                          borderColor: theme.accentColor
+                        } : {
+                          color: "rgb(107, 114, 128)",
+                          borderColor: "transparent",
+                          opacity: 0.4
+                        }}
                         title="Insert the polished voice over script"
                       >
                         <Plus className="h-3 w-3" /> INSERT
                       </button>
 
-                      <label className="py-1 px-3 rounded-[17px] font-mono text-[9px] font-extrabold tracking-wider uppercase transition-all duration-300 flex items-center gap-1 border cursor-pointer bg-green-900/30 border-green-800 text-[#00FF01] hover:border-[#00FF01] hover:bg-[#00FF01]/10 hover:scale-105 active:scale-95">
+                      <label
+                        className="glass-button py-1 px-3 rounded-xl font-mono text-[9px] font-extrabold tracking-wider uppercase transition-all duration-300 flex items-center gap-1 border cursor-pointer active:scale-95"
+                        style={{
+                          backgroundColor: `${theme.accentColor}15`,
+                          borderColor: theme.accentColor,
+                          color: theme.accentColor
+                        }}
+                      >
                         <Plus className="h-3 w-3" /> IMPORT FILE
                         <input
                           type="file"
@@ -2744,18 +3106,18 @@ export default function App() {
                     </div>
 
                     {/* Row 3: Format Dropdown below them */}
-                    <div className="flex items-center gap-1.5 bg-black/40 px-2.5 py-1 rounded-[17px] border border-green-800/60 hover:border-[#00FF01]/40 transition-all duration-300 w-fit">
+                    <div className="glass-card flex items-center gap-1.5 px-2.5 py-1 rounded-xl border transition-all duration-300 w-fit" style={{ backgroundColor: `${theme.accentColor}08`, borderColor: `${theme.accentColor}30` }}>
                       <span className="text-[9px] text-gray-400 font-mono">FORMAT:</span>
                       <select
                         value={storyboardFormat}
                         onChange={(e) => setStoryboardFormat(e.target.value as any)}
-                        className="bg-transparent text-[10px] text-[#00FF01] font-mono focus:outline-none font-bold cursor-pointer outline-none"
-                        style={{ colorScheme: "dark" }}
+                        className="bg-transparent text-[10px] font-mono focus:outline-none font-bold cursor-pointer outline-none"
+                        style={{ colorScheme: "dark", color: theme.accentColor }}
                       >
-                        <option value="16:9" className="bg-[#05290e] text-[#00FF01]">Horizontal (16:9)</option>
-                        <option value="9:16" className="bg-[#05290e] text-[#00FF01]">Vertical (9:16)</option>
-                        <option value="1:1" className="bg-[#05290e] text-[#00FF01]">Square (1:1)</option>
-                        <option value="none" className="bg-[#05290e] text-[#00FF01]">None (No Format)</option>
+                        <option value="16:9" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Horizontal (16:9)</option>
+                        <option value="9:16" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Vertical (9:16)</option>
+                        <option value="1:1" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Square (1:1)</option>
+                        <option value="none" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>None (No Format)</option>
                       </select>
                     </div>
 
@@ -2770,16 +3132,22 @@ export default function App() {
                         initial={{ height: 0, opacity: 0 }}
                         animate={{ height: "auto", opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
-                        className="bg-black/95 border-b border-green-800/80 p-4 space-y-3 font-mono overflow-hidden z-30"
+                        className="border-b p-4 space-y-3 font-mono overflow-hidden z-30"
+                        style={{ backgroundColor: theme.cardBg, borderColor: `${theme.accentColor}40` }}
                       >
                         <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-bold text-[#00FF01] uppercase tracking-widest flex items-center gap-1.5">
+                          <span className="text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5" style={{ color: theme.accentColor }}>
                             <Calculator className="h-3.5 w-3.5 animate-pulse" /> duration-based shots calculator
                           </span>
                           <button
                             type="button"
                             onClick={() => setShowShotsCalculator(false)}
-                            className="text-[10px] text-red-400 hover:text-red-300 font-bold border border-red-900/60 bg-red-950/20 px-2 py-0.5 rounded"
+                            className="text-[10px] font-bold px-2 py-0.5 rounded cursor-pointer transition-colors"
+                            style={{
+                              backgroundColor: "rgba(127, 29, 29, 0.2)",
+                              color: "#f87171",
+                              border: "1px solid rgba(239, 68, 110, 0.4)"
+                            }}
                           >
                             CLOSE
                           </button>
@@ -2788,7 +3156,7 @@ export default function App() {
                         {/* Calculator Inputs */}
                         <div className="grid grid-cols-3 gap-2.5">
                           <div>
-                            <label className="text-[8px] text-gray-500 block mb-1">VIDEO MINS</label>
+                            <label className="text-[8px] text-gray-400 block mb-1">VIDEO MINS</label>
                             <input
                               type="number"
                               min="0"
@@ -2799,11 +3167,12 @@ export default function App() {
                                 const totSec = (val * 60) + calcVideoSeconds;
                                 setNumScenes(Math.ceil(totSec / calcShotDuration) || 1);
                               }}
-                              className="w-full bg-green-950/20 border border-green-800/60 rounded px-2 py-1 text-xs text-[#00FF01] font-bold font-mono focus:outline-none focus:border-[#00FF01]"
+                              className="w-full rounded px-2 py-1 text-xs font-bold font-mono focus:outline-none border"
+                              style={{ backgroundColor: theme.inputBg, borderColor: `${theme.accentColor}40`, color: theme.textColor }}
                             />
                           </div>
                           <div>
-                            <label className="text-[8px] text-gray-500 block mb-1">VIDEO SECS</label>
+                            <label className="text-[8px] text-gray-400 block mb-1">VIDEO SECS</label>
                             <input
                               type="number"
                               min="0"
@@ -2815,11 +3184,12 @@ export default function App() {
                                 const totSec = (calcVideoMinutes * 60) + val;
                                 setNumScenes(Math.ceil(totSec / calcShotDuration) || 1);
                               }}
-                              className="w-full bg-green-950/20 border border-green-800/60 rounded px-2 py-1 text-xs text-[#00FF01] font-bold font-mono focus:outline-none focus:border-[#00FF01]"
+                              className="w-full rounded px-2 py-1 text-xs font-bold font-mono focus:outline-none border"
+                              style={{ backgroundColor: theme.inputBg, borderColor: `${theme.accentColor}40`, color: theme.textColor }}
                             />
                           </div>
                           <div>
-                            <label className="text-[8px] text-gray-500 block mb-1">SHOT TIME (SEC)</label>
+                            <label className="text-[8px] text-gray-400 block mb-1">SHOT TIME (SEC)</label>
                             <input
                               type="number"
                               min="1"
@@ -2830,28 +3200,29 @@ export default function App() {
                                 const totSec = (calcVideoMinutes * 60) + calcVideoSeconds;
                                 setNumScenes(Math.ceil(totSec / val) || 1);
                               }}
-                              className="w-full bg-green-950/20 border border-green-800/60 rounded px-2 py-1 text-xs text-[#00FF01] font-bold font-mono focus:outline-none focus:border-[#00FF01]"
+                              className="w-full rounded px-2 py-1 text-xs font-bold font-mono focus:outline-none border"
+                              style={{ backgroundColor: theme.inputBg, borderColor: `${theme.accentColor}40`, color: theme.textColor }}
                             />
                           </div>
                         </div>
 
                         {/* Output format requested by the user */}
-                        <div className="bg-green-950/15 p-3 rounded-xl border border-green-800/50 space-y-1.5 text-[10px] md:text-xs">
-                          <p className="text-[#00FF01] font-bold uppercase tracking-wider text-[8px] opacity-75">Output Details:</p>
-                          <div className="space-y-1 text-gray-300 font-bold">
-                            <div className="flex justify-between border-b border-green-950 py-1">
+                        <div className="p-3 rounded-xl border space-y-1.5 text-[10px] md:text-xs" style={{ backgroundColor: `${theme.accentColor}06`, borderColor: `${theme.accentColor}25` }}>
+                          <p className="font-bold uppercase tracking-wider text-[8px] opacity-75" style={{ color: theme.accentColor }}>Output Details:</p>
+                          <div className="space-y-1 font-bold" style={{ color: theme.textColor }}>
+                            <div className="flex justify-between border-b py-1" style={{ borderColor: `${theme.accentColor}15` }}>
                               <span>Video Duration:</span>
-                              <span className="text-[#00FF01]">
+                              <span style={{ color: theme.accentColor }}>
                                 {calcVideoMinutes} minute{calcVideoMinutes !== 1 ? 's' : ''} {calcVideoSeconds > 0 ? `${calcVideoSeconds} second${calcVideoSeconds !== 1 ? 's' : ''}` : ''}
                               </span>
                             </div>
-                            <div className="flex justify-between border-b border-green-950 py-1">
+                            <div className="flex justify-between border-b py-1" style={{ borderColor: `${theme.accentColor}15` }}>
                               <span>Shot Duration:</span>
-                              <span className="text-[#00FF01]">{calcShotDuration} seconds</span>
+                              <span style={{ color: theme.accentColor }}>{calcShotDuration} seconds</span>
                             </div>
                             <div className="flex justify-between pt-1">
                               <span>Total Shots Required:</span>
-                              <span className="text-[#00FF01] text-xs font-black">{Math.ceil(((calcVideoMinutes * 60) + calcVideoSeconds) / calcShotDuration) || 1}</span>
+                              <span style={{ color: theme.accentColor }} className="text-xs font-black">{Math.ceil(((calcVideoMinutes * 60) + calcVideoSeconds) / calcShotDuration) || 1}</span>
                             </div>
                           </div>
                         </div>
@@ -2863,7 +3234,8 @@ export default function App() {
                     value={transcriptInput}
                     onChange={(e) => setTranscriptInput(e.target.value)}
                     placeholder="Paste complete raw transcript here. Specify the Number of Scenes and Content Category above, then hit Generate Scene Prompts..."
-                    className="flex-1 bg-transparent resize-none p-5 text-xs md:text-sm text-gray-200 focus:outline-none placeholder-gray-600 leading-relaxed font-mono transition-all duration-300 hover:bg-[#00FF01]/2 focus:bg-[#031d0a]/30"
+                    className="flex-1 bg-transparent resize-none p-5 text-xs md:text-sm focus:outline-none placeholder-gray-500 leading-relaxed font-mono transition-all duration-300 pr-12"
+                    style={{ color: theme.textColor }}
                   />
 
                   {/* Speech to Text Floating Activator */}
@@ -2872,16 +3244,21 @@ export default function App() {
                       <button
                         type="button"
                         onClick={stopSpeechToText}
-                        className="p-2.5 rounded-full bg-red-950/80 text-red-400 border border-red-800/80 hover:bg-red-900 transition-all cursor-pointer shadow-lg flex items-center justify-center"
+                        className="glass-button p-2.5 rounded-full bg-red-950/80 text-red-400 border border-red-800/80 hover:bg-red-900 transition-all cursor-pointer shadow-lg flex items-center justify-center"
                         title="Stop speech-to-text"
                       >
-                        <MicOff className="h-4 w-4 animate-bounce text-[#00FF00]" />
+                        <MicOff className="h-4 w-4 animate-bounce text-red-400" />
                       </button>
                     ) : (
                       <button
                         type="button"
                         onClick={() => startSpeechToText("transcript")}
-                        className="p-2.5 rounded-full bg-green-950/85 text-gray-300 border border-green-800/80 hover:border-[#00FF01] hover:text-[#00FF01] hover:bg-green-900/30 transition-all cursor-pointer shadow-lg flex items-center justify-center hover:scale-110 active:scale-95"
+                        className="glass-button p-2.5 rounded-full border transition-all cursor-pointer shadow-lg flex items-center justify-center hover:scale-110 active:scale-95"
+                        style={{
+                          backgroundColor: `${theme.accentColor}12`,
+                          borderColor: theme.accentColor,
+                          color: theme.textColor
+                        }}
                         title="Speak to enter transcript / explain scene"
                       >
                         <Mic className="h-4 w-4" />
@@ -2896,11 +3273,12 @@ export default function App() {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="absolute inset-0 bg-black/95 backdrop-blur-md flex flex-col items-center justify-center p-6 space-y-5 z-20"
+                        className="absolute inset-0 bg-black/95 backdrop-blur-md flex flex-col items-center justify-center p-6 space-y-5 z-20 border glass-card"
+                        style={{ borderColor: theme.accentColor }}
                       >
                         <div className="flex items-center gap-2">
-                          <span className="h-3 w-3 rounded-full bg-[#00FF00] animate-ping" />
-                          <h3 className="text-sm font-mono text-[#00FF01] uppercase tracking-widest font-black">
+                          <span className="h-3 w-3 rounded-full bg-red-500 animate-ping" />
+                          <h3 className="text-sm font-mono uppercase tracking-widest font-black" style={{ color: theme.accentColor }}>
                             Gemini Voice Explainer Active
                           </h3>
                         </div>
@@ -2909,19 +3287,19 @@ export default function App() {
                         </p>
                         
                         {/* Gemini Waveform */}
-                        <div className="flex items-end gap-1.5 h-10 px-6 py-2 bg-green-950/20 rounded-full border border-green-900/40">
-                          <motion.div className="w-1.5 bg-[#00FF00] rounded-full" animate={{ height: ["15%", "85%", "15%"] }} transition={{ duration: 0.6, repeat: Infinity, ease: "easeInOut" }} />
-                          <motion.div className="w-1.5 bg-[#00FF00] rounded-full" animate={{ height: ["40%", "100%", "40%"] }} transition={{ duration: 0.5, repeat: Infinity, ease: "easeInOut", delay: 0.08 }} />
-                          <motion.div className="w-1.5 bg-[#00FF00] rounded-full" animate={{ height: ["20%", "70%", "20%"] }} transition={{ duration: 0.7, repeat: Infinity, ease: "easeInOut", delay: 0.16 }} />
-                          <motion.div className="w-1.5 bg-[#00FF00] rounded-full" animate={{ height: ["50%", "95%", "50%"] }} transition={{ duration: 0.4, repeat: Infinity, ease: "easeInOut", delay: 0.12 }} />
-                          <motion.div className="w-1.5 bg-[#00FF00] rounded-full" animate={{ height: ["10%", "60%", "10%"] }} transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut", delay: 0.2 }} />
-                          <motion.div className="w-1.5 bg-[#00FF00] rounded-full" animate={{ height: ["35%", "80%", "35%"] }} transition={{ duration: 0.55, repeat: Infinity, ease: "easeInOut", delay: 0.14 }} />
+                        <div className="flex items-end gap-1.5 h-10 px-6 py-2 rounded-full border glass-card" style={{ backgroundColor: `${theme.accentColor}08`, borderColor: `${theme.accentColor}30` }}>
+                          <motion.div className="w-1.5 rounded-full" style={{ backgroundColor: theme.accentColor }} animate={{ height: ["15%", "85%", "15%"] }} transition={{ duration: 0.6, repeat: Infinity, ease: "easeInOut" }} />
+                          <motion.div className="w-1.5 rounded-full" style={{ backgroundColor: theme.accentColor }} animate={{ height: ["40%", "100%", "40%"] }} transition={{ duration: 0.5, repeat: Infinity, ease: "easeInOut", delay: 0.08 }} />
+                          <motion.div className="w-1.5 rounded-full" style={{ backgroundColor: theme.accentColor }} animate={{ height: ["20%", "70%", "20%"] }} transition={{ duration: 0.7, repeat: Infinity, ease: "easeInOut", delay: 0.16 }} />
+                          <motion.div className="w-1.5 rounded-full" style={{ backgroundColor: theme.accentColor }} animate={{ height: ["50%", "95%", "50%"] }} transition={{ duration: 0.4, repeat: Infinity, ease: "easeInOut", delay: 0.12 }} />
+                          <motion.div className="w-1.5 rounded-full" style={{ backgroundColor: theme.accentColor }} animate={{ height: ["10%", "60%", "10%"] }} transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut", delay: 0.2 }} />
+                          <motion.div className="w-1.5 rounded-full" style={{ backgroundColor: theme.accentColor }} animate={{ height: ["35%", "80%", "35%"] }} transition={{ duration: 0.55, repeat: Infinity, ease: "easeInOut", delay: 0.14 }} />
                         </div>
 
                         <button
                           type="button"
                           onClick={stopSpeechToText}
-                          className="px-5 py-2 rounded-xl bg-red-950/30 hover:bg-red-900 border border-red-900/60 text-red-200 text-xs font-mono transition-all cursor-pointer hover:scale-105"
+                          className="glass-button px-5 py-2 rounded-xl bg-red-950/30 hover:bg-red-900 border border-red-900/60 text-red-200 text-xs font-mono transition-all cursor-pointer hover:scale-105"
                         >
                           Finish & Save Input
                         </button>
@@ -2932,10 +3310,10 @@ export default function App() {
               </div>
 
               {/* SECTION 2: GENERATED SCENE PROMPTS */}
-              <div className="flex flex-col h-[480px] rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md overflow-hidden shadow-lg relative transition-all duration-300 hover:border-green-600 hover:shadow-[0_0_20px_rgba(0,255,1,0.05)]">
-                <div className="px-5 py-3 border-b border-green-800/80 bg-green-900/15 flex flex-col xl:flex-row xl:items-center justify-between gap-3">
-                  <span className="text-xs font-mono font-bold tracking-wider text-[#00FF01] flex items-center gap-1.5">
-                    <Sparkles className="h-4 w-4 text-[#00FF01]" />
+              <div className="glass-card flex flex-col h-[480px] rounded-2xl overflow-hidden shadow-2xl relative transition-all duration-300 border hover:border-white/30 backdrop-blur-xl" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor }}>
+                <div className="px-5 py-3 border-b flex flex-col xl:flex-row xl:items-center justify-between gap-3 glass-card" style={{ borderColor: `${theme.accentColor}30`, backgroundColor: `${theme.accentColor}08` }}>
+                  <span className="text-xs font-mono font-extrabold tracking-wider flex items-center gap-1.5" style={{ color: theme.accentColor }}>
+                    <Sparkles className="h-4 w-4" style={{ color: theme.accentColor }} />
                     GENERATED SCENE PROMPTS
                   </span>
                   
@@ -2944,11 +3322,16 @@ export default function App() {
                     <button
                       onClick={handleGenerateScenes}
                       disabled={scenesLoading || !transcriptInput.trim()}
-                      className={`py-1.5 px-4 rounded-[17px] font-mono text-[10px] font-black tracking-wider uppercase transition-all duration-300 flex items-center gap-1.5 border cursor-pointer ${
-                        transcriptInput.trim() && !scenesLoading
-                          ? "bg-[#00FF01] text-black border-[#00FF01] hover:shadow-[0_0_15px_rgba(0,255,1,0.4)] hover:scale-105 active:scale-95"
-                          : "bg-green-900/10 text-gray-500 border-green-800/40 cursor-not-allowed"
-                      }`}
+                      className="glass-button py-1.5 px-4 rounded-xl font-mono text-[10px] font-black tracking-wider uppercase transition-all duration-300 flex items-center gap-1.5 border cursor-pointer"
+                      style={transcriptInput.trim() && !scenesLoading ? {
+                        backgroundColor: theme.accentColor,
+                        color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000",
+                        borderColor: theme.accentColor
+                      } : {
+                        color: "rgb(107, 114, 128)",
+                        borderColor: "transparent",
+                        opacity: 0.4
+                      }}
                     >
                       {scenesLoading ? (
                         <>
@@ -2965,28 +3348,31 @@ export default function App() {
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <button
                           onClick={handleCopyAllScenes}
-                          className="p-1.5 rounded-lg bg-green-900/30 hover:bg-[#00FF01]/10 text-[#00FF01] border border-green-800 hover:border-[#00FF01] transition-all text-[10px] font-mono flex items-center gap-1 cursor-pointer"
+                          className="glass-button p-1.5 rounded-xl border transition-all text-[10px] font-mono flex items-center gap-1 cursor-pointer"
+                          style={{ backgroundColor: `${theme.accentColor}15`, borderColor: theme.accentColor, color: theme.accentColor }}
                           title="Copy All"
                         >
                           <Copy className="h-3 w-3" /> COPY ALL
                         </button>
                         <button
                           onClick={handleDownloadAllScenesTxt}
-                          className="p-1.5 rounded-lg bg-green-900/30 hover:bg-[#00FF01]/10 text-[#00FF01] border border-green-800 hover:border-[#00FF01] transition-all text-[10px] font-mono flex items-center gap-1 cursor-pointer"
+                          className="glass-button p-1.5 rounded-xl border transition-all text-[10px] font-mono flex items-center gap-1 cursor-pointer"
+                          style={{ backgroundColor: `${theme.accentColor}15`, borderColor: theme.accentColor, color: theme.accentColor }}
                           title="Download Text"
                         >
                           <Download className="h-3 w-3" /> .TXT
                         </button>
                         <button
                           onClick={handleDownloadAllScenesDocx}
-                          className="p-1.5 rounded-lg bg-green-900/30 hover:bg-[#00FF01]/10 text-[#00FF01] border border-green-800 hover:border-[#00FF01] transition-all text-[10px] font-mono flex items-center gap-1 cursor-pointer"
+                          className="glass-button p-1.5 rounded-xl border transition-all text-[10px] font-mono flex items-center gap-1 cursor-pointer"
+                          style={{ backgroundColor: `${theme.accentColor}15`, borderColor: theme.accentColor, color: theme.accentColor }}
                           title="Download Word Document"
                         >
                           <Download className="h-3 w-3" /> .DOCX
                         </button>
                         <button
                           onClick={handleClearAllScenes}
-                          className="p-1.5 rounded-lg bg-red-950/20 hover:bg-red-900 hover:text-white text-red-400 border border-red-900/40 transition-all text-[10px] font-mono flex items-center gap-1 cursor-pointer"
+                          className="glass-button p-1.5 rounded-xl bg-red-950/20 hover:bg-red-900 hover:text-white text-red-400 border border-red-900/40 transition-all text-[10px] font-mono flex items-center gap-1 cursor-pointer"
                           title="Clear storyboard"
                         >
                           <Trash2 className="h-3 w-3" /> CLEAR
@@ -3000,43 +3386,45 @@ export default function App() {
                 <div className="flex-1 overflow-y-auto p-4 space-y-4">
                   {scenesLoading ? (
                     <div className="h-full flex flex-col items-center justify-center space-y-3">
-                      <Loader2 className="h-10 w-10 text-[#00FF01] animate-spin" />
-                      <p className="text-xs font-mono text-[#00FF01] uppercase tracking-wider animate-pulse">CREATING CINEMATIC STORYBOARD...</p>
+                      <Loader2 className="h-10 w-10 animate-spin" style={{ color: theme.accentColor }} />
+                      <p className="text-xs font-mono uppercase tracking-wider animate-pulse" style={{ color: theme.accentColor }}>CREATING CINEMATIC STORYBOARD...</p>
                     </div>
                   ) : scenes.length > 0 ? (
                     scenes.map((scene) => (
                       <div
                         key={scene.id}
-                        className="p-4 rounded-xl border border-green-900/80 bg-green-950/10 space-y-3 hover:border-[#00FF01]/30 transition-all duration-300 relative group"
+                        className="glass-card p-4 rounded-xl border space-y-3 transition-all duration-300 relative group"
+                        style={{ backgroundColor: `${theme.accentColor}06`, borderColor: `${theme.accentColor}25` }}
                       >
                         <div className="flex items-center justify-between">
-                          <span className="text-xs font-mono font-bold text-[#00FF01] bg-green-900/30 px-2.5 py-1 rounded-lg border border-green-800">
+                          <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-lg border glass-card" style={{ backgroundColor: `${theme.accentColor}15`, borderColor: `${theme.accentColor}30`, color: theme.accentColor }}>
                             SCENE {scene.id}
                           </span>
                         </div>
 
                         {scene.loading ? (
                           <div className="py-6 flex flex-col items-center justify-center space-y-2">
-                            <Loader2 className="h-6 w-6 text-[#00FF01] animate-spin" />
+                            <Loader2 className="h-6 w-6 animate-spin" style={{ color: theme.accentColor }} />
                             <p className="text-[10px] font-mono text-gray-400">Regenerating Scene...</p>
                           </div>
                         ) : (
                           <textarea
                             value={scene.text}
                             onChange={(e) => handleEditSceneText(scene.id, e.target.value)}
-                            className="w-full bg-black/20 border border-green-900/55 rounded-lg p-3 text-xs text-gray-200 focus:outline-none focus:border-[#00FF01]/40 leading-relaxed font-sans h-28 resize-none"
+                            className="glass-input w-full rounded-lg p-3 text-xs focus:outline-none border leading-relaxed font-sans h-28 resize-none"
+                            style={{ backgroundColor: theme.inputBg, borderColor: `${theme.accentColor}40`, color: theme.textColor }}
                           />
                         )}
                       </div>
                     ))
                   ) : (
                     <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-3">
-                      <div className="h-12 w-12 rounded-xl border border-dashed border-green-800/60 flex items-center justify-center text-green-700 animate-pulse">
+                      <div className="h-12 w-12 rounded-2xl border border-dashed flex items-center justify-center text-gray-400 animate-pulse glass-card" style={{ borderColor: `${theme.accentColor}35`, color: theme.accentColor }}>
                         <Sparkles className="h-6 w-6" />
                       </div>
                       <div className="space-y-1">
-                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">No Storyboard Generated</p>
-                        <p className="text-[11px] text-gray-500 max-w-xs mx-auto">
+                        <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: theme.textColor }}>No Storyboard Generated</p>
+                        <p className="text-[11px] text-gray-400 max-w-xs mx-auto">
                           Paste your transcript in the left panel and click Generate Scene Prompts to build a stunning, optimized storyboard!
                         </p>
                       </div>
@@ -3053,9 +3441,9 @@ export default function App() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   
                   {/* Left Column: Video Transcript Input */}
-                  <div className="flex flex-col h-[480px] rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md overflow-hidden shadow-lg transition-all duration-300 hover:border-green-600">
-                    <div className="px-5 py-3 border-b border-green-800/80 bg-green-900/10 flex items-center justify-between">
-                      <span className="text-xs font-mono font-extrabold tracking-wider text-[#00FF01] flex items-center gap-2">
+                  <div className="glass-card flex flex-col h-[480px] rounded-2xl overflow-hidden shadow-2xl transition-all duration-300 border hover:border-white/30 backdrop-blur-xl" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor }}>
+                    <div className="px-5 py-3 border-b flex items-center justify-between glass-card" style={{ borderColor: `${theme.accentColor}30`, backgroundColor: `${theme.accentColor}08` }}>
+                      <span className="text-xs font-mono font-extrabold tracking-wider flex items-center gap-2" style={{ color: theme.accentColor }}>
                         <FileText className="h-4 w-4" />
                         Video Transcript Input
                       </span>
@@ -3067,16 +3455,29 @@ export default function App() {
                             }
                           }}
                           disabled={!polishedScript}
-                          className={`py-1 px-2.5 rounded-[17px] font-mono text-[9px] font-extrabold tracking-tight flex items-center gap-1 border cursor-pointer transition-all ${
-                            polishedScript
-                              ? "bg-[#00FF01] text-black border-[#00FF01] hover:scale-105 active:scale-95 animate-pulse"
-                              : "opacity-40 cursor-not-allowed text-gray-500 border-transparent"
-                          }`}
+                          className="glass-button py-1 px-2.5 rounded-xl font-mono text-[9px] font-extrabold tracking-tight flex items-center gap-1 border cursor-pointer transition-all"
+                          style={polishedScript ? {
+                            backgroundColor: theme.accentColor,
+                            color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000",
+                            borderColor: theme.accentColor
+                          } : {
+                            color: "rgb(107, 114, 128)",
+                            borderColor: "transparent",
+                            opacity: 0.4,
+                            cursor: "not-allowed"
+                          }}
                           title="Insert from Polished Script"
                         >
                           <Plus className="h-3 w-3" /> INSERT POLISHED VO
                         </button>
-                        <label className="py-1 px-2.5 rounded-[17px] font-mono text-[9px] font-extrabold tracking-tight flex items-center gap-1 border cursor-pointer transition-all bg-green-900/30 border-green-800 text-[#00FF01] hover:border-[#00FF01] hover:bg-[#00FF01]/10 hover:scale-105 active:scale-95">
+                        <label
+                          className="glass-button py-1 px-2.5 rounded-xl font-mono text-[9px] font-extrabold tracking-tight flex items-center gap-1 border cursor-pointer transition-all hover:scale-105 active:scale-95"
+                          style={{
+                            backgroundColor: `${theme.accentColor}15`,
+                            borderColor: `${theme.accentColor}40`,
+                            color: theme.accentColor
+                          }}
+                        >
                           <Plus className="h-3 w-3" /> IMPORT FILE
                           <input
                             type="file"
@@ -3093,7 +3494,11 @@ export default function App() {
                         value={videoTranscriptInput}
                         onChange={(e) => setVideoTranscriptInput(e.target.value)}
                         placeholder="Paste complete video transcript here to auto-generate fully optimized, high-CTR metadata titles, description, timestamps, hashtags, and tags..."
-                        className="w-full h-full bg-transparent resize-none p-4 text-xs md:text-sm text-gray-200 focus:outline-none placeholder-gray-600 leading-relaxed font-mono focus:bg-[#031d0a]/30 pr-12"
+                        className="w-full h-full bg-transparent resize-none p-4 text-xs md:text-sm focus:outline-none placeholder-gray-600 leading-relaxed font-mono pr-12"
+                        style={{
+                          color: theme.textColor,
+                          backgroundColor: 'transparent'
+                        }}
                       />
                       
                       {/* Controls container in bottom right corner */}
@@ -3102,16 +3507,26 @@ export default function App() {
                           <button
                             type="button"
                             onClick={stopSpeechToText}
-                            className="p-2.5 rounded-full bg-red-950/80 text-red-400 border border-red-800/80 hover:bg-red-900 transition-all cursor-pointer shadow-lg flex items-center justify-center"
+                            className="p-2.5 rounded-full hover:opacity-90 transition-all cursor-pointer shadow-lg flex items-center justify-center border"
+                            style={{
+                              backgroundColor: "rgba(220, 38, 38, 0.2)",
+                              color: "rgb(248, 113, 113)",
+                              borderColor: "rgba(220, 38, 38, 0.4)"
+                            }}
                             title="Stop speech-to-text"
                           >
-                            <MicOff className="h-4 w-4 animate-bounce text-[#00FF00]" />
+                            <MicOff className="h-4 w-4 animate-bounce" style={{ color: theme.accentColor }} />
                           </button>
                         ) : (
                           <button
                             type="button"
                             onClick={() => startSpeechToText("videoTranscript")}
-                            className="p-2.5 rounded-full bg-green-950/85 text-gray-300 border border-green-800/80 hover:border-[#00FF01] hover:text-[#00FF01] hover:bg-green-900/30 transition-all cursor-pointer shadow-lg flex items-center justify-center hover:scale-110 active:scale-95"
+                            className="p-2.5 rounded-full hover:scale-110 active:scale-95 transition-all cursor-pointer shadow-lg flex items-center justify-center border"
+                            style={{
+                              backgroundColor: `${theme.accentColor}10`,
+                              borderColor: `${theme.accentColor}40`,
+                              color: theme.textColor
+                            }}
                             title="Speak to enter video transcript"
                           >
                             <Mic className="h-4 w-4" />
@@ -3121,7 +3536,12 @@ export default function App() {
                         {videoTranscriptInput && (
                           <button
                             onClick={() => setVideoTranscriptInput("")}
-                            className="p-2 rounded-xl bg-red-950/30 text-red-400 border border-red-900/40 hover:bg-red-900 hover:text-white transition-all duration-300 cursor-pointer hover:scale-105"
+                            className="p-2 rounded-xl transition-all duration-300 cursor-pointer hover:scale-105 border"
+                            style={{
+                              backgroundColor: "rgba(220, 38, 38, 0.1)",
+                              borderColor: "rgba(220, 38, 38, 0.2)",
+                              color: "rgb(248, 113, 113)"
+                            }}
                             title="Clear transcript input"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -3139,8 +3559,8 @@ export default function App() {
                             className="absolute inset-0 bg-black/95 backdrop-blur-md flex flex-col items-center justify-center p-6 space-y-5 z-20"
                           >
                             <div className="flex items-center gap-2">
-                              <span className="h-3 w-3 rounded-full bg-[#00FF00] animate-ping" />
-                              <h3 className="text-sm font-mono text-[#00FF01] uppercase tracking-widest font-black">
+                              <span className="h-3 w-3 rounded-full animate-ping" style={{ backgroundColor: theme.accentColor }} />
+                              <h3 className="text-sm font-mono uppercase tracking-widest font-black" style={{ color: theme.accentColor }}>
                                 Gemini Voice Explainer Active
                               </h3>
                             </div>
@@ -3149,19 +3569,24 @@ export default function App() {
                             </p>
                             
                             {/* Gemini Waveform */}
-                            <div className="flex items-end gap-1.5 h-10 px-6 py-2 bg-green-950/20 rounded-full border border-green-900/40">
-                              <motion.div className="w-1.5 bg-[#00FF00] rounded-full" animate={{ height: ["15%", "85%", "15%"] }} transition={{ duration: 0.6, repeat: Infinity, ease: "easeInOut" }} />
-                              <motion.div className="w-1.5 bg-[#00FF00] rounded-full" animate={{ height: ["40%", "100%", "40%"] }} transition={{ duration: 0.5, repeat: Infinity, ease: "easeInOut", delay: 0.08 }} />
-                              <motion.div className="w-1.5 bg-[#00FF00] rounded-full" animate={{ height: ["20%", "70%", "20%"] }} transition={{ duration: 0.7, repeat: Infinity, ease: "easeInOut", delay: 0.16 }} />
-                              <motion.div className="w-1.5 bg-[#00FF00] rounded-full" animate={{ height: ["50%", "95%", "50%"] }} transition={{ duration: 0.4, repeat: Infinity, ease: "easeInOut", delay: 0.12 }} />
-                              <motion.div className="w-1.5 bg-[#00FF00] rounded-full" animate={{ height: ["10%", "60%", "10%"] }} transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut", delay: 0.2 }} />
-                              <motion.div className="w-1.5 bg-[#00FF00] rounded-full" animate={{ height: ["35%", "80%", "35%"] }} transition={{ duration: 0.55, repeat: Infinity, ease: "easeInOut", delay: 0.14 }} />
+                            <div className="flex items-end gap-1.5 h-10 px-6 py-2 rounded-full border" style={{ backgroundColor: `${theme.accentColor}10`, borderColor: `${theme.accentColor}30` }}>
+                              <motion.div className="w-1.5 rounded-full" style={{ backgroundColor: theme.accentColor }} animate={{ height: ["15%", "85%", "15%"] }} transition={{ duration: 0.6, repeat: Infinity, ease: "easeInOut" }} />
+                              <motion.div className="w-1.5 rounded-full" style={{ backgroundColor: theme.accentColor }} animate={{ height: ["40%", "100%", "40%"] }} transition={{ duration: 0.5, repeat: Infinity, ease: "easeInOut", delay: 0.08 }} />
+                              <motion.div className="w-1.5 rounded-full" style={{ backgroundColor: theme.accentColor }} animate={{ height: ["20%", "70%", "20%"] }} transition={{ duration: 0.7, repeat: Infinity, ease: "easeInOut", delay: 0.16 }} />
+                              <motion.div className="w-1.5 rounded-full" style={{ backgroundColor: theme.accentColor }} animate={{ height: ["50%", "95%", "50%"] }} transition={{ duration: 0.4, repeat: Infinity, ease: "easeInOut", delay: 0.12 }} />
+                              <motion.div className="w-1.5 rounded-full" style={{ backgroundColor: theme.accentColor }} animate={{ height: ["10%", "60%", "10%"] }} transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut", delay: 0.2 }} />
+                              <motion.div className="w-1.5 rounded-full" style={{ backgroundColor: theme.accentColor }} animate={{ height: ["35%", "80%", "35%"] }} transition={{ duration: 0.55, repeat: Infinity, ease: "easeInOut", delay: 0.14 }} />
                             </div>
 
                             <button
                               type="button"
                               onClick={stopSpeechToText}
-                              className="px-5 py-2 rounded-xl bg-red-950/30 hover:bg-red-900 border border-red-900/60 text-red-200 text-xs font-mono transition-all cursor-pointer hover:scale-105"
+                              className="px-5 py-2 rounded-xl text-xs font-mono transition-all cursor-pointer hover:scale-105 border"
+                              style={{
+                                backgroundColor: "rgba(220, 38, 38, 0.15)",
+                                borderColor: "rgba(220, 38, 38, 0.3)",
+                                color: "rgb(254, 202, 202)"
+                              }}
                             >
                               Finish & Save Transcript
                             </button>
@@ -3172,10 +3597,10 @@ export default function App() {
                   </div>
 
                   {/* Right Column: CTR YT & SM output */}
-                  <div className="flex flex-col h-[480px] rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md overflow-hidden shadow-lg relative transition-all duration-300 hover:border-green-600">
-                    <div className="px-4 py-3 border-b border-green-800/80 bg-green-900/15 flex items-center justify-between">
-                      <span className="text-xs font-mono font-bold tracking-wider text-[#00FF01] flex items-center gap-1.5">
-                        <Sparkles className="h-4 w-4 text-[#00FF01]" />
+                  <div className="glass-card flex flex-col h-[480px] rounded-2xl overflow-hidden shadow-2xl relative transition-all duration-300 border hover:border-white/30 backdrop-blur-xl" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor }}>
+                    <div className="px-4 py-3 border-b flex items-center justify-between glass-card" style={{ borderColor: `${theme.accentColor}30`, backgroundColor: `${theme.accentColor}08` }}>
+                      <span className="text-xs font-mono font-extrabold tracking-wider flex items-center gap-1.5" style={{ color: theme.accentColor }}>
+                        <Sparkles className="h-4 w-4" style={{ color: theme.accentColor }} />
                         CTR YT & SM output
                       </span>
 
@@ -3183,11 +3608,17 @@ export default function App() {
                         <button
                           onClick={handleGenerateCtr}
                           disabled={ctrLoading || !videoTranscriptInput.trim()}
-                          className={`py-1 px-3 rounded-[17px] font-mono text-[9px] font-black tracking-wider uppercase transition-all duration-300 flex items-center gap-1 border cursor-pointer ${
-                            videoTranscriptInput.trim() && !ctrLoading
-                              ? "bg-[#00FF01] text-black border-[#00FF01] hover:scale-105 active:scale-95 shadow-[0_0_12px_rgba(0,255,1,0.3)]"
-                              : "bg-green-900/10 text-gray-500 border-green-800/40 cursor-not-allowed"
-                          }`}
+                          className="glass-button py-1 px-3 rounded-xl font-mono text-[9px] font-black tracking-wider uppercase transition-all duration-300 flex items-center gap-1 border cursor-pointer"
+                          style={videoTranscriptInput.trim() && !ctrLoading ? {
+                            backgroundColor: theme.accentColor,
+                            color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000",
+                            borderColor: theme.accentColor
+                          } : {
+                            backgroundColor: "transparent",
+                            color: "rgb(107, 114, 128)",
+                            borderColor: `${theme.accentColor}20`,
+                            cursor: "not-allowed"
+                          }}
                         >
                           {ctrLoading ? "GEN..." : "GEN CTR"}
                         </button>
@@ -3196,21 +3627,31 @@ export default function App() {
                           <>
                             <button
                               onClick={() => handleCopyText(formatCtrOutputText(ctrOutput), "CTR Suite")}
-                              className="p-1 rounded bg-green-900/20 hover:bg-[#00FF01]/10 text-[#00FF01] border border-green-800 text-[9px] font-mono flex items-center gap-1 cursor-pointer transition-all duration-300 hover:scale-110 active:scale-90 shadow-[0_0_8px_rgba(0,255,1,0.15)]"
+                              className="glass-button p-1 rounded-xl text-[9px] font-mono flex items-center gap-1 cursor-pointer transition-all duration-300 hover:scale-110 active:scale-90 border"
+                              style={{
+                                backgroundColor: `${theme.accentColor}15`,
+                                borderColor: `${theme.accentColor}30`,
+                                color: theme.textColor
+                              }}
                               title="Copy All output text"
                             >
                               <Copy className="h-3 w-3" /> COPY ALL
                             </button>
                             <button
                               onClick={() => handleDownloadTextFile(formatCtrOutputText(ctrOutput), "YT_CTR_Metadata_Suite.txt")}
-                              className="p-1 rounded bg-green-900/20 hover:bg-[#00FF01]/10 text-[#00FF01] border border-green-800 text-[9px] font-mono flex items-center gap-1 cursor-pointer transition-all duration-300 hover:scale-110 active:scale-90 shadow-[0_0_8px_rgba(0,255,1,0.15)]"
+                              className="glass-button p-1 rounded-xl text-[9px] font-mono flex items-center gap-1 cursor-pointer transition-all duration-300 hover:scale-110 active:scale-90 border"
+                              style={{
+                                backgroundColor: `${theme.accentColor}15`,
+                                borderColor: `${theme.accentColor}30`,
+                                color: theme.textColor
+                              }}
                               title="Download All as .txt"
                             >
                               <Download className="h-3 w-3" /> .TXT
                             </button>
                             <button
                               onClick={() => setCtrOutput(null)}
-                              className="p-1 rounded bg-red-950/25 hover:bg-red-900 hover:text-white text-red-400 border border-red-900/40 text-[9px] font-mono flex items-center gap-1 cursor-pointer transition-all duration-300 hover:scale-110 active:scale-90"
+                              className="glass-button p-1 rounded-xl bg-red-950/25 hover:bg-red-900 hover:text-white text-red-400 border border-red-900/40 text-[9px] font-mono flex items-center gap-1 cursor-pointer transition-all duration-300 hover:scale-110 active:scale-90"
                               title="Clear outputs"
                             >
                               <Trash2 className="h-3 w-3" /> CLEAR
@@ -3223,44 +3664,47 @@ export default function App() {
                     <div className="flex-1 overflow-y-auto p-4 space-y-4">
                       {ctrLoading ? (
                         <div className="h-full flex flex-col items-center justify-center space-y-3">
-                          <Loader2 className="h-8 w-8 text-[#00FF01] animate-spin" />
-                          <p className="text-[10px] font-mono text-[#00FF01] uppercase tracking-wider animate-pulse">STRATEGIZING METADATA IN REAL-TIME...</p>
+                          <Loader2 className="h-8 w-8 animate-spin" style={{ color: theme.accentColor }} />
+                          <p className="text-[10px] font-mono uppercase tracking-wider animate-pulse" style={{ color: theme.accentColor }}>STRATEGIZING METADATA IN REAL-TIME...</p>
                         </div>
                       ) : ctrOutput ? (
                         <div className="space-y-4 text-xs select-text">
                           {/* TITLES BLOCK */}
                           {toggleTitle && ctrOutput.titles && (
-                            <div id="ctr-section-title" className="p-3 rounded-xl border border-green-900/80 bg-green-950/10 space-y-2">
-                              <div className="flex justify-between items-center border-b border-green-900/50 pb-1.5">
-                                <span className="font-mono font-bold text-[#00FF01] tracking-wide">🏆 10 HIGH-CTR TITLES (EN/UR/HI)</span>
+                            <div id="ctr-section-title" className="glass-card p-3 rounded-xl border space-y-2" style={{ backgroundColor: `${theme.accentColor}05`, borderColor: `${theme.accentColor}25` }}>
+                              <div className="flex justify-between items-center border-b pb-1.5" style={{ borderColor: `${theme.accentColor}20` }}>
+                                <span className="font-mono font-bold tracking-wide" style={{ color: theme.accentColor }}>🏆 10 HIGH-CTR TITLES (EN/UR/HI)</span>
                                 <div className="flex items-center gap-1.5">
                                   <button
                                     onClick={() => handleCopyText((ctrOutput.titles || []).join("\n"), "Titles")}
-                                    className="p-1 text-[9px] bg-black/40 text-gray-400 hover:text-[#00FF01] rounded border border-green-900 cursor-pointer"
+                                    className="p-1 text-[9px] bg-black/40 hover:opacity-85 rounded border cursor-pointer"
+                                    style={{ color: theme.textColor, borderColor: `${theme.accentColor}30` }}
                                   >
                                     Copy Keys
                                   </button>
                                   <button
                                     onClick={() => handleRegenerateCtrField("titles")}
                                     disabled={ctrRegeneratingField !== null}
-                                    className="p-1 text-[9px] bg-black/40 text-[#00FF01] hover:bg-[#00FF01]/10 rounded border border-[#00FF01]/30 cursor-pointer"
+                                    className="p-1 text-[9px] bg-black/40 hover:opacity-85 rounded border cursor-pointer"
+                                    style={{ color: theme.accentColor, borderColor: `${theme.accentColor}30` }}
                                   >
                                     Regenerate
                                   </button>
                                 </div>
                               </div>
-                              <ul className="space-y-2 text-gray-300">
+                              <ul className="space-y-2" style={{ color: theme.textColor }}>
                                 {ctrOutput.titles.map((t, index) => {
                                   const isUrdu = /[\u0600-\u06FF]/.test(t);
                                   return (
                                     <li
                                       key={index}
-                                      className={`border-b border-green-900/20 pb-2 last:border-b-0 flex items-start gap-3 ${
+                                      className={`pb-2 border-b last:border-b-0 flex items-start gap-3 ${
                                         isUrdu ? "font-urdu text-base leading-relaxed text-right" : "font-sans text-xs leading-relaxed text-left"
                                       }`}
                                       dir={isUrdu ? "rtl" : "ltr"}
+                                      style={{ borderColor: `${theme.accentColor}12` }}
                                     >
-                                      <span className="text-[#00FF01] font-mono font-bold text-[10px] pt-0.5 shrink-0">
+                                      <span className="font-mono font-bold text-[10px] pt-0.5 shrink-0" style={{ color: theme.accentColor }}>
                                         {index + 1}.
                                       </span>
                                       <span className="flex-1 select-text">{t}</span>
@@ -3273,56 +3717,60 @@ export default function App() {
 
                           {/* DESCRIPTION BLOCK */}
                           {toggleDescription && ctrOutput.description && (
-                            <div id="ctr-section-description" className="p-3 rounded-xl border border-green-900/80 bg-green-950/10 space-y-2">
-                              <div className="flex justify-between items-center border-b border-green-900/50 pb-1.5">
-                                <span className="font-mono font-bold text-[#00FF01] tracking-wide">📝 SEO DESCRIPTION METADATA</span>
+                            <div id="ctr-section-description" className="glass-card p-3 rounded-xl border space-y-2" style={{ backgroundColor: `${theme.accentColor}05`, borderColor: `${theme.accentColor}25` }}>
+                              <div className="flex justify-between items-center border-b pb-1.5" style={{ borderColor: `${theme.accentColor}20` }}>
+                                <span className="font-mono font-bold tracking-wide" style={{ color: theme.accentColor }}>📝 SEO DESCRIPTION METADATA</span>
                                 <div className="flex items-center gap-1.5">
                                   <button
                                     onClick={() => handleCopyText(ctrOutput.description || "", "Description")}
-                                    className="p-1 text-[9px] bg-black/40 text-gray-400 hover:text-[#00FF01] rounded border border-green-900 cursor-pointer"
+                                    className="p-1 text-[9px] bg-black/40 hover:opacity-85 rounded border cursor-pointer"
+                                    style={{ color: theme.textColor, borderColor: `${theme.accentColor}30` }}
                                   >
                                     Copy Key
                                   </button>
                                   <button
                                     onClick={() => handleRegenerateCtrField("description")}
                                     disabled={ctrRegeneratingField !== null}
-                                    className="p-1 text-[9px] bg-black/40 text-[#00FF01] hover:bg-[#00FF01]/10 rounded border border-[#00FF01]/30 cursor-pointer"
+                                    className="p-1 text-[9px] bg-black/40 hover:opacity-85 rounded border cursor-pointer"
+                                    style={{ color: theme.accentColor, borderColor: `${theme.accentColor}30` }}
                                   >
                                     Regenerate
                                   </button>
                                 </div>
                               </div>
-                              <p className="font-sans text-gray-300 leading-relaxed whitespace-pre-wrap">{ctrOutput.description}</p>
+                              <p className="font-sans leading-relaxed whitespace-pre-wrap text-xs" style={{ color: theme.textColor }}>{ctrOutput.description}</p>
                             </div>
                           )}
 
                           {/* TIMESTAMPS BLOCK */}
                           {toggleTimestamps && ctrOutput.timestamps && (
-                            <div id="ctr-section-timestamps" className="p-3 rounded-xl border border-green-900/80 bg-green-950/10 space-y-2">
-                              <div className="flex justify-between items-center border-b border-green-900/50 pb-1.5">
-                                <span className="font-mono font-bold text-[#00FF01] tracking-wide">⏱️ AUTOMATED PROPORTIONAL CHAPTERS</span>
+                            <div id="ctr-section-timestamps" className="glass-card p-3 rounded-xl border space-y-2" style={{ backgroundColor: `${theme.accentColor}05`, borderColor: `${theme.accentColor}25` }}>
+                              <div className="flex justify-between items-center border-b pb-1.5" style={{ borderColor: `${theme.accentColor}20` }}>
+                                <span className="font-mono font-bold tracking-wide" style={{ color: theme.accentColor }}>⏱️ AUTOMATED PROPORTIONAL CHAPTERS</span>
                                 <div className="flex items-center gap-1.5">
                                   <button
                                     onClick={() => handleCopyText((ctrOutput.timestamps || []).map(ts => `${ts.time} - ${ts.label}`).join("\n"), "Timestamps")}
-                                    className="p-1 text-[9px] bg-black/40 text-gray-400 hover:text-[#00FF01] rounded border border-green-900 cursor-pointer"
+                                    className="p-1 text-[9px] bg-black/40 hover:opacity-85 rounded border cursor-pointer"
+                                    style={{ color: theme.textColor, borderColor: `${theme.accentColor}30` }}
                                   >
                                     Copy Keys
                                   </button>
                                   <button
                                     onClick={() => handleRegenerateCtrField("timestamps")}
                                     disabled={ctrRegeneratingField !== null}
-                                    className="p-1 text-[9px] bg-black/40 text-[#00FF01] hover:bg-[#00FF01]/10 rounded border border-[#00FF01]/30 cursor-pointer"
+                                    className="p-1 text-[9px] bg-black/40 hover:opacity-85 rounded border cursor-pointer"
+                                    style={{ color: theme.accentColor, borderColor: `${theme.accentColor}30` }}
                                   >
                                     Regenerate
                                   </button>
                                 </div>
                               </div>
-                              <div className="font-mono text-gray-300 space-y-1">
+                              <div className="font-mono space-y-1" style={{ color: theme.textColor }}>
                                 {ctrOutput.timestamps.map((ts, index) => (
                                   <div key={index} className="flex gap-2">
-                                    <span className="text-[#00FF01] font-bold shrink-0">{ts.time}</span>
+                                    <span className="font-bold shrink-0" style={{ color: theme.accentColor }}>{ts.time}</span>
                                     <span className="text-gray-400 shrink-0">-</span>
-                                    <span className="font-sans text-gray-300">{ts.label}</span>
+                                    <span className="font-sans">{ts.label}</span>
                                   </div>
                                 ))}
                               </div>
@@ -3331,20 +3779,22 @@ export default function App() {
 
                           {/* HASHTAGS BLOCK */}
                           {toggleHashtags && ctrOutput.hashtags && (
-                            <div id="ctr-section-hashtags" className="p-3 rounded-xl border border-green-900/80 bg-green-950/10 space-y-2">
-                              <div className="flex justify-between items-center border-b border-green-900/50 pb-1.5">
-                                <span className="font-mono font-bold text-[#00FF01] tracking-wide">🏷️ 15 VIRAL HASHTAGS</span>
+                            <div id="ctr-section-hashtags" className="glass-card p-3 rounded-xl border space-y-2" style={{ backgroundColor: `${theme.accentColor}05`, borderColor: `${theme.accentColor}25` }}>
+                              <div className="flex justify-between items-center border-b pb-1.5" style={{ borderColor: `${theme.accentColor}20` }}>
+                                <span className="font-mono font-bold tracking-wide" style={{ color: theme.accentColor }}>🏷️ 15 VIRAL HASHTAGS</span>
                                 <div className="flex items-center gap-1.5">
                                   <button
                                     onClick={() => handleCopyText((ctrOutput.hashtags || []).join(" "), "Hashtags")}
-                                    className="p-1 text-[9px] bg-black/40 text-gray-400 hover:text-[#00FF01] rounded border border-green-900 cursor-pointer"
+                                    className="p-1 text-[9px] bg-black/40 hover:opacity-85 rounded border cursor-pointer"
+                                    style={{ color: theme.textColor, borderColor: `${theme.accentColor}30` }}
                                   >
                                     Copy Keys
                                   </button>
                                   <button
                                     onClick={() => handleRegenerateCtrField("hashtags")}
                                     disabled={ctrRegeneratingField !== null}
-                                    className="p-1 text-[9px] bg-black/40 text-[#00FF01] hover:bg-[#00FF01]/10 rounded border border-[#00FF01]/30 cursor-pointer"
+                                    className="p-1 text-[9px] bg-black/40 hover:opacity-85 rounded border cursor-pointer"
+                                    style={{ color: theme.accentColor, borderColor: `${theme.accentColor}30` }}
                                   >
                                     Regenerate
                                   </button>
@@ -3352,7 +3802,7 @@ export default function App() {
                               </div>
                               <div className="flex flex-wrap gap-1.5 font-mono text-xs">
                                 {ctrOutput.hashtags.map((h, index) => (
-                                  <span key={index} className="px-2 py-0.5 rounded-lg bg-green-900/20 text-[#00FF01] border border-green-900/50">
+                                  <span key={index} className="px-2 py-0.5 rounded-lg border text-xs glass-card" style={{ backgroundColor: `${theme.accentColor}12`, borderColor: `${theme.accentColor}30`, color: theme.accentColor }}>
                                     {h}
                                   </span>
                                 ))}
@@ -3362,36 +3812,38 @@ export default function App() {
 
                           {/* TAGS BLOCK */}
                           {toggleTags && ctrOutput.tags && (
-                            <div id="ctr-section-tags" className="p-3 rounded-xl border border-green-900/80 bg-green-950/10 space-y-2">
-                              <div className="flex justify-between items-center border-b border-green-900/50 pb-1.5">
-                                <span className="font-mono font-bold text-[#00FF01] tracking-wide">🎯 15 OPTIMIZED SEO METATAGS</span>
+                            <div id="ctr-section-tags" className="glass-card p-3 rounded-xl border space-y-2" style={{ backgroundColor: `${theme.accentColor}05`, borderColor: `${theme.accentColor}25` }}>
+                              <div className="flex justify-between items-center border-b pb-1.5" style={{ borderColor: `${theme.accentColor}20` }}>
+                                <span className="font-mono font-bold tracking-wide" style={{ color: theme.accentColor }}>🎯 15 OPTIMIZED SEO METATAGS</span>
                                 <div className="flex items-center gap-1.5">
                                   <button
                                     onClick={() => handleCopyText((ctrOutput.tags || []).join(", "), "Tags")}
-                                    className="p-1 text-[9px] bg-black/40 text-gray-400 hover:text-[#00FF01] rounded border border-green-900 cursor-pointer"
+                                    className="p-1 text-[9px] bg-black/40 hover:opacity-85 rounded border cursor-pointer"
+                                    style={{ color: theme.textColor, borderColor: `${theme.accentColor}30` }}
                                   >
                                     Copy Keys
                                   </button>
                                   <button
                                     onClick={() => handleRegenerateCtrField("tags")}
                                     disabled={ctrRegeneratingField !== null}
-                                    className="p-1 text-[9px] bg-black/40 text-[#00FF01] hover:bg-[#00FF01]/10 rounded border border-[#00FF01]/30 cursor-pointer"
+                                    className="p-1 text-[9px] bg-black/40 hover:opacity-85 rounded border cursor-pointer"
+                                    style={{ color: theme.accentColor, borderColor: `${theme.accentColor}30` }}
                                   >
                                     Regenerate
                                   </button>
                                 </div>
                               </div>
-                              <p className="font-mono text-gray-300 text-xs leading-relaxed">{ctrOutput.tags.join(", ")}</p>
+                              <p className="font-mono text-xs leading-relaxed" style={{ color: theme.textColor }}>{ctrOutput.tags.join(", ")}</p>
                             </div>
                           )}
                         </div>
                       ) : (
                         <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-3">
-                          <div className="h-10 w-10 rounded-xl border border-dashed border-green-800 flex items-center justify-center text-green-700 animate-pulse">
+                          <div className="h-10 w-10 rounded-2xl border border-dashed flex items-center justify-center animate-pulse glass-card" style={{ borderColor: `${theme.accentColor}35`, color: theme.accentColor }}>
                             <TrendingUp className="h-5 w-5" />
                           </div>
-                          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">Metadata Suite Empty</p>
-                          <p className="text-[10px] text-gray-500 max-w-xs mx-auto">
+                          <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: theme.textColor }}>Metadata Suite Empty</p>
+                          <p className="text-[10px] text-gray-400 max-w-xs mx-auto">
                             Paste a transcript to the left, configure elements in the growth strategist sidebar, and hit GEN CTR!
                           </p>
                         </div>
@@ -3405,9 +3857,9 @@ export default function App() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   
                   {/* Left Column: Thumbnail Transcript Input */}
-                  <div className="flex flex-col h-[480px] rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md overflow-hidden shadow-lg transition-all duration-300 hover:border-green-600">
-                    <div className="px-5 py-3 border-b border-green-800/80 bg-green-900/10 flex items-center justify-between">
-                      <span className="text-xs font-mono font-extrabold tracking-wider text-[#00FF01] flex items-center gap-2">
+                  <div className="glass-card flex flex-col h-[480px] rounded-2xl overflow-hidden shadow-2xl transition-all duration-300 border hover:border-white/30 backdrop-blur-xl" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor }}>
+                    <div className="px-5 py-3 border-b flex items-center justify-between glass-card" style={{ borderColor: `${theme.accentColor}30`, backgroundColor: `${theme.accentColor}08` }}>
+                      <span className="text-xs font-mono font-extrabold tracking-wider flex items-center gap-2" style={{ color: theme.accentColor }}>
                         <FileText className="h-4 w-4" />
                         Thumbnail Transcript Input
                       </span>
@@ -3419,16 +3871,29 @@ export default function App() {
                             }
                           }}
                           disabled={!polishedScript}
-                          className={`py-1 px-2.5 rounded-[17px] font-mono text-[9px] font-extrabold tracking-tight flex items-center gap-1 border cursor-pointer transition-all ${
-                            polishedScript
-                              ? "bg-[#00FF01] text-black border-[#00FF01] hover:scale-105 active:scale-95 animate-pulse"
-                              : "opacity-40 cursor-not-allowed text-gray-500 border-transparent"
-                          }`}
+                          className="glass-button py-1 px-2.5 rounded-xl font-mono text-[9px] font-extrabold tracking-tight flex items-center gap-1 border cursor-pointer transition-all"
+                          style={polishedScript ? {
+                            backgroundColor: theme.accentColor,
+                            color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000",
+                            borderColor: theme.accentColor
+                          } : {
+                            color: "rgb(107, 114, 128)",
+                            borderColor: "transparent",
+                            opacity: 0.4,
+                            cursor: "not-allowed"
+                          }}
                           title="Insert from Polished Script"
                         >
                           <Plus className="h-3 w-3" /> INSERT POLISHED VO
                         </button>
-                        <label className="py-1 px-2.5 rounded-[17px] font-mono text-[9px] font-extrabold tracking-tight flex items-center gap-1 border cursor-pointer transition-all bg-green-900/30 border-green-800 text-[#00FF01] hover:border-[#00FF01] hover:bg-[#00FF01]/10 hover:scale-105 active:scale-95">
+                        <label
+                          className="glass-button py-1 px-2.5 rounded-xl font-mono text-[9px] font-extrabold tracking-tight flex items-center gap-1 border cursor-pointer transition-all hover:scale-105 active:scale-95"
+                          style={{
+                            backgroundColor: `${theme.accentColor}15`,
+                            borderColor: `${theme.accentColor}40`,
+                            color: theme.accentColor
+                          }}
+                        >
                           <Plus className="h-3 w-3" /> IMPORT FILE
                           <input
                             type="file"
@@ -3445,20 +3910,25 @@ export default function App() {
                         value={thumbnailTranscriptInput}
                         onChange={(e) => setThumbnailTranscriptInput(e.target.value)}
                         placeholder="Paste voice transcript segment or complete text here. Specify design parameters on the left to direct thumbnail graphic concepts..."
-                        className="flex-1 w-full bg-transparent resize-none p-4 pb-2 text-xs md:text-sm text-gray-200 focus:outline-none placeholder-gray-600 leading-relaxed font-mono focus:bg-[#031d0a]/30"
+                        className="flex-1 w-full bg-transparent resize-none p-4 pb-2 text-xs md:text-sm focus:outline-none placeholder-gray-600 leading-relaxed font-mono"
+                        style={{
+                          color: theme.textColor,
+                          backgroundColor: 'transparent'
+                        }}
                       />
                       
                       {/* Character Picture upload & voice/clear controls bottom bar */}
-                      <div className="border-t border-green-900/40 bg-[#051408]/60 p-2.5 px-3 flex items-center justify-between gap-3 select-none">
+                      <div className="border-t p-2.5 px-3 flex items-center justify-between gap-3 select-none" style={{ borderColor: `${theme.accentColor}25`, backgroundColor: `${theme.accentColor}05` }}>
                         {/* Left Side: Character Picture Upload/Preview */}
                         <div className="flex items-center gap-2">
                           {characterImage ? (
-                            <div className="flex items-center gap-2 bg-black/40 border border-green-800/80 rounded-xl p-1 px-2.5">
+                            <div className="flex items-center gap-2 bg-black/40 rounded-xl p-1 px-2.5 border" style={{ borderColor: `${theme.accentColor}30` }}>
                               <img
                                 src={characterImage}
                                 alt="Character Preview"
                                 referrerPolicy="no-referrer"
-                                className="w-8 h-8 object-cover rounded-lg border border-[#00FF01]/60"
+                                className="w-8 h-8 object-cover rounded-lg border"
+                                style={{ borderColor: `${theme.accentColor}50` }}
                               />
                               <div className="flex flex-col text-[10px] font-mono leading-tight max-w-[120px]">
                                 <span className="text-gray-300 truncate font-semibold">Character Attached</span>
@@ -3473,7 +3943,14 @@ export default function App() {
                               </button>
                             </div>
                           ) : (
-                            <label className="flex items-center gap-1.5 py-1.5 px-3 rounded-xl border border-dashed border-green-900/80 bg-green-950/20 text-[#00FF01]/80 hover:text-[#00FF01] hover:border-[#00FF01] hover:bg-green-950/40 cursor-pointer text-[10px] font-mono transition-all">
+                            <label
+                              className="flex items-center gap-1.5 py-1.5 px-3 rounded-xl border border-dashed text-[10px] font-mono transition-all hover:scale-102 cursor-pointer"
+                              style={{
+                                backgroundColor: `${theme.accentColor}10`,
+                                borderColor: `${theme.accentColor}35`,
+                                color: theme.accentColor
+                              }}
+                            >
                               <Image className="h-3.5 w-3.5" />
                               <span>CHARACTER PIC (OPTIONAL)</span>
                               <input
@@ -3495,13 +3972,18 @@ export default function App() {
                               className="p-2 rounded-xl bg-red-950/80 text-red-400 border border-red-800/80 hover:bg-red-900 transition-all cursor-pointer flex items-center justify-center shadow"
                               title="Stop speech-to-text"
                             >
-                              <MicOff className="h-3.5 w-3.5 animate-bounce text-[#00FF00]" />
+                              <MicOff className="h-3.5 w-3.5 animate-bounce" style={{ color: theme.accentColor }} />
                             </button>
                           ) : (
                             <button
                               type="button"
                               onClick={() => startSpeechToText("thumbnail")}
-                              className="p-2 rounded-xl bg-green-950/85 text-gray-300 border border-green-800/80 hover:border-[#00FF01] hover:text-[#00FF01] hover:bg-green-900/30 transition-all cursor-pointer flex items-center justify-center hover:scale-105 active:scale-95 shadow animate-[fadeIn_0.3s_ease]"
+                              className="p-2 rounded-xl hover:scale-105 active:scale-95 transition-all cursor-pointer flex items-center justify-center shadow border"
+                              style={{
+                                backgroundColor: `${theme.accentColor}10`,
+                                borderColor: `${theme.accentColor}35`,
+                                color: theme.textColor
+                              }}
                               title="Speak to enter thumbnail details"
                             >
                               <Mic className="h-3.5 w-3.5" />
@@ -3511,7 +3993,12 @@ export default function App() {
                           {thumbnailTranscriptInput && (
                             <button
                               onClick={() => setThumbnailTranscriptInput("")}
-                              className="p-2 rounded-xl bg-red-950/30 text-red-400 border border-red-900/40 hover:bg-red-900 hover:text-white transition-all duration-300 cursor-pointer"
+                              className="p-2 rounded-xl transition-all duration-300 cursor-pointer border"
+                              style={{
+                                backgroundColor: "rgba(220, 38, 38, 0.1)",
+                                borderColor: "rgba(220, 38, 38, 0.2)",
+                                color: "rgb(248, 113, 113)"
+                              }}
                               title="Clear transcript input"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
@@ -3527,11 +4014,11 @@ export default function App() {
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
-                            className="absolute inset-0 bg-black/95 backdrop-blur-md flex flex-col items-center justify-center p-6 space-y-5 z-20"
+                            className="absolute inset-0 bg-black/95 backdrop-blur-md flex flex-col items-center justify-center p-6 space-y-5 z-20 glass-card"
                           >
                             <div className="flex items-center gap-2">
-                              <span className="h-3 w-3 rounded-full bg-[#00FF00] animate-ping" />
-                              <h3 className="text-sm font-mono text-[#00FF01] uppercase tracking-widest font-black">
+                              <span className="h-3 w-3 rounded-full animate-ping" style={{ backgroundColor: theme.accentColor }} />
+                              <h3 className="text-sm font-mono uppercase tracking-widest font-black" style={{ color: theme.accentColor }}>
                                 Gemini Voice Explainer Active
                               </h3>
                             </div>
@@ -3540,19 +4027,24 @@ export default function App() {
                             </p>
                             
                             {/* Gemini Waveform */}
-                            <div className="flex items-end gap-1.5 h-10 px-6 py-2 bg-green-950/20 rounded-full border border-green-900/40">
-                              <motion.div className="w-1.5 bg-[#00FF00] rounded-full" animate={{ height: ["15%", "85%", "15%"] }} transition={{ duration: 0.6, repeat: Infinity, ease: "easeInOut" }} />
-                              <motion.div className="w-1.5 bg-[#00FF00] rounded-full" animate={{ height: ["40%", "100%", "40%"] }} transition={{ duration: 0.5, repeat: Infinity, ease: "easeInOut", delay: 0.08 }} />
-                              <motion.div className="w-1.5 bg-[#00FF00] rounded-full" animate={{ height: ["20%", "70%", "20%"] }} transition={{ duration: 0.7, repeat: Infinity, ease: "easeInOut", delay: 0.16 }} />
-                              <motion.div className="w-1.5 bg-[#00FF00] rounded-full" animate={{ height: ["50%", "95%", "50%"] }} transition={{ duration: 0.4, repeat: Infinity, ease: "easeInOut", delay: 0.12 }} />
-                              <motion.div className="w-1.5 bg-[#00FF00] rounded-full" animate={{ height: ["10%", "60%", "10%"] }} transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut", delay: 0.2 }} />
-                              <motion.div className="w-1.5 bg-[#00FF00] rounded-full" animate={{ height: ["35%", "80%", "35%"] }} transition={{ duration: 0.55, repeat: Infinity, ease: "easeInOut", delay: 0.14 }} />
+                            <div className="flex items-end gap-1.5 h-10 px-6 py-2 rounded-full border glass-card" style={{ backgroundColor: `${theme.accentColor}10`, borderColor: `${theme.accentColor}30` }}>
+                              <motion.div className="w-1.5 rounded-full" style={{ backgroundColor: theme.accentColor }} animate={{ height: ["15%", "85%", "15%"] }} transition={{ duration: 0.6, repeat: Infinity, ease: "easeInOut" }} />
+                              <motion.div className="w-1.5 rounded-full" style={{ backgroundColor: theme.accentColor }} animate={{ height: ["40%", "100%", "40%"] }} transition={{ duration: 0.5, repeat: Infinity, ease: "easeInOut", delay: 0.08 }} />
+                              <motion.div className="w-1.5 rounded-full" style={{ backgroundColor: theme.accentColor }} animate={{ height: ["20%", "70%", "20%"] }} transition={{ duration: 0.7, repeat: Infinity, ease: "easeInOut", delay: 0.16 }} />
+                              <motion.div className="w-1.5 rounded-full" style={{ backgroundColor: theme.accentColor }} animate={{ height: ["50%", "95%", "50%"] }} transition={{ duration: 0.4, repeat: Infinity, ease: "easeInOut", delay: 0.12 }} />
+                              <motion.div className="w-1.5 rounded-full" style={{ backgroundColor: theme.accentColor }} animate={{ height: ["10%", "60%", "10%"] }} transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut", delay: 0.2 }} />
+                              <motion.div className="w-1.5 rounded-full" style={{ backgroundColor: theme.accentColor }} animate={{ height: ["35%", "80%", "35%"] }} transition={{ duration: 0.55, repeat: Infinity, ease: "easeInOut", delay: 0.14 }} />
                             </div>
 
                             <button
                               type="button"
                               onClick={stopSpeechToText}
-                              className="px-5 py-2 rounded-xl bg-red-950/30 hover:bg-red-900 border border-red-900/60 text-red-200 text-xs font-mono transition-all cursor-pointer hover:scale-105"
+                              className="glass-button px-5 py-2 rounded-xl text-xs font-mono transition-all cursor-pointer hover:scale-105 border"
+                              style={{
+                                backgroundColor: "rgba(220, 38, 38, 0.15)",
+                                borderColor: "rgba(220, 38, 38, 0.3)",
+                                color: "rgb(254, 202, 202)"
+                              }}
                             >
                               Finish & Save Input
                             </button>
@@ -3563,18 +4055,23 @@ export default function App() {
                   </div>
 
                   {/* Right Column: YT Thumbnails Prompt output */}
-                  <div className="flex flex-col h-[480px] rounded-2xl border border-green-800 bg-black/50 backdrop-blur-md overflow-hidden shadow-lg relative transition-all duration-300 hover:border-green-600">
-                    <div className="px-4 py-3 border-b border-green-800/80 bg-green-900/15 flex items-center justify-between">
+                  <div className="glass-card flex flex-col h-[480px] rounded-2xl overflow-hidden shadow-2xl relative transition-all duration-300 border hover:border-white/30 backdrop-blur-xl" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor }}>
+                    <div className="px-4 py-3 border-b flex items-center justify-between glass-card" style={{ borderColor: `${theme.accentColor}30`, backgroundColor: `${theme.accentColor}08` }}>
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-xs font-mono font-bold tracking-wider text-[#00FF01] flex items-center gap-1.5 shrink-0">
-                          <Sparkles className="h-4 w-4 text-[#00FF01]" />
+                        <span className="text-xs font-mono font-extrabold tracking-wider flex items-center gap-1.5 shrink-0" style={{ color: theme.accentColor }}>
+                          <Sparkles className="h-4 w-4" style={{ color: theme.accentColor }} />
                           YT Thumbnails Prompt output
                         </span>
                         <a
                           href="https://labs.google/fx/tools/flow"
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-[9px] font-mono text-black bg-[#00FF01] hover:bg-white px-2 py-0.5 rounded-full border border-[#00FF01] hover:border-white font-bold cursor-pointer transition-all duration-300 shadow-[0_0_8px_rgba(0,255,1,0.2)] hover:scale-105 active:scale-95 shrink-0"
+                          className="glass-button inline-flex items-center gap-1 text-[9px] font-mono px-2 py-0.5 rounded-full border font-bold cursor-pointer transition-all duration-300 hover:scale-105 active:scale-95 shrink-0"
+                          style={{
+                            backgroundColor: theme.accentColor,
+                            color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000",
+                            borderColor: theme.accentColor
+                          }}
                           title="Open Google Flow Nano Banana 2 & Flux 1"
                         >
                           <span>Google Flow</span>
@@ -3586,11 +4083,17 @@ export default function App() {
                         <button
                           onClick={handleGenerateThumbnailPrompt}
                           disabled={thumbnailLoading || !thumbnailTranscriptInput.trim()}
-                          className={`py-1 px-3 rounded-[17px] font-mono text-[9px] font-black tracking-wider uppercase transition-all duration-300 flex items-center gap-1 border cursor-pointer ${
-                            thumbnailTranscriptInput.trim() && !thumbnailLoading
-                              ? "bg-[#00FF01] text-black border-[#00FF01] hover:scale-105 active:scale-95 shadow-[0_0_12px_rgba(0,255,1,0.3)]"
-                              : "bg-green-900/10 text-gray-500 border-green-800/40 cursor-not-allowed"
-                          }`}
+                          className="glass-button py-1 px-3 rounded-xl font-mono text-[9px] font-black tracking-wider uppercase transition-all duration-300 flex items-center gap-1 border cursor-pointer"
+                          style={thumbnailTranscriptInput.trim() && !thumbnailLoading ? {
+                            backgroundColor: theme.accentColor,
+                            color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000",
+                            borderColor: theme.accentColor
+                          } : {
+                            backgroundColor: "transparent",
+                            color: "rgb(107, 114, 128)",
+                            borderColor: `${theme.accentColor}20`,
+                            cursor: "not-allowed"
+                          }}
                         >
                           {thumbnailLoading ? "GEN..." : "GEN PROMPT"}
                         </button>
@@ -3599,21 +4102,31 @@ export default function App() {
                           <>
                             <button
                               onClick={() => handleCopyText(formatThumbnailOutputText(thumbnailOutput), "Thumbnail Prompts")}
-                              className="p-1 rounded bg-green-900/20 hover:bg-[#00FF01]/10 text-[#00FF01] border border-green-800 text-[9px] font-mono flex items-center gap-1 cursor-pointer transition-all duration-300 hover:scale-110 active:scale-90 shadow-[0_0_8px_rgba(0,255,1,0.15)]"
+                              className="glass-button p-1 rounded-xl text-[9px] font-mono flex items-center gap-1 cursor-pointer transition-all duration-300 hover:scale-110 active:scale-90 border"
+                              style={{
+                                backgroundColor: `${theme.accentColor}15`,
+                                borderColor: `${theme.accentColor}30`,
+                                color: theme.textColor
+                              }}
                               title="Copy prompt output"
                             >
                               <Copy className="h-3 w-3" /> COPY ALL
                             </button>
                             <button
                               onClick={() => handleDownloadTextFile(formatThumbnailOutputText(thumbnailOutput), "YT_Thumbnail_Director_Output.txt")}
-                              className="p-1 rounded bg-green-900/20 hover:bg-[#00FF01]/10 text-[#00FF01] border border-green-800 text-[9px] font-mono flex items-center gap-1 cursor-pointer transition-all duration-300 hover:scale-110 active:scale-90 shadow-[0_0_8px_rgba(0,255,1,0.15)]"
+                              className="glass-button p-1 rounded-xl text-[9px] font-mono flex items-center gap-1 cursor-pointer transition-all duration-300 hover:scale-110 active:scale-90 border"
+                              style={{
+                                backgroundColor: `${theme.accentColor}15`,
+                                borderColor: `${theme.accentColor}30`,
+                                color: theme.textColor
+                              }}
                               title="Download Prompt text"
                             >
                               <Download className="h-3 w-3" /> .TXT
                             </button>
                             <button
                               onClick={() => setThumbnailOutput(null)}
-                              className="p-1 rounded bg-red-950/25 hover:bg-red-900 hover:text-white text-red-400 border border-red-900/40 text-[9px] font-mono flex items-center gap-1 cursor-pointer transition-all duration-300 hover:scale-110 active:scale-90"
+                              className="glass-button p-1 rounded-xl bg-red-950/25 hover:bg-red-900 hover:text-white text-red-400 border border-red-900/40 text-[9px] font-mono flex items-center gap-1 cursor-pointer transition-all duration-300 hover:scale-110 active:scale-90"
                               title="Clear prompts"
                             >
                               <Trash2 className="h-3 w-3" /> CLEAR
@@ -3626,57 +4139,64 @@ export default function App() {
                     <div className="flex-1 overflow-y-auto p-4 space-y-4">
                       {thumbnailLoading ? (
                         <div className="h-full flex flex-col items-center justify-center space-y-3">
-                          <Loader2 className="h-8 w-8 text-[#00FF01] animate-spin" />
-                          <p className="text-[10px] font-mono text-[#00FF01] uppercase tracking-wider animate-pulse">COMPOSING HIGH-CTR IMAGE METRICS...</p>
+                          <Loader2 className="h-8 w-8 animate-spin" style={{ color: theme.accentColor }} />
+                          <p className="text-[10px] font-mono uppercase tracking-wider animate-pulse" style={{ color: theme.accentColor }}>COMPOSING HIGH-CTR IMAGE METRICS...</p>
                         </div>
                       ) : thumbnailOutput ? (
                         <div className="space-y-4 text-xs select-text animate-[fadeIn_0.4s_ease-out]">
                           {thumbnailOutput.engine === "flux1" ? (
                             <>
                               {/* FLUX 1 SCENE PROMPT */}
-                              <div className="p-3 rounded-xl border border-green-900/80 bg-green-950/10 space-y-2">
-                                <div className="flex justify-between items-center border-b border-green-900/50 pb-1.5 flex-wrap gap-2">
-                                  <span className="font-mono font-bold text-[#00FF01]">1️⃣ Scene Prompt (Positive) — English, NO Urdu</span>
+                              <div className="glass-card p-3 rounded-xl border space-y-2" style={{ backgroundColor: `${theme.accentColor}05`, borderColor: `${theme.accentColor}25` }}>
+                                <div className="flex justify-between items-center border-b pb-1.5 flex-wrap gap-2" style={{ borderColor: `${theme.accentColor}20` }}>
+                                  <span className="font-mono font-bold text-xs" style={{ color: theme.accentColor }}>1️⃣ Scene Prompt (Positive) — English, NO Urdu</span>
                                   <div className="flex items-center gap-1.5">
                                     <button
                                       type="button"
                                       onClick={() => openImageStudioWithPrompt(thumbnailOutput.fluxScenePrompt || thumbnailOutput.thumbnailPrompt)}
-                                      className="px-2 py-1 text-[10px] bg-[#00FF01] text-black font-extrabold rounded-lg border border-[#00FF01] cursor-pointer hover:bg-white transition-all flex items-center gap-1"
+                                      className="glass-button px-2 py-1 text-[10px] font-extrabold rounded-lg cursor-pointer transition-all flex items-center gap-1 border"
+                                      style={{
+                                        backgroundColor: theme.accentColor,
+                                        color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000",
+                                        borderColor: theme.accentColor
+                                      }}
                                     >
                                       <Sparkles className="h-3 w-3" />
                                       <span>Generate Image in Studio</span>
                                     </button>
                                     <button
                                       onClick={() => handleCopyText(thumbnailOutput.fluxScenePrompt || thumbnailOutput.thumbnailPrompt, "Scene Prompt")}
-                                      className="p-1 text-[9px] bg-black/40 text-gray-400 hover:text-[#00FF01] rounded border border-green-900 cursor-pointer"
+                                      className="p-1 text-[9px] bg-black/40 hover:opacity-85 rounded border cursor-pointer"
+                                      style={{ color: theme.textColor, borderColor: `${theme.accentColor}30` }}
                                     >
                                       Copy Scene Prompt
                                     </button>
                                   </div>
                                 </div>
-                                <p className="font-sans text-gray-300 leading-relaxed text-xs">{thumbnailOutput.fluxScenePrompt || thumbnailOutput.thumbnailPrompt}</p>
+                                <p className="font-sans leading-relaxed text-xs" style={{ color: theme.textColor }}>{thumbnailOutput.fluxScenePrompt || thumbnailOutput.thumbnailPrompt}</p>
                               </div>
 
                               {/* FLUX 1 NEGATIVE PROMPT */}
-                              <div className="p-3 rounded-xl border border-green-900/80 bg-green-950/10 space-y-2">
-                                <div className="flex justify-between items-center border-b border-green-900/50 pb-1.5">
-                                  <span className="font-mono font-bold text-[#00FF01]">2️⃣ Negative Prompt (Anti-Text)</span>
+                              <div className="glass-card p-3 rounded-xl border space-y-2" style={{ backgroundColor: `${theme.accentColor}05`, borderColor: `${theme.accentColor}25` }}>
+                                <div className="flex justify-between items-center border-b pb-1.5" style={{ borderColor: `${theme.accentColor}20` }}>
+                                  <span className="font-mono font-bold" style={{ color: theme.accentColor }}>2️⃣ Negative Prompt (Anti-Text)</span>
                                   <button
                                     onClick={() => handleCopyText(thumbnailOutput.fluxNegativePrompt || "low quality, blurry, bad anatomy, deformed hands, extra fingers, text, letters, words, watermark, gibberish script, distorted face, cartoon", "Negative Prompt")}
-                                    className="p-1 text-[9px] bg-black/40 text-gray-400 hover:text-[#00FF01] rounded border border-green-900 cursor-pointer"
+                                    className="p-1 text-[9px] bg-black/40 hover:opacity-85 rounded border cursor-pointer"
+                                    style={{ color: theme.textColor, borderColor: `${theme.accentColor}30` }}
                                   >
                                     Copy Negative
                                   </button>
                                 </div>
-                                <p className="font-sans text-gray-400 text-xs italic">
+                                <p className="font-sans text-xs italic" style={{ color: theme.textColor }}>
                                   {thumbnailOutput.fluxNegativePrompt || "low quality, blurry, bad anatomy, deformed hands, extra fingers, text, letters, words, watermark, gibberish script, distorted face, cartoon"}
                                 </p>
                               </div>
 
                               {/* FLUX 1 URDU POSTER TEXT OVERLAY NODE FIELDS */}
-                              <div className="p-3 rounded-xl border border-green-900/80 bg-green-950/10 space-y-2">
-                                <div className="flex justify-between items-center border-b border-green-900/50 pb-1.5">
-                                  <span className="font-mono font-bold text-[#00FF01]">3️⃣ Urdu Poster Text Overlay Fields</span>
+                              <div className="glass-card p-3 rounded-xl border space-y-2" style={{ backgroundColor: `${theme.accentColor}05`, borderColor: `${theme.accentColor}25` }}>
+                                <div className="flex justify-between items-center border-b pb-1.5" style={{ borderColor: `${theme.accentColor}20` }}>
+                                  <span className="font-mono font-bold" style={{ color: theme.accentColor }}>3️⃣ Urdu Poster Text Overlay Fields</span>
                                   <button
                                     onClick={() => {
                                       const fieldsStr = thumbnailOutput.overlayFields
@@ -3686,41 +4206,42 @@ export default function App() {
                                         : "";
                                       handleCopyText(fieldsStr, "Overlay Fields");
                                     }}
-                                    className="p-1 text-[9px] bg-black/40 text-gray-400 hover:text-[#00FF01] rounded border border-green-900 cursor-pointer"
+                                    className="p-1 text-[9px] bg-black/40 hover:opacity-85 rounded border cursor-pointer"
+                                    style={{ color: theme.textColor, borderColor: `${theme.accentColor}30` }}
                                   >
                                     Copy Fields
                                   </button>
                                 </div>
-                                <div className="font-mono text-[10px] space-y-1 bg-black/35 p-2.5 rounded-lg border border-green-900/40">
+                                <div className="font-mono text-[10px] space-y-1 p-2.5 rounded-lg border glass-card" style={{ backgroundColor: "rgba(0,0,0,0.15)", borderColor: `${theme.accentColor}25` }}>
                                   {thumbnailOutput.overlayFields ? (
                                     <>
-                                      <div className="flex justify-between py-0.5 border-b border-green-950/20">
+                                      <div className="flex justify-between py-0.5 border-b" style={{ borderColor: `${theme.accentColor}12` }}>
                                         <span className="text-gray-400">heading_text</span>
-                                        <span className="text-[#00FF01] font-urdu" dir="rtl">{thumbnailOutput.overlayFields.heading_text}</span>
+                                        <span className="font-urdu font-bold" dir="rtl" style={{ color: theme.accentColor }}>{thumbnailOutput.overlayFields.heading_text}</span>
                                       </div>
-                                      <div className="flex justify-between py-0.5 border-b border-green-950/20">
+                                      <div className="flex justify-between py-0.5 border-b" style={{ borderColor: `${theme.accentColor}12` }}>
                                         <span className="text-gray-400">tagline_text</span>
-                                        <span className="text-[#00FF01] font-urdu" dir="rtl">{thumbnailOutput.overlayFields.tagline_text}</span>
+                                        <span className="font-urdu" dir="rtl" style={{ color: theme.accentColor }}>{thumbnailOutput.overlayFields.tagline_text}</span>
                                       </div>
-                                      <div className="flex justify-between py-0.5 border-b border-green-950/20">
+                                      <div className="flex justify-between py-0.5 border-b" style={{ borderColor: `${theme.accentColor}12` }}>
                                         <span className="text-gray-400">text_color</span>
-                                        <span className="text-white font-bold">{thumbnailOutput.overlayFields.text_color}</span>
+                                        <span className="font-bold" style={{ color: theme.textColor }}>{thumbnailOutput.overlayFields.text_color}</span>
                                       </div>
-                                      <div className="flex justify-between py-0.5 border-b border-green-950/20">
+                                      <div className="flex justify-between py-0.5 border-b" style={{ borderColor: `${theme.accentColor}12` }}>
                                         <span className="text-gray-400">stroke_color</span>
-                                        <span className="text-[#00FF01] font-bold">{thumbnailOutput.overlayFields.stroke_color}</span>
+                                        <span className="font-bold" style={{ color: theme.accentColor }}>{thumbnailOutput.overlayFields.stroke_color}</span>
                                       </div>
-                                      <div className="flex justify-between py-0.5 border-b border-green-950/20">
+                                      <div className="flex justify-between py-0.5 border-b" style={{ borderColor: `${theme.accentColor}12` }}>
                                         <span className="text-gray-400">stroke_width</span>
-                                        <span className="text-white">{thumbnailOutput.overlayFields.stroke_width}</span>
+                                        <span style={{ color: theme.textColor }}>{thumbnailOutput.overlayFields.stroke_width}</span>
                                       </div>
-                                      <div className="flex justify-between py-0.5 border-b border-green-950/20">
+                                      <div className="flex justify-between py-0.5 border-b" style={{ borderColor: `${theme.accentColor}12` }}>
                                         <span className="text-gray-400">heading_y_percent</span>
-                                        <span className="text-white">{thumbnailOutput.overlayFields.heading_y_percent}</span>
+                                        <span style={{ color: theme.textColor }}>{thumbnailOutput.overlayFields.heading_y_percent}</span>
                                       </div>
                                       <div className="flex justify-between py-0.5">
                                         <span className="text-gray-400">tagline_y_percent</span>
-                                        <span className="text-white">{thumbnailOutput.overlayFields.tagline_y_percent}</span>
+                                        <span style={{ color: theme.textColor }}>{thumbnailOutput.overlayFields.tagline_y_percent}</span>
                                       </div>
                                     </>
                                   ) : (
@@ -3730,18 +4251,18 @@ export default function App() {
                               </div>
 
                               {/* FLUX 1 EMPTY LATENT IMAGE */}
-                              <div className="p-3 rounded-xl border border-green-900/80 bg-green-950/10 space-y-2">
-                                <div className="flex justify-between items-center border-b border-green-900/50 pb-1.5">
-                                  <span className="font-mono font-bold text-[#00FF01]">4️⃣ EmptyLatentImage Size</span>
+                              <div className="glass-card p-3 rounded-xl border space-y-2" style={{ backgroundColor: `${theme.accentColor}05`, borderColor: `${theme.accentColor}25` }}>
+                                <div className="flex justify-between items-center border-b pb-1.5" style={{ borderColor: `${theme.accentColor}20` }}>
+                                  <span className="font-mono font-bold" style={{ color: theme.accentColor }}>4️⃣ EmptyLatentImage Size</span>
                                 </div>
-                                <div className="flex gap-4 font-mono text-[10px] bg-black/35 p-2.5 rounded-lg border border-green-900/40 justify-around">
+                                <div className="flex gap-4 font-mono text-[10px] p-2.5 rounded-lg border justify-around glass-card" style={{ backgroundColor: "rgba(0,0,0,0.15)", borderColor: `${theme.accentColor}25` }}>
                                   <div>
                                     <span className="text-gray-400">Width: </span>
-                                    <span className="text-[#00FF01] font-bold">{thumbnailOutput.emptyLatentImage?.width || 1024}</span>
+                                    <span className="font-bold" style={{ color: theme.accentColor }}>{thumbnailOutput.emptyLatentImage?.width || 1024}</span>
                                   </div>
                                   <div>
                                     <span className="text-gray-400">Height: </span>
-                                    <span className="text-[#00FF01] font-bold">{thumbnailOutput.emptyLatentImage?.height || 1820}</span>
+                                    <span className="font-bold" style={{ color: theme.accentColor }}>{thumbnailOutput.emptyLatentImage?.height || 1820}</span>
                                   </div>
                                 </div>
                               </div>
@@ -3749,47 +4270,50 @@ export default function App() {
                           ) : (
                             <>
                               {/* ENGLISH PROMPT SPECIFICATION */}
-                              <div className="p-3 rounded-xl border border-green-900/80 bg-green-950/10 space-y-2">
-                                <div className="flex justify-between items-center border-b border-green-900/50 pb-1.5">
-                                  <span className="font-mono font-bold text-[#00FF01]">🖼️ CINEMATIC VISUAL SPECIFICATION</span>
+                              <div className="glass-card p-3 rounded-xl border space-y-2" style={{ backgroundColor: `${theme.accentColor}05`, borderColor: `${theme.accentColor}25` }}>
+                                <div className="flex justify-between items-center border-b pb-1.5" style={{ borderColor: `${theme.accentColor}20` }}>
+                                  <span className="font-mono font-bold" style={{ color: theme.accentColor }}>🖼️ CINEMATIC VISUAL SPECIFICATION</span>
                                   <button
                                     onClick={() => handleCopyText(thumbnailOutput.thumbnailPrompt, "Visual Prompt")}
-                                    className="p-1 text-[9px] bg-black/40 text-gray-400 hover:text-[#00FF01] rounded border border-green-900 cursor-pointer"
+                                    className="p-1 text-[9px] bg-black/40 hover:opacity-85 rounded border cursor-pointer"
+                                    style={{ color: theme.textColor, borderColor: `${theme.accentColor}30` }}
                                   >
                                     Copy Specification
                                   </button>
                                 </div>
-                                <p className="font-sans text-gray-300 leading-relaxed text-xs">{thumbnailOutput.thumbnailPrompt}</p>
+                                <p className="font-sans leading-relaxed text-xs" style={{ color: theme.textColor }}>{thumbnailOutput.thumbnailPrompt}</p>
                               </div>
 
                               {/* URDU HEADLINE */}
-                              <div className="p-3 rounded-xl border border-green-900/80 bg-green-950/10 space-y-2">
-                                <div className="flex justify-between items-center border-b border-green-900/50 pb-1.5">
-                                  <span className="font-mono font-bold text-[#00FF01]">🇵🇰 URDU OVERLAY HEADLINE</span>
+                              <div className="glass-card p-3 rounded-xl border space-y-2" style={{ backgroundColor: `${theme.accentColor}05`, borderColor: `${theme.accentColor}25` }}>
+                                <div className="flex justify-between items-center border-b pb-1.5" style={{ borderColor: `${theme.accentColor}20` }}>
+                                  <span className="font-mono font-bold" style={{ color: theme.accentColor }}>🇵🇰 URDU OVERLAY HEADLINE</span>
                                   <button
                                     onClick={() => handleCopyText(thumbnailOutput.headlineUrdu, "Urdu Headline")}
-                                    className="p-1 text-[9px] bg-black/40 text-gray-400 hover:text-[#00FF01] rounded border border-green-900 cursor-pointer"
+                                    className="p-1 text-[9px] bg-black/40 hover:opacity-85 rounded border cursor-pointer"
+                                    style={{ color: theme.textColor, borderColor: `${theme.accentColor}30` }}
                                   >
                                     Copy text
                                   </button>
                                 </div>
-                                <p className="font-urdu text-right text-lg text-white font-bold tracking-wide py-2 leading-relaxed font-semibold" dir="rtl">
+                                <p className="font-urdu text-right text-lg font-bold tracking-wide py-2 leading-relaxed" style={{ color: theme.textColor }} dir="rtl">
                                   {thumbnailOutput.headlineUrdu}
                                 </p>
                               </div>
 
                               {/* URDU TAGLINE */}
-                              <div className="p-3 rounded-xl border border-green-900/80 bg-green-950/10 space-y-2">
-                                <div className="flex justify-between items-center border-b border-green-900/50 pb-1.5">
-                                  <span className="font-mono font-bold text-[#00FF01]">🇵🇰 URDU OVERLAY TAGLINE</span>
+                              <div className="glass-card p-3 rounded-xl border space-y-2" style={{ backgroundColor: `${theme.accentColor}05`, borderColor: `${theme.accentColor}25` }}>
+                                <div className="flex justify-between items-center border-b pb-1.5" style={{ borderColor: `${theme.accentColor}20` }}>
+                                  <span className="font-mono font-bold" style={{ color: theme.accentColor }}>🇵🇰 URDU OVERLAY TAGLINE</span>
                                   <button
                                     onClick={() => handleCopyText(thumbnailOutput.smallTaglineUrdu, "Urdu Tagline")}
-                                    className="p-1 text-[9px] bg-black/40 text-gray-400 hover:text-[#00FF01] rounded border border-green-900 cursor-pointer"
+                                    className="p-1 text-[9px] bg-black/40 hover:opacity-85 rounded border cursor-pointer"
+                                    style={{ color: theme.textColor, borderColor: `${theme.accentColor}30` }}
                                   >
                                     Copy text
                                   </button>
                                 </div>
-                                <p className="font-urdu text-right text-base text-gray-300 py-1 leading-relaxed" dir="rtl">
+                                <p className="font-urdu text-right text-base py-1 leading-relaxed" style={{ color: theme.textColor }} dir="rtl">
                                   {thumbnailOutput.smallTaglineUrdu}
                                 </p>
                               </div>
@@ -3798,11 +4322,11 @@ export default function App() {
                         </div>
                       ) : (
                         <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-3">
-                          <div className="h-10 w-10 rounded-xl border border-dashed border-green-800 flex items-center justify-center text-green-700 animate-pulse">
+                          <div className="h-10 w-10 rounded-2xl border border-dashed flex items-center justify-center animate-pulse glass-card" style={{ borderColor: `${theme.accentColor}35`, color: theme.accentColor }}>
                             <Sparkles className="h-5 w-5" />
                           </div>
-                          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">Graphics Suite Empty</p>
-                          <p className="text-[10px] text-gray-500 max-w-xs mx-auto">
+                          <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: theme.textColor }}>Graphics Suite Empty</p>
+                          <p className="text-[10px] text-gray-400 max-w-xs mx-auto">
                             Paste a transcript to the left, configure design options, and click GEN PROMPT to get viral thumbnail layouts!
                           </p>
                         </div>
@@ -3810,30 +4334,32 @@ export default function App() {
                     </div>
 
                     {/* Floating Thumbnail Controls (Format & Engine Selectors) */}
-                    <div className="absolute bottom-3 left-3 z-20 flex items-center gap-2 bg-black/95 px-2.5 py-1.5 rounded border border-green-800 shadow-[0_4px_12px_rgba(0,0,0,0.6)] text-[9px] font-mono">
+                    <div className="absolute bottom-3 left-3 z-20 flex items-center gap-2 px-2.5 py-1.5 rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.6)] text-[9px] font-mono border glass-panel" style={{ backgroundColor: theme.cardBg, borderColor: `${theme.accentColor}40`, color: theme.textColor }}>
                       <div className="flex items-center gap-1">
                         <span className="text-gray-500 uppercase tracking-widest font-bold text-[8px]">FORMAT:</span>
                         <select
                           value={thumbnailFormat}
                           onChange={(e) => setThumbnailFormat(e.target.value as any)}
-                          className="bg-transparent text-[#00FF01] font-bold focus:outline-none cursor-pointer text-[9px]"
+                          className="bg-transparent font-bold focus:outline-none cursor-pointer text-[9px]"
+                          style={{ color: theme.accentColor }}
                         >
-                          <option value="16:9" className="bg-[#051a09] text-[#00FF01]">Landscape</option>
-                          <option value="9:16" className="bg-[#051a09] text-[#00FF01]">Vertical</option>
-                          <option value="1:1" className="bg-[#051a09] text-[#00FF01]">Square format</option>
-                          <option value="none" className="bg-[#051a09] text-[#00FF01]">None</option>
+                          <option value="16:9" className="bg-black text-[#00FF01]">Landscape</option>
+                          <option value="9:16" className="bg-black text-[#00FF01]">Vertical</option>
+                          <option value="1:1" className="bg-black text-[#00FF01]">Square format</option>
+                          <option value="none" className="bg-black text-[#00FF01]">None</option>
                         </select>
                       </div>
-                      <div className="w-[1px] h-3 bg-green-900/60" />
+                      <div className="w-[1px] h-3" style={{ backgroundColor: `${theme.accentColor}30` }} />
                       <div className="flex items-center gap-1">
                         <span className="text-gray-500 uppercase tracking-widest font-bold text-[8px]">ENGINE:</span>
                         <select
                           value={thumbnailEngine}
                           onChange={(e) => setThumbnailEngine(e.target.value as any)}
-                          className="bg-transparent text-[#00FF01] font-bold focus:outline-none cursor-pointer text-[9px]"
+                          className="bg-transparent font-bold focus:outline-none cursor-pointer text-[9px]"
+                          style={{ color: theme.accentColor }}
                         >
-                          <option value="nano_banana" className="bg-[#051a09] text-[#00FF01]">Nano banana two</option>
-                          <option value="flux1" className="bg-[#051a09] text-[#00FF01]">Flux 1</option>
+                          <option value="nano_banana" className="bg-black text-[#00FF01]">Nano banana two</option>
+                          <option value="flux1" className="bg-black text-[#00FF01]">Flux 1</option>
                         </select>
                       </div>
                     </div>
@@ -3845,7 +4371,7 @@ export default function App() {
 
             {/* ERROR LOG PRESENTATION */}
             {error && (
-              <div className="p-4 rounded-2xl bg-red-950/20 border border-red-500/40 text-red-200 text-xs font-mono flex items-start gap-2.5 shadow-md animate-pulse">
+              <div className="glass-card p-4 rounded-2xl bg-red-950/20 border border-red-500/40 text-red-200 text-xs font-mono flex items-start gap-2.5 shadow-md animate-pulse">
                 <span className="h-2.5 w-2.5 rounded-xl bg-red-500 mt-1.5 shrink-0" />
                 <div className="space-y-1">
                   <p className="font-bold uppercase tracking-wider text-red-400">System Log Warning</p>
@@ -3855,13 +4381,13 @@ export default function App() {
             )}
 
             {/* LOWER UNIQUE STATUS REMINDER */}
-            <div className="p-4 rounded-2xl border border-[#00FF01]/20 bg-green-900/5 flex items-center gap-3">
-              <RefreshCw className="h-5 w-5 text-[#00FF01] shrink-0 animate-spin" style={{ animationDuration: "12s" }} />
+            <div className="glass-card p-4 rounded-2xl flex items-center gap-3 border shadow-xl backdrop-blur-xl" style={{ backgroundColor: `${theme.accentColor}05`, borderColor: `${theme.accentColor}25` }}>
+              <RefreshCw className="h-5 w-5 shrink-0 animate-spin" style={{ animationDuration: "12s", color: theme.accentColor }} />
               <div className="space-y-0.5">
-                <p className="text-xs font-mono text-[#00FF01] font-bold uppercase tracking-wider">
+                <p className="text-xs font-mono font-bold uppercase tracking-wider" style={{ color: theme.accentColor }}>
                   Guaranteed Dynamic Variations
                 </p>
-                <p className="text-[11px] text-gray-400 font-mono">
+                <p className="text-[11px] font-mono" style={{ color: theme.textColor }}>
                   Our advanced multi-entropy algorithm forces unique wording patterns for each trigger, ensuring zero duplicate outcomes.
                 </p>
               </div>
@@ -3872,9 +4398,9 @@ export default function App() {
         </div>
 
         {/* BOTTOM ARCHITECT FOOTER */}
-        <footer className="pt-6 border-t border-green-800/30 flex flex-col md:flex-row items-center justify-between text-[11px] font-mono text-gray-500 gap-3">
+        <footer className="pt-6 border-t flex flex-col md:flex-row items-center justify-between text-[11px] font-mono text-gray-500 gap-3" style={{ borderColor: `${theme.accentColor}15` }}>
           <p>© 2026 Script Automation Studio. Built for unique social media VO rephrasings.</p>
-          <p className="text-[#00FF01] tracking-widest font-semibold bg-[#05290e] px-4 py-1.5 rounded-xl border border-[#00FF01]/20 shadow-[0_0_10px_rgba(0,255,1,0.1)]">
+          <p className="glass-panel tracking-widest font-semibold px-4 py-1.5 rounded-2xl border shadow-lg" style={{ color: theme.textColor, backgroundColor: `${theme.accentColor}12`, borderColor: `${theme.accentColor}35` }}>
             REGION: PAKISTAN
           </p>
         </footer>
@@ -3889,14 +4415,15 @@ export default function App() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ type: "spring", stiffness: 350, damping: 25 }}
-            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2.5 px-5 py-3 rounded-2xl bg-black border border-[#00FF01]/60 text-white shadow-[0_0_25px_rgba(0,255,1,0.25)] backdrop-blur-lg"
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2.5 px-5 py-3 rounded-2xl bg-black/80 border text-white shadow-[0_0_25px_rgba(0,0,0,0.6)] backdrop-blur-2xl glass-card"
+            style={{ borderColor: theme.accentColor }}
           >
             {popupType === "copy" ? (
-              <CheckCircle className="h-4 w-4 text-[#00FF01]" />
+              <CheckCircle className="h-4 w-4" style={{ color: theme.accentColor }} />
             ) : (
-              <Download className="h-4 w-4 text-[#00FF01]" />
+              <Download className="h-4 w-4" style={{ color: theme.accentColor }} />
             )}
-            <span className="text-xs font-mono font-bold tracking-tight">{popupMessage}</span>
+            <span className="text-xs font-mono font-bold tracking-tight" style={{ color: theme.textColor }}>{popupMessage}</span>
           </motion.div>
         )}
       </AnimatePresence>
