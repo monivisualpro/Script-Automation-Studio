@@ -1180,6 +1180,13 @@ export default function App() {
     );
   };
 
+  const isLight = currentTheme === "Pure Light";
+  const btnTextColor = isLight || theme.accentColor === "#FF1744" || theme.accentColor === "#8E44FF" ? "#ffffff" : "#000000";
+
+  const panelShadow = isLight
+    ? "0 12px 32px -4px rgba(0, 0, 0, 0.08), 0 4px 12px -3px rgba(0, 0, 0, 0.03)"
+    : "0 16px 36px -4px rgba(0, 0, 0, 0.65), 0 6px 16px -4px rgba(0, 0, 0, 0.45)";
+
   return (
     <div className={`min-h-screen ${theme.rootBg} ${theme.textColor} font-sans overflow-x-hidden transition-colors duration-300`}>
       {/* Top User Navigation Header */}
@@ -1203,24 +1210,28 @@ export default function App() {
       {/* Unauthenticated / Missing API Key Alert Banners */}
       {!user && (
         <div
-          className="border-b px-4 py-3 text-center text-xs font-mono flex flex-col sm:flex-row items-center justify-center gap-3 backdrop-blur-md shadow-sm transition-colors duration-300"
+          className="border-b px-4 py-3 text-center text-xs font-mono flex flex-col sm:flex-row items-center justify-center gap-3 backdrop-blur-md shadow-md transition-colors duration-300"
           style={{
-            backgroundColor: theme.cardBg.includes("bg-white") ? "#f8fafc" : `${theme.accentColor}12`,
-            borderColor: `${theme.accentColor}40`,
-            color: theme.textColor
+            backgroundColor: isLight ? "#ffffff" : "rgba(13, 17, 26, 0.88)",
+            borderColor: isLight ? "#cbd5e1" : `${theme.accentColor}50`,
+            color: isLight ? "#0f172a" : "#f8fafc",
+            boxShadow: isLight ? "0 2px 10px rgba(0,0,0,0.05)" : `0 4px 20px ${theme.accentColor}15`
           }}
         >
           <span className="font-bold flex items-center gap-1.5" style={{ color: theme.accentColor }}>
-            <Lock className="h-4 w-4" />
+            <Lock className="h-4 w-4" style={{ color: theme.accentColor }} />
             <span>Authentication Required:</span>
           </span>
-          <span className="opacity-90">Sign up or log in with Google / Email to generate scripts using your own personal Google AI API Key.</span>
+          <span className="opacity-95 font-medium" style={{ color: isLight ? "#334155" : "#f1f5f9" }}>
+            Sign up or log in with Google / Email to generate scripts using your own personal Google AI API Key.
+          </span>
           <button
             onClick={() => setIsAuthModalOpen(true)}
-            className="px-3.5 py-1.5 rounded-xl font-extrabold text-xs transition-all shadow-md hover:scale-105 active:scale-95 cursor-pointer flex items-center gap-1.5 shrink-0"
+            className="px-4 py-1.5 rounded-xl font-extrabold text-xs transition-all shadow-md hover:scale-105 active:scale-95 cursor-pointer flex items-center gap-1.5 shrink-0 border"
             style={{
               backgroundColor: theme.accentColor,
-              color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000"
+              color: btnTextColor,
+              borderColor: `${theme.accentColor}`
             }}
           >
             <LogIn className="h-3.5 w-3.5" />
@@ -1230,12 +1241,19 @@ export default function App() {
       )}
 
       {user && !profile?.hasApiKey && (
-        <div className="bg-amber-950/90 border-b border-amber-600/80 px-4 py-3 text-center text-xs font-mono text-amber-200 flex flex-col sm:flex-row items-center justify-center gap-3">
-          <span className="text-amber-400 font-bold flex items-center gap-1.5 animate-pulse">
+        <div
+          className="border-b px-4 py-3 text-center text-xs font-mono flex flex-col sm:flex-row items-center justify-center gap-3 backdrop-blur-md transition-colors duration-300"
+          style={{
+            backgroundColor: isLight ? "#fffbeb" : "rgba(69, 26, 3, 0.9)",
+            borderColor: isLight ? "#fde68a" : "rgba(217, 119, 6, 0.8)",
+            color: isLight ? "#78350f" : "#fef3c7"
+          }}
+        >
+          <span className="font-bold flex items-center gap-1.5 animate-pulse" style={{ color: isLight ? "#b45309" : "#fbbf24" }}>
             <Key className="h-4 w-4" />
             <span>Personal API Key Needed:</span>
           </span>
-          <span>Your account requires a Google AI Studio API Key before script generation can run.</span>
+          <span className="opacity-95">Your account requires a Google AI Studio API Key before script generation can run.</span>
           <button
             onClick={() => setIsApiKeyModalOpen(true)}
             className="px-3.5 py-1.5 rounded-xl bg-amber-400 text-black font-extrabold text-xs hover:bg-white transition-all shadow-[0_0_10px_rgba(245,158,11,0.4)] cursor-pointer flex items-center gap-1.5 shrink-0"
@@ -1255,7 +1273,13 @@ export default function App() {
       <div className="relative z-10 max-w-7xl mx-auto space-y-5">
         
         {/* UPPER HEADER WITH GLASSMORPHISM LIQUID GLOW EFFECTS */}
-        <header className={`glass-panel p-4 sm:p-5 rounded-3xl border border-white/15 backdrop-blur-2xl shadow-2xl flex flex-col lg:flex-row items-center justify-between gap-4 transition-all duration-300 hover:border-white/25`}>
+        <header
+          className="glass-panel p-4 sm:p-5 rounded-3xl border backdrop-blur-2xl flex flex-col lg:flex-row items-center justify-between gap-4 transition-all duration-300"
+          style={{
+            borderColor: theme.accentColor,
+            boxShadow: panelShadow
+          }}
+        >
           <div className="flex items-center gap-3.5">
             <div className="h-12 w-12 rounded-2xl glass-card border flex items-center justify-center shadow-lg transition-transform duration-300 hover:scale-105" style={{ borderColor: `${theme.accentColor}60`, color: theme.accentColor }}>
               <Sparkles className="h-6 w-6 animate-pulse" />
@@ -1314,7 +1338,7 @@ export default function App() {
           <div className="lg:col-span-4 xl:col-span-4 space-y-4">
             
             {/* VOICE PERSONA CARD - ROUNDED GLASS TABS */}
-            <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-3 shadow-xl transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor }}>
+            <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-3 transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor, boxShadow: panelShadow }}>
               <label className="text-xs font-mono uppercase tracking-widest block font-extrabold" style={{ color: theme.accentColor }}>
                 Voice Persona (Speaker)
               </label>
@@ -1349,7 +1373,7 @@ export default function App() {
             </div>
 
             {/* TOPIC DOMAIN / NICHE */}
-            <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-3 shadow-xl transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor }}>
+            <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-3 transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor, boxShadow: panelShadow }}>
               <label className="text-xs font-mono uppercase tracking-widest flex items-center gap-1.5 font-extrabold" style={{ color: theme.accentColor }}>
                 <TrendingUp className="h-3.5 w-3.5" style={{ color: theme.accentColor }} />
                 Domain
@@ -1371,7 +1395,7 @@ export default function App() {
             </div>
 
             {/* TUTORIAL & LITERATURE TONES */}
-            <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-3 shadow-xl transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor }}>
+            <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-3 transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor, boxShadow: panelShadow }}>
               <label className="text-xs font-mono uppercase tracking-widest block font-extrabold" style={{ color: theme.accentColor }}>
                 Tutorial & Literature Tool
               </label>
@@ -1401,7 +1425,7 @@ export default function App() {
             </div>
 
             {/* TRANSFORMATION OPTIONS */}
-            <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-3 shadow-xl transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor }}>
+            <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-3 transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor, boxShadow: panelShadow }}>
               <label className="text-xs font-mono uppercase tracking-widest flex items-center gap-1.5 font-extrabold" style={{ color: theme.accentColor }}>
                 <Globe className="h-3.5 w-3.5" style={{ color: theme.accentColor }} />
                 Transformation Option
@@ -1421,7 +1445,7 @@ export default function App() {
             </div>
 
             {/* TARGET AUDIENCE */}
-            <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-3 shadow-xl transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor }}>
+            <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-3 transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor, boxShadow: panelShadow }}>
               <label className="text-xs font-mono uppercase tracking-widest flex items-center gap-1.5 font-extrabold" style={{ color: theme.accentColor }}>
                 <Lock className="h-3.5 w-3.5" style={{ color: theme.accentColor }} />
                 Target Audience
@@ -1440,7 +1464,7 @@ export default function App() {
             </div>
 
             {/* TARGET REGIONS / COUNTRIES */}
-            <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-3 shadow-xl transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor }}>
+            <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-3 transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor, boxShadow: panelShadow }}>
               <div className="flex items-center justify-between">
                 <label className="text-xs font-mono uppercase tracking-widest flex items-center gap-1.5 font-extrabold" style={{ color: theme.accentColor }}>
                   <Globe className="h-3.5 w-3.5" style={{ color: theme.accentColor }} />
@@ -1563,7 +1587,7 @@ export default function App() {
             </div>
 
             {/* SCRIPT LENGTH TYPE & DETAILS */}
-            <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-4 shadow-xl transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor }}>
+            <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-4 transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor, boxShadow: panelShadow }}>
               <div>
                 <label className="text-xs font-mono uppercase tracking-widest block mb-2 font-extrabold" style={{ color: theme.accentColor }}>
                   Script Length
@@ -1709,7 +1733,7 @@ export default function App() {
             </div>
 
             {/* GREETINGS PREFIX / BEGINNING - ASSALAMU ALAIKUM FIRST */}
-            <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-3 shadow-xl transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor }}>
+            <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-3 transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor, boxShadow: panelShadow }}>
               <div className="flex justify-between items-center">
                 <label className="text-xs font-mono uppercase tracking-widest block font-extrabold" style={{ color: theme.accentColor }}>
                   Greeting
@@ -1761,7 +1785,7 @@ export default function App() {
             </div>
 
             {/* CUSTOM HOOK & STRUCTURING - DEFAULT WHAT DO YOU KNOW? */}
-            <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-3 shadow-xl transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor }}>
+            <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-3 transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor, boxShadow: panelShadow }}>
               <div className="space-y-1">
                 <label className="text-xs font-mono uppercase tracking-widest block font-extrabold" style={{ color: theme.accentColor }}>
                   Custom Hook Input
@@ -1814,7 +1838,7 @@ export default function App() {
             <div className="border-b my-4" style={{ borderColor: `${theme.accentColor}20` }} />
 
             {/* MOVED: YouTube and social media growth strategist */}
-            <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-4 shadow-xl transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor }}>
+            <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-4 transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor, boxShadow: panelShadow }}>
               <div className="border-b pb-2 flex items-center justify-between" style={{ borderColor: `${theme.accentColor}30` }}>
                 <span className="text-xs font-mono uppercase tracking-wider block font-extrabold" style={{ color: theme.accentColor }}>
                   YouTube and social media growth strategist
@@ -1971,7 +1995,7 @@ export default function App() {
             </div>
 
             {/* MOVED: thumbnail director and Tagline */}
-            <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-4 shadow-xl transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor }}>
+            <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-4 transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor, boxShadow: panelShadow }}>
               <div className="border-b pb-2 flex items-center justify-between" style={{ borderColor: `${theme.accentColor}30` }}>
                 <span className="text-xs font-mono uppercase tracking-wider block font-extrabold" style={{ color: theme.accentColor }}>
                   thumbnail director & Tagline
@@ -2308,7 +2332,7 @@ export default function App() {
           <div className="lg:col-span-8 xl:col-span-8 space-y-5">
             
             {/* INPUT SOURCE EXTRACTOR & GENERATOR TABS */}
-            <div className="glass-card p-5 rounded-2xl backdrop-blur-xl space-y-4 shadow-2xl transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor }}>
+            <div className="glass-card p-5 rounded-2xl backdrop-blur-xl space-y-4 transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor, boxShadow: panelShadow }}>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-3" style={{ borderColor: `${theme.accentColor}30` }}>
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-mono font-extrabold tracking-wider uppercase" style={{ color: theme.accentColor }}>Input Source:</span>
@@ -2563,7 +2587,7 @@ export default function App() {
                 "Place the 'fast light mood' and 'generative script' above the download tabs and the output Tab."
                 Here is the stunning, horizontal generation and options bar! Positioned prominently right on top of the workspaces.
             */}
-            <div className="glass-card p-4 rounded-2xl backdrop-blur-xl flex flex-col md:flex-row items-center justify-between gap-4 transition-all duration-300 shadow-xl border border-white/20" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor }}>
+            <div className="glass-card p-4 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4 transition-all duration-300 border" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor, boxShadow: panelShadow }}>
               
               <div className="flex items-center gap-3">
                 <div className="h-9 w-9 rounded-xl flex items-center justify-center animate-pulse glass-card" style={{ backgroundColor: `${theme.accentColor}15`, color: theme.accentColor }}>
@@ -2635,9 +2659,9 @@ export default function App() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               
               {/* RAW SOURCE SCRIPT BOX */}
-              <div className="glass-card flex flex-col h-[480px] rounded-2xl overflow-hidden shadow-2xl transition-all duration-300 border hover:border-white/30 backdrop-blur-xl" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor }}>
+              <div className="glass-card flex flex-col h-[480px] rounded-2xl overflow-hidden transition-all duration-150 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor, boxShadow: panelShadow }}>
                 <div className="px-5 py-3 border-b flex items-center justify-between glass-card" style={{ borderColor: `${theme.accentColor}30`, backgroundColor: `${theme.accentColor}08` }}>
-                  <span className="text-xs font-mono font-extrabold tracking-wider flex items-center gap-2 animate-pulse" style={{ color: theme.accentColor }}>
+                  <span className="text-xs font-mono font-extrabold tracking-wider flex items-center gap-2" style={{ color: theme.accentColor }}>
                     <FileText className="h-4 w-4" style={{ color: theme.accentColor }} />
                     RAW SOURCE SCRIPT
                   </span>
@@ -2739,13 +2763,13 @@ export default function App() {
               </div>
 
               {/* POLISHED V.O. SCRIPT / OUTPUT BOX */}
-              <div className="glass-card flex flex-col h-[480px] rounded-2xl overflow-hidden shadow-2xl relative transition-all duration-300 border hover:border-white/30 backdrop-blur-xl" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor }}>
+              <div className="glass-card flex flex-col h-[480px] rounded-2xl overflow-hidden relative transition-all duration-150 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor, boxShadow: panelShadow }}>
                 {/* Active glowing ambient frame segment */}
                 <div className="absolute top-0 left-0 right-0 h-[1.5px]" style={{ background: `linear-gradient(to right, transparent, ${theme.accentColor}80, transparent)` }} />
                 
                 <div className="px-4 py-3 border-b flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 glass-card" style={{ borderColor: `${theme.accentColor}30`, backgroundColor: `${theme.accentColor}08` }}>
                   <span className="text-xs font-mono font-extrabold tracking-wider flex items-center gap-1.5" style={{ color: theme.accentColor }}>
-                    <Sparkles className="h-4 w-4 animate-pulse" style={{ color: theme.accentColor }} />
+                    <Sparkles className="h-4 w-4" style={{ color: theme.accentColor }} />
                     POLISHED V.O. SCRIPT
                   </span>
                   
@@ -3001,7 +3025,7 @@ export default function App() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
               
               {/* SECTION 1: TRANSCRIPT INPUT */}
-              <div className="glass-card flex flex-col h-[480px] rounded-2xl overflow-hidden shadow-2xl transition-all duration-300 border hover:border-white/30 backdrop-blur-xl" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor }}>
+              <div className="glass-card flex flex-col h-[480px] rounded-2xl overflow-hidden transition-all duration-300 border hover:border-white/30 backdrop-blur-xl" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor, boxShadow: panelShadow }}>
                 <div className="px-5 py-3 border-b flex flex-col xl:flex-row xl:items-start justify-between gap-3 glass-card" style={{ borderColor: `${theme.accentColor}30`, backgroundColor: `${theme.accentColor}08` }}>
                   <div className="flex flex-col gap-1">
                     <span className="text-xs font-mono font-extrabold tracking-wider flex items-center gap-2" style={{ color: theme.accentColor }}>
@@ -3310,7 +3334,7 @@ export default function App() {
               </div>
 
               {/* SECTION 2: GENERATED SCENE PROMPTS */}
-              <div className="glass-card flex flex-col h-[480px] rounded-2xl overflow-hidden shadow-2xl relative transition-all duration-300 border hover:border-white/30 backdrop-blur-xl" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor }}>
+              <div className="glass-card flex flex-col h-[480px] rounded-2xl overflow-hidden relative transition-all duration-300 border hover:border-white/30 backdrop-blur-xl" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor, boxShadow: panelShadow }}>
                 <div className="px-5 py-3 border-b flex flex-col xl:flex-row xl:items-center justify-between gap-3 glass-card" style={{ borderColor: `${theme.accentColor}30`, backgroundColor: `${theme.accentColor}08` }}>
                   <span className="text-xs font-mono font-extrabold tracking-wider flex items-center gap-1.5" style={{ color: theme.accentColor }}>
                     <Sparkles className="h-4 w-4" style={{ color: theme.accentColor }} />
@@ -3441,7 +3465,7 @@ export default function App() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   
                   {/* Left Column: Video Transcript Input */}
-                  <div className="glass-card flex flex-col h-[480px] rounded-2xl overflow-hidden shadow-2xl transition-all duration-300 border hover:border-white/30 backdrop-blur-xl" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor }}>
+                  <div className="glass-card flex flex-col h-[480px] rounded-2xl overflow-hidden transition-all duration-300 border hover:border-white/30 backdrop-blur-xl" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor, boxShadow: panelShadow }}>
                     <div className="px-5 py-3 border-b flex items-center justify-between glass-card" style={{ borderColor: `${theme.accentColor}30`, backgroundColor: `${theme.accentColor}08` }}>
                       <span className="text-xs font-mono font-extrabold tracking-wider flex items-center gap-2" style={{ color: theme.accentColor }}>
                         <FileText className="h-4 w-4" />
@@ -3597,7 +3621,7 @@ export default function App() {
                   </div>
 
                   {/* Right Column: CTR YT & SM output */}
-                  <div className="glass-card flex flex-col h-[480px] rounded-2xl overflow-hidden shadow-2xl relative transition-all duration-300 border hover:border-white/30 backdrop-blur-xl" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor }}>
+                  <div className="glass-card flex flex-col h-[480px] rounded-2xl overflow-hidden relative transition-all duration-150 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor, boxShadow: panelShadow }}>
                     <div className="px-4 py-3 border-b flex items-center justify-between glass-card" style={{ borderColor: `${theme.accentColor}30`, backgroundColor: `${theme.accentColor}08` }}>
                       <span className="text-xs font-mono font-extrabold tracking-wider flex items-center gap-1.5" style={{ color: theme.accentColor }}>
                         <Sparkles className="h-4 w-4" style={{ color: theme.accentColor }} />
@@ -3857,7 +3881,7 @@ export default function App() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   
                   {/* Left Column: Thumbnail Transcript Input */}
-                  <div className="glass-card flex flex-col h-[480px] rounded-2xl overflow-hidden shadow-2xl transition-all duration-300 border hover:border-white/30 backdrop-blur-xl" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor }}>
+                  <div className="glass-card flex flex-col h-[480px] rounded-2xl overflow-hidden transition-all duration-150 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor, boxShadow: panelShadow }}>
                     <div className="px-5 py-3 border-b flex items-center justify-between glass-card" style={{ borderColor: `${theme.accentColor}30`, backgroundColor: `${theme.accentColor}08` }}>
                       <span className="text-xs font-mono font-extrabold tracking-wider flex items-center gap-2" style={{ color: theme.accentColor }}>
                         <FileText className="h-4 w-4" />
@@ -4010,14 +4034,11 @@ export default function App() {
                       {/* Gemini listening wave animation overlay */}
                       <AnimatePresence>
                         {listeningInput === "thumbnail" && (
-                          <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            className="absolute inset-0 bg-black/95 backdrop-blur-md flex flex-col items-center justify-center p-6 space-y-5 z-20 glass-card"
+                          <div
+                            className="absolute inset-0 bg-black/95 flex flex-col items-center justify-center p-6 space-y-5 z-20 glass-card"
                           >
                             <div className="flex items-center gap-2">
-                              <span className="h-3 w-3 rounded-full animate-ping" style={{ backgroundColor: theme.accentColor }} />
+                              <span className="h-3 w-3 rounded-full" style={{ backgroundColor: theme.accentColor }} />
                               <h3 className="text-sm font-mono uppercase tracking-widest font-black" style={{ color: theme.accentColor }}>
                                 Gemini Voice Explainer Active
                               </h3>
@@ -4028,12 +4049,12 @@ export default function App() {
                             
                             {/* Gemini Waveform */}
                             <div className="flex items-end gap-1.5 h-10 px-6 py-2 rounded-full border glass-card" style={{ backgroundColor: `${theme.accentColor}10`, borderColor: `${theme.accentColor}30` }}>
-                              <motion.div className="w-1.5 rounded-full" style={{ backgroundColor: theme.accentColor }} animate={{ height: ["15%", "85%", "15%"] }} transition={{ duration: 0.6, repeat: Infinity, ease: "easeInOut" }} />
-                              <motion.div className="w-1.5 rounded-full" style={{ backgroundColor: theme.accentColor }} animate={{ height: ["40%", "100%", "40%"] }} transition={{ duration: 0.5, repeat: Infinity, ease: "easeInOut", delay: 0.08 }} />
-                              <motion.div className="w-1.5 rounded-full" style={{ backgroundColor: theme.accentColor }} animate={{ height: ["20%", "70%", "20%"] }} transition={{ duration: 0.7, repeat: Infinity, ease: "easeInOut", delay: 0.16 }} />
-                              <motion.div className="w-1.5 rounded-full" style={{ backgroundColor: theme.accentColor }} animate={{ height: ["50%", "95%", "50%"] }} transition={{ duration: 0.4, repeat: Infinity, ease: "easeInOut", delay: 0.12 }} />
-                              <motion.div className="w-1.5 rounded-full" style={{ backgroundColor: theme.accentColor }} animate={{ height: ["10%", "60%", "10%"] }} transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut", delay: 0.2 }} />
-                              <motion.div className="w-1.5 rounded-full" style={{ backgroundColor: theme.accentColor }} animate={{ height: ["35%", "80%", "35%"] }} transition={{ duration: 0.55, repeat: Infinity, ease: "easeInOut", delay: 0.14 }} />
+                              <div className="w-1.5 h-[60%] rounded-full" style={{ backgroundColor: theme.accentColor }} />
+                              <div className="w-1.5 h-[90%] rounded-full" style={{ backgroundColor: theme.accentColor }} />
+                              <div className="w-1.5 h-[40%] rounded-full" style={{ backgroundColor: theme.accentColor }} />
+                              <div className="w-1.5 h-[80%] rounded-full" style={{ backgroundColor: theme.accentColor }} />
+                              <div className="w-1.5 h-[50%] rounded-full" style={{ backgroundColor: theme.accentColor }} />
+                              <div className="w-1.5 h-[70%] rounded-full" style={{ backgroundColor: theme.accentColor }} />
                             </div>
 
                             <button
@@ -4048,14 +4069,14 @@ export default function App() {
                             >
                               Finish & Save Input
                             </button>
-                          </motion.div>
+                          </div>
                         )}
                       </AnimatePresence>
                     </div>
                   </div>
 
                   {/* Right Column: YT Thumbnails Prompt output */}
-                  <div className="glass-card flex flex-col h-[480px] rounded-2xl overflow-hidden shadow-2xl relative transition-all duration-300 border hover:border-white/30 backdrop-blur-xl" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor }}>
+                  <div className="glass-card flex flex-col h-[480px] rounded-2xl overflow-hidden relative transition-all duration-150 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor, boxShadow: panelShadow }}>
                     <div className="px-4 py-3 border-b flex items-center justify-between glass-card" style={{ borderColor: `${theme.accentColor}30`, backgroundColor: `${theme.accentColor}08` }}>
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-xs font-mono font-extrabold tracking-wider flex items-center gap-1.5 shrink-0" style={{ color: theme.accentColor }}>
@@ -4381,7 +4402,14 @@ export default function App() {
             )}
 
             {/* LOWER UNIQUE STATUS REMINDER */}
-            <div className="glass-card p-4 rounded-2xl flex items-center gap-3 border shadow-xl backdrop-blur-xl" style={{ backgroundColor: `${theme.accentColor}05`, borderColor: `${theme.accentColor}25` }}>
+            <div
+              className="glass-card p-4 rounded-2xl flex items-center gap-3 border"
+              style={{
+                backgroundColor: `${theme.accentColor}05`,
+                borderColor: `${theme.accentColor}25`,
+                boxShadow: panelShadow
+              }}
+            >
               <RefreshCw className="h-5 w-5 shrink-0 animate-spin" style={{ animationDuration: "12s", color: theme.accentColor }} />
               <div className="space-y-0.5">
                 <p className="text-xs font-mono font-bold uppercase tracking-wider" style={{ color: theme.accentColor }}>
@@ -4400,7 +4428,17 @@ export default function App() {
         {/* BOTTOM ARCHITECT FOOTER */}
         <footer className="pt-6 border-t flex flex-col md:flex-row items-center justify-between text-[11px] font-mono text-gray-500 gap-3" style={{ borderColor: `${theme.accentColor}15` }}>
           <p>© 2026 Script Automation Studio. Built for unique social media VO rephrasings.</p>
-          <p className="glass-panel tracking-widest font-semibold px-4 py-1.5 rounded-2xl border shadow-lg" style={{ color: theme.textColor, backgroundColor: `${theme.accentColor}12`, borderColor: `${theme.accentColor}35` }}>
+          <p
+            className="glass-panel tracking-widest font-semibold px-4 py-1.5 rounded-2xl border"
+            style={{
+              color: theme.textColor,
+              backgroundColor: `${theme.accentColor}12`,
+              borderColor: `${theme.accentColor}35`,
+              boxShadow: theme.cardBg.includes("bg-white")
+                ? "0 6px 16px -3px rgba(0,0,0,0.06)"
+                : "0 8px 20px -3px rgba(0,0,0,0.4)"
+            }}
+          >
             REGION: PAKISTAN
           </p>
         </footer>
@@ -4415,7 +4453,7 @@ export default function App() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ type: "spring", stiffness: 350, damping: 25 }}
-            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2.5 px-5 py-3 rounded-2xl bg-black/80 border text-white shadow-[0_0_25px_rgba(0,0,0,0.6)] backdrop-blur-2xl glass-card"
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2.5 px-5 py-3 rounded-2xl bg-black/80 border text-white shadow-[0_0_25px_rgba(0,0,0,0.6)] glass-card"
             style={{ borderColor: theme.accentColor }}
           >
             {popupType === "copy" ? (

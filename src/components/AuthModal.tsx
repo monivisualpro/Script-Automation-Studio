@@ -176,45 +176,51 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-2xl p-4 sm:p-6 overflow-y-auto animate-[fadeIn_0.2s_ease-out]">
-      {/* Floating Liquid Background Blob behind Auth Modal for authentic glass refraction */}
-      <div 
-        className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 rounded-full blur-[120px] pointer-events-none opacity-30 animate-liquid-blob-1"
-        style={{ backgroundColor: theme.accentColor }} 
-      />
+  const isLight = currentTheme === "Pure Light";
+  const modalBg = isLight ? "#ffffff" : "#0d111a";
+  const modalTextColor = isLight ? "#0f172a" : "#f8fafc";
+  const btnTextColor = isLight || theme.accentColor === "#FF1744" || theme.accentColor === "#8E44FF" ? "#ffffff" : "#000000";
 
-      <div className="w-full max-w-md glass-panel rounded-3xl shadow-2xl p-6 sm:p-8 relative overflow-hidden my-auto border border-white/20 backdrop-blur-2xl" style={{ color: theme.textColor }}>
+  return (
+    <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto backdrop-blur-md ${isLight ? "bg-slate-900/60" : "bg-black/85"}`}>
+
+      <div 
+        className="w-full max-w-md rounded-3xl p-6 sm:p-8 relative overflow-hidden my-auto border transition-all duration-300" 
+        style={{ 
+          color: modalTextColor,
+          backgroundColor: modalBg,
+          borderColor: isLight ? "#cbd5e1" : theme.accentColor,
+          boxShadow: isLight
+            ? "0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05)"
+            : `0 25px 50px -12px rgba(0, 0, 0, 0.9), 0 0 0 1px ${theme.accentColor}50, 0 0 25px ${theme.accentColor}20`
+        }}
+      >
         {/* Close Button */}
         <button
           type="button"
           onClick={onClose}
-          className="absolute top-4 right-4 p-2 rounded-full glass-button transition-transform duration-200 hover:scale-110 active:scale-90 z-10 cursor-pointer border border-white/20"
-          style={{ color: theme.textColor }}
+          className="absolute top-4 right-4 p-2 rounded-full transition-transform duration-150 hover:scale-105 active:scale-90 z-10 cursor-pointer border"
+          style={{ color: modalTextColor, backgroundColor: isLight ? "#f1f5f9" : "#1e293b", borderColor: isLight ? "#cbd5e1" : "rgba(255,255,255,0.2)" }}
           title="Close modal"
         >
           <X className="h-5 w-5" />
         </button>
 
-        {/* Glow accent orbs */}
-        <div className="absolute -top-24 -left-24 w-48 h-48 rounded-full blur-3xl pointer-events-none opacity-25 animate-pulse" style={{ backgroundColor: theme.accentColor }} />
-        <div className="absolute -bottom-24 -right-24 w-48 h-48 rounded-full blur-3xl pointer-events-none opacity-25 animate-pulse" style={{ backgroundColor: theme.accentColor }} />
-
         {/* Header Branding */}
         <div className="text-center mb-6 relative z-10">
-          <div className="inline-flex items-center justify-center p-3.5 rounded-2xl glass-card border mb-3 shadow-lg" style={{ borderColor: `${theme.accentColor}60`, color: theme.accentColor }}>
-            <Sparkles className="h-8 w-8 animate-pulse" />
+          <div className="inline-flex items-center justify-center p-3.5 rounded-2xl border mb-3 shadow-lg" style={{ backgroundColor: isLight ? "#f8fafc" : "#1e293b", borderColor: `${theme.accentColor}60`, color: theme.accentColor }}>
+            <Sparkles className="h-8 w-8" />
           </div>
           <h2 className="text-2xl font-extrabold font-sans tracking-tight" style={{ color: theme.accentColor }}>
             Script Automation Studio
           </h2>
-          <p className="text-xs mt-1.5 font-mono opacity-80" style={{ color: theme.textColor }}>
+          <p className="text-xs mt-1.5 font-mono opacity-85 font-medium" style={{ color: modalTextColor }}>
             {isSignUp ? "Create your account in seconds" : "Welcome back! Sign in to your account"}
           </p>
         </div>
 
         {/* Liquid Tab Switcher for Easy Toggle */}
-        <div className="flex rounded-full p-1.5 glass-card border mb-6 relative z-10" style={{ borderColor: `${theme.accentColor}40` }}>
+        <div className="flex rounded-full p-1.5 border mb-6 relative z-10" style={{ borderColor: isLight ? "#cbd5e1" : `${theme.accentColor}40`, backgroundColor: isLight ? "#f1f5f9" : "rgba(0,0,0,0.4)" }}>
           <button
             type="button"
             onClick={() => {
@@ -222,11 +228,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
               setError(null);
               setIsNotAllowedErr(false);
             }}
-            className="flex-1 py-2.5 text-xs font-mono font-bold rounded-full transition-all duration-300 cursor-pointer glass-tab"
+            className="flex-1 py-2.5 text-xs font-mono font-bold rounded-full transition-all duration-300 cursor-pointer"
             style={{
               backgroundColor: !isSignUp ? theme.accentColor : "transparent",
-              color: !isSignUp ? (theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000") : theme.textColor,
-              boxShadow: !isSignUp ? `0 4px 20px ${theme.accentColor}50` : "none"
+              color: !isSignUp ? btnTextColor : modalTextColor,
+              boxShadow: !isSignUp ? `0 4px 20px ${theme.accentColor}40` : "none"
             }}
           >
             Log In
@@ -238,11 +244,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
               setError(null);
               setIsNotAllowedErr(false);
             }}
-            className="flex-1 py-2.5 text-xs font-mono font-bold rounded-full transition-all duration-300 cursor-pointer glass-tab"
+            className="flex-1 py-2.5 text-xs font-mono font-bold rounded-full transition-all duration-300 cursor-pointer"
             style={{
               backgroundColor: isSignUp ? theme.accentColor : "transparent",
-              color: isSignUp ? (theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000") : theme.textColor,
-              boxShadow: isSignUp ? `0 4px 20px ${theme.accentColor}50` : "none"
+              color: isSignUp ? btnTextColor : modalTextColor,
+              boxShadow: isSignUp ? `0 4px 20px ${theme.accentColor}40` : "none"
             }}
           >
             Sign Up
@@ -251,20 +257,27 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
 
         {/* Firebase Console Guidance Box for auth/operation-not-allowed */}
         {isNotAllowedErr && (
-          <div className="mb-6 p-4 rounded-2xl glass-card border border-amber-500/80 text-amber-200 text-xs font-mono space-y-2.5 animate-[fadeIn_0.2s_ease]" style={{ backgroundColor: "rgba(120,53,15,0.4)" }}>
-            <div className="flex items-center gap-2 text-amber-300 font-bold">
+          <div
+            className="mb-6 p-4 rounded-2xl border text-xs font-mono space-y-2.5 animate-[fadeIn_0.2s_ease]"
+            style={{
+              backgroundColor: isLight ? "#fffbeb" : "rgba(120,53,15,0.4)",
+              borderColor: isLight ? "#fde68a" : "rgba(245,158,11,0.8)",
+              color: isLight ? "#78350f" : "#fef3c7"
+            }}
+          >
+            <div className="flex items-center gap-2 font-bold" style={{ color: isLight ? "#b45309" : "#fcd34d" }}>
               <AlertCircle className="h-4 w-4 shrink-0" />
               <span>How to solve `auth/operation-not-allowed`:</span>
             </div>
-            <p className="text-[11px] text-amber-200/90 leading-relaxed">
+            <p className="text-[11px] leading-relaxed opacity-90">
               Firebase sign-in provider is disabled in your Firebase Console project. Enable it in 3 quick steps:
             </p>
-            <ol className="list-decimal list-inside space-y-1 text-[11px] text-amber-100 pl-1">
-              <li>Open <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer" className="underline font-bold text-amber-300">Firebase Console</a></li>
+            <ol className="list-decimal list-inside space-y-1 text-[11px] pl-1 font-semibold">
+              <li>Open <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer" className="underline font-bold" style={{ color: isLight ? "#b45309" : "#fcd34d" }}>Firebase Console</a></li>
               <li>Select your project &rarr; <b>Authentication</b> &rarr; <b>Sign-in method</b></li>
               <li>Click <b>Email/Password</b> (or Google / Anonymous) and set it to <b>Enable</b></li>
             </ol>
-            <div className="pt-2 border-t border-amber-800/60 flex items-center justify-between text-[10px]">
+            <div className="pt-2 border-t flex items-center justify-between text-[10px]" style={{ borderColor: isLight ? "#fde68a" : "rgba(245,158,11,0.3)" }}>
               <span>Or click below to try quick guest mode:</span>
               <button
                 type="button"
@@ -279,9 +292,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
 
         {/* Standard Error Alert */}
         {error && !isNotAllowedErr && (
-          <div className="mb-5 p-3.5 rounded-2xl glass-card border border-red-500/80 text-red-200 text-xs font-mono flex items-start gap-2.5 animate-[fadeIn_0.2s_ease]" style={{ backgroundColor: "rgba(127,29,29,0.4)" }}>
-            <AlertCircle className="h-4 w-4 text-red-400 shrink-0 mt-0.5" />
-            <span className="flex-1 leading-snug">{error}</span>
+          <div
+            className="mb-5 p-3.5 rounded-2xl border text-xs font-mono flex items-start gap-2.5 animate-[fadeIn_0.2s_ease]"
+            style={{
+              backgroundColor: isLight ? "#fef2f2" : "rgba(127,29,29,0.5)",
+              color: isLight ? "#991b1b" : "#fca5a5",
+              borderColor: isLight ? "#fca5a5" : "#ef4444"
+            }}
+          >
+            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-red-500" />
+            <span className="flex-1 leading-snug font-medium">{error}</span>
           </div>
         )}
 
@@ -291,9 +311,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
             onClick={handleGoogleSignIn}
             disabled={loading}
             type="button"
-            className="w-full flex items-center justify-center gap-3 py-3 px-4 rounded-2xl bg-white text-gray-900 font-bold text-sm glass-button hover:bg-gray-100 transition-all cursor-pointer shadow-xl disabled:opacity-50 active:scale-[0.98] border border-white/40"
+            className="w-full flex items-center justify-center gap-3 py-3 px-4 rounded-2xl bg-white text-slate-900 font-extrabold text-sm hover:bg-slate-100 transition-all cursor-pointer shadow-lg disabled:opacity-50 active:scale-[0.98] border border-slate-300"
           >
-            <svg className="w-4 h-4" viewBox="0 0 24 24">
+            <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
               <path
                 fill="#4285F4"
                 d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -318,42 +338,42 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
             onClick={handleAnonymousSignIn}
             disabled={loading}
             type="button"
-            className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-2xl glass-button font-mono text-xs font-bold transition-all cursor-pointer disabled:opacity-50 border"
+            className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-2xl font-mono text-xs font-extrabold transition-all cursor-pointer disabled:opacity-50 border hover:opacity-90 shadow-sm"
             style={{
-              backgroundColor: `${theme.accentColor}20`,
-              borderColor: `${theme.accentColor}60`,
-              color: theme.textColor
+              backgroundColor: isLight ? "#f1f5f9" : `${theme.accentColor}18`,
+              borderColor: isLight ? "#cbd5e1" : `${theme.accentColor}60`,
+              color: modalTextColor
             }}
           >
-            <Zap className="h-4 w-4 animate-pulse" style={{ color: theme.accentColor }} />
+            <Zap className="h-4 w-4 animate-pulse shrink-0" style={{ color: theme.accentColor }} />
             <span>Instant One-Click Guest Mode</span>
           </button>
         </div>
 
         {/* Divider */}
         <div className="flex items-center gap-3 my-5 relative z-10">
-          <div className="flex-1 h-px" style={{ backgroundColor: `${theme.accentColor}30` }} />
-          <span className="text-[11px] font-mono opacity-70 uppercase tracking-wider" style={{ color: theme.textColor }}>or with email</span>
-          <div className="flex-1 h-px" style={{ backgroundColor: `${theme.accentColor}30` }} />
+          <div className="flex-1 h-px" style={{ backgroundColor: isLight ? "#cbd5e1" : `${theme.accentColor}30` }} />
+          <span className="text-[11px] font-mono opacity-80 uppercase tracking-wider font-semibold" style={{ color: modalTextColor }}>or with email</span>
+          <div className="flex-1 h-px" style={{ backgroundColor: isLight ? "#cbd5e1" : `${theme.accentColor}30` }} />
         </div>
 
         {/* Form */}
         <form onSubmit={handleEmailAuth} className="space-y-4 relative z-10">
           {isSignUp && (
             <div>
-              <label className="block text-xs font-mono opacity-80 mb-1 font-medium" style={{ color: theme.textColor }}>Full Name</label>
+              <label className="block text-xs font-mono opacity-90 mb-1 font-semibold" style={{ color: modalTextColor }}>Full Name</label>
               <div className="relative">
-                <User className="absolute left-3.5 top-3.5 h-4 w-4 opacity-50" style={{ color: theme.textColor }} />
+                <User className="absolute left-3.5 top-3.5 h-4 w-4 opacity-60 shrink-0" style={{ color: modalTextColor }} />
                 <input
                   type="text"
                   required
                   placeholder="John Doe"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full rounded-2xl py-3 pl-10 pr-4 text-sm glass-input focus:outline-none transition-all border"
+                  className={`w-full rounded-2xl py-3 pl-10 pr-4 text-sm focus:outline-none transition-all border ${isLight ? "bg-slate-50 text-slate-900 border-slate-300" : "bg-slate-950/80 text-slate-100 border-slate-700"}`}
                   style={{
-                    borderColor: `${theme.accentColor}40`,
-                    color: theme.textColor
+                    borderColor: isLight ? "#cbd5e1" : `${theme.accentColor}50`,
+                    color: modalTextColor
                   }}
                 />
               </div>
@@ -361,45 +381,45 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
           )}
 
           <div>
-            <label className="block text-xs font-mono opacity-80 mb-1 font-medium" style={{ color: theme.textColor }}>Email Address</label>
+            <label className="block text-xs font-mono opacity-90 mb-1 font-semibold" style={{ color: modalTextColor }}>Email Address</label>
             <div className="relative">
-              <Mail className="absolute left-3.5 top-3.5 h-4 w-4 opacity-50" style={{ color: theme.textColor }} />
+              <Mail className="absolute left-3.5 top-3.5 h-4 w-4 opacity-60 shrink-0" style={{ color: modalTextColor }} />
               <input
                 type="email"
                 required
                 placeholder="creator@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-2xl py-3 pl-10 pr-4 text-sm glass-input focus:outline-none transition-all border"
+                className={`w-full rounded-2xl py-3 pl-10 pr-4 text-sm focus:outline-none transition-all border ${isLight ? "bg-slate-50 text-slate-900 border-slate-300" : "bg-slate-950/80 text-slate-100 border-slate-700"}`}
                 style={{
-                  borderColor: `${theme.accentColor}40`,
-                  color: theme.textColor
+                  borderColor: isLight ? "#cbd5e1" : `${theme.accentColor}50`,
+                  color: modalTextColor
                 }}
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-mono opacity-80 mb-1 font-medium" style={{ color: theme.textColor }}>Password</label>
+            <label className="block text-xs font-mono opacity-90 mb-1 font-semibold" style={{ color: modalTextColor }}>Password</label>
             <div className="relative">
-              <Lock className="absolute left-3.5 top-3.5 h-4 w-4 opacity-50" style={{ color: theme.textColor }} />
+              <Lock className="absolute left-3.5 top-3.5 h-4 w-4 opacity-60 shrink-0" style={{ color: modalTextColor }} />
               <input
                 type={showPassword ? "text" : "password"}
                 required
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-2xl py-3 pl-10 pr-11 text-sm glass-input focus:outline-none transition-all font-mono border"
+                className={`w-full rounded-2xl py-3 pl-10 pr-11 text-sm focus:outline-none transition-all font-mono border ${isLight ? "bg-slate-50 text-slate-900 border-slate-300" : "bg-slate-950/80 text-slate-100 border-slate-700"}`}
                 style={{
-                  borderColor: `${theme.accentColor}40`,
-                  color: theme.textColor
+                  borderColor: isLight ? "#cbd5e1" : `${theme.accentColor}50`,
+                  color: modalTextColor
                 }}
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3.5 top-3 opacity-60 hover:opacity-100 transition-colors p-1 cursor-pointer"
-                style={{ color: theme.textColor }}
+                className="absolute right-3.5 top-3 opacity-70 hover:opacity-100 transition-colors p-1 cursor-pointer"
+                style={{ color: modalTextColor }}
                 title={showPassword ? "Hide password" : "Show password"}
               >
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -410,12 +430,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3.5 px-4 rounded-2xl font-extrabold text-sm glass-button transition-all cursor-pointer shadow-xl flex items-center justify-center gap-2 mt-6 active:scale-[0.98] disabled:opacity-50 border"
+            className="w-full py-3.5 px-4 rounded-2xl font-extrabold text-sm transition-all cursor-pointer shadow-xl flex items-center justify-center gap-2 mt-6 active:scale-[0.98] disabled:opacity-50 border"
             style={{
               backgroundColor: theme.accentColor,
-              color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000",
-              borderColor: `${theme.accentColor}90`,
-              boxShadow: `0 8px 30px ${theme.accentColor}60`
+              color: btnTextColor,
+              borderColor: `${theme.accentColor}`,
+              boxShadow: `0 8px 30px ${theme.accentColor}40`
             }}
           >
             {loading ? (
@@ -430,8 +450,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
         </form>
 
         {/* Toggle Sign Up / Login Footer */}
-        <div className="mt-6 pt-4 border-t text-center relative z-10" style={{ borderColor: `${theme.accentColor}25` }}>
-          <p className="text-xs font-mono opacity-80" style={{ color: theme.textColor }}>
+        <div className="mt-6 pt-4 border-t text-center relative z-10" style={{ borderColor: isLight ? "#e2e8f0" : `${theme.accentColor}25` }}>
+          <p className="text-xs font-mono opacity-85" style={{ color: modalTextColor }}>
             {isSignUp ? "Already have an account?" : "Don't have an account yet?"}{" "}
             <button
               type="button"
@@ -449,8 +469,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
         </div>
 
         {/* Privacy Note */}
-        <div className="mt-4 flex items-center justify-center gap-1.5 text-[10px] font-mono opacity-60 relative z-10" style={{ color: theme.textColor }}>
-          <Shield className="h-3 w-3" style={{ color: theme.accentColor }} />
+        <div className="mt-4 flex items-center justify-center gap-1.5 text-[10px] font-mono opacity-70 relative z-10" style={{ color: modalTextColor }}>
+          <Shield className="h-3 w-3 shrink-0" style={{ color: theme.accentColor }} />
           <span>AES-256 Encrypted personal API key security</span>
         </div>
       </div>

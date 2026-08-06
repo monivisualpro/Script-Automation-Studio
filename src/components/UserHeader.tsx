@@ -46,11 +46,19 @@ export const UserHeader: React.FC = () => {
   }, []);
 
   return (
-    <header className="w-full glass-panel border-b border-white/10 px-4 py-2.5 sm:px-6 backdrop-blur-2xl sticky top-0 z-40 flex items-center justify-between gap-4 select-none transition-all duration-300 shadow-xl">
+    <header
+      className="w-full glass-panel border-b px-4 py-2.5 sm:px-6 sticky top-0 z-40 flex items-center justify-between gap-4 select-none"
+      style={{
+        borderBottomColor: theme.accentColor,
+        boxShadow: theme.cardBg.includes("bg-white")
+          ? "0 8px 24px -4px rgba(0, 0, 0, 0.06), 0 4px 8px -3px rgba(0, 0, 0, 0.02)"
+          : "0 12px 28px -4px rgba(0, 0, 0, 0.55), 0 4px 10px -4px rgba(0, 0, 0, 0.35)"
+      }}
+    >
       {/* Left Branding / Title */}
       <div className="flex items-center gap-3">
-        <div className="p-2.5 rounded-2xl glass-card border flex items-center justify-center shadow-lg transition-transform duration-300 hover:scale-105" style={{ borderColor: `${theme.accentColor}50`, color: theme.accentColor }}>
-          <Sparkles className="h-5 w-5 animate-pulse" />
+        <div className="p-2.5 rounded-2xl glass-card border flex items-center justify-center shadow-lg transition-transform duration-150 hover:scale-102" style={{ borderColor: `${theme.accentColor}50`, color: theme.accentColor }}>
+          <Sparkles className="h-5 w-5" />
         </div>
         <div>
           <h1 className="text-sm font-extrabold tracking-tight font-sans flex items-center gap-1.5" style={{ color: theme.accentColor }}>
@@ -76,7 +84,7 @@ export const UserHeader: React.FC = () => {
         {/* Image Studio Modal Trigger Button */}
         <button
           onClick={() => setIsImageStudioOpen(true)}
-          className="p-2 sm:px-3.5 py-2 rounded-2xl glass-button transition-all cursor-pointer flex items-center gap-1.5 shadow-lg border hover:scale-105 active:scale-95"
+          className="p-2 sm:px-3.5 py-2 rounded-2xl glass-button transition-all cursor-pointer flex items-center gap-1.5 shadow-lg border hover:scale-102 active:scale-95"
           style={{
             backgroundColor: `${theme.accentColor}20`,
             color: theme.accentColor,
@@ -84,7 +92,7 @@ export const UserHeader: React.FC = () => {
           }}
           title="Open Image Generation Studio"
         >
-          <Wand2 className="h-4 w-4 animate-pulse" style={{ color: theme.accentColor }} />
+          <Wand2 className="h-4 w-4" style={{ color: theme.accentColor }} />
           <span className="text-xs font-mono font-bold hidden sm:inline">Image Studio</span>
         </button>
 
@@ -132,10 +140,10 @@ export const UserHeader: React.FC = () => {
           /* Unauthenticated state: Show prominent Login / Sign Up button */
           <button
             onClick={() => setIsAuthModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-2xl glass-button font-extrabold text-xs transition-all shadow-xl hover:scale-105 active:scale-95 cursor-pointer border"
+            className="flex items-center gap-2 px-4 py-2 rounded-2xl font-extrabold text-xs transition-all shadow-xl hover:scale-105 active:scale-95 cursor-pointer border"
             style={{
               backgroundColor: theme.accentColor,
-              color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000",
+              color: currentTheme === "Pure Light" || theme.accentColor === "#FF1744" || theme.accentColor === "#8E44FF" ? "#ffffff" : "#000000",
               borderColor: `${theme.accentColor}80`
             }}
           >
@@ -211,10 +219,10 @@ export const UserHeader: React.FC = () => {
                   style={{ borderColor: theme.accentColor }}
                 />
                 <div className="flex flex-col text-left hidden sm:flex leading-tight">
-                  <span className="text-xs font-bold transition-colors truncate max-w-[110px]" style={{ color: theme.textColor }}>
+                  <span className="text-xs font-bold transition-colors truncate max-w-[110px]" style={{ color: currentTheme === "Pure Light" ? "#0f172a" : "#f8fafc" }}>
                     {profile.name}
                   </span>
-                  <span className="text-[9px] font-mono truncate max-w-[110px] opacity-70" style={{ color: theme.textColor }}>
+                  <span className="text-[9px] font-mono truncate max-w-[110px] opacity-70" style={{ color: currentTheme === "Pure Light" ? "#475569" : "#cbd5e1" }}>
                     {profile.email}
                   </span>
                 </div>
@@ -223,10 +231,20 @@ export const UserHeader: React.FC = () => {
 
               {/* Profile Dropdown Menu */}
               {isDropdownOpen && (
-                <div className="absolute right-0 mt-3 w-60 glass-panel rounded-3xl shadow-2xl py-2 z-50 animate-[fadeIn_0.15s_ease] font-mono text-xs backdrop-blur-2xl border border-white/20" style={{ color: theme.textColor }}>
-                  <div className="px-4 py-2.5 border-b border-white/10 mb-1">
+                <div
+                  className="absolute right-0 mt-3 w-60 rounded-3xl shadow-2xl py-2 z-50 font-mono text-xs border backdrop-blur-xl"
+                  style={{
+                    backgroundColor: currentTheme === "Pure Light" ? "#ffffff" : "#0d111a",
+                    borderColor: currentTheme === "Pure Light" ? "#e2e8f0" : `${theme.accentColor}40`,
+                    color: currentTheme === "Pure Light" ? "#0f172a" : "#f8fafc",
+                    boxShadow: currentTheme === "Pure Light"
+                      ? "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05)"
+                      : `0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 20px ${theme.accentColor}20`
+                  }}
+                >
+                  <div className="px-4 py-2.5 border-b mb-1" style={{ borderColor: currentTheme === "Pure Light" ? "#f1f5f9" : "rgba(255,255,255,0.1)" }}>
                     <p className="font-bold truncate" style={{ color: theme.accentColor }}>{profile.name}</p>
-                    <p className="text-[10px] opacity-70 truncate">{profile.email}</p>
+                    <p className="text-[10px] opacity-70 truncate" style={{ color: currentTheme === "Pure Light" ? "#475569" : "#cbd5e1" }}>{profile.email}</p>
                   </div>
 
                   <button
@@ -234,8 +252,8 @@ export const UserHeader: React.FC = () => {
                       setIsDropdownOpen(false);
                       setIsSettingsModalOpen(true);
                     }}
-                    className="w-full px-4 py-2.5 text-left flex items-center gap-2.5 transition-colors cursor-pointer hover:bg-white/15"
-                    style={{ color: theme.textColor }}
+                    className="w-full px-4 py-2.5 text-left flex items-center gap-2.5 transition-colors cursor-pointer hover:opacity-80"
+                    style={{ color: currentTheme === "Pure Light" ? "#0f172a" : "#f8fafc" }}
                   >
                     <UserIcon className="h-4 w-4" style={{ color: theme.accentColor }} />
                     <span>My Profile</span>
@@ -246,8 +264,8 @@ export const UserHeader: React.FC = () => {
                       setIsDropdownOpen(false);
                       setIsApiKeyModalOpen(true);
                     }}
-                    className="w-full px-4 py-2.5 text-left flex items-center gap-2.5 transition-colors cursor-pointer hover:bg-white/15"
-                    style={{ color: theme.textColor }}
+                    className="w-full px-4 py-2.5 text-left flex items-center gap-2.5 transition-colors cursor-pointer hover:opacity-80"
+                    style={{ color: currentTheme === "Pure Light" ? "#0f172a" : "#f8fafc" }}
                   >
                     <Key className="h-4 w-4" style={{ color: theme.accentColor }} />
                     <span>API Key Settings</span>
@@ -258,23 +276,23 @@ export const UserHeader: React.FC = () => {
                       setIsDropdownOpen(false);
                       setIsSettingsModalOpen(true);
                     }}
-                    className="w-full px-4 py-2.5 text-left flex items-center gap-2.5 transition-colors cursor-pointer hover:bg-white/15"
-                    style={{ color: theme.textColor }}
+                    className="w-full px-4 py-2.5 text-left flex items-center gap-2.5 transition-colors cursor-pointer hover:opacity-80"
+                    style={{ color: currentTheme === "Pure Light" ? "#0f172a" : "#f8fafc" }}
                   >
                     <Cpu className="h-4 w-4" style={{ color: theme.accentColor }} />
                     <span>AI Model Preferences</span>
                   </button>
 
-                  <div className="my-1 border-t border-white/10" />
+                  <div className="my-1 border-t" style={{ borderColor: currentTheme === "Pure Light" ? "#f1f5f9" : "rgba(255,255,255,0.1)" }} />
 
                   <button
                     onClick={() => {
                       setIsDropdownOpen(false);
                       logout();
                     }}
-                    className="w-full px-4 py-2.5 text-left text-red-400 hover:text-red-300 hover:bg-red-950/30 flex items-center gap-2.5 transition-colors cursor-pointer"
+                    className="w-full px-4 py-2.5 text-left text-red-500 hover:text-red-600 flex items-center gap-2.5 transition-colors cursor-pointer"
                   >
-                    <LogOut className="h-4 w-4 text-red-400" />
+                    <LogOut className="h-4 w-4 text-red-500" />
                     <span>Log Out</span>
                   </button>
                 </div>
