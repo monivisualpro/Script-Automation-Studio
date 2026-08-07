@@ -133,9 +133,10 @@ export default function App() {
     openImageStudioWithPrompt,
     modelSettings,
     currentTheme,
+    currentBrand,
   } = useAuth();
 
-  const theme = getThemeConfig(currentTheme);
+  const theme = getThemeConfig(currentTheme, currentBrand);
 
   const [lastModelUsed, setLastModelUsed] = useState<string | null>(null);
 
@@ -1180,15 +1181,15 @@ export default function App() {
     );
   };
 
-  const isLight = currentTheme === "Pure Light";
-  const btnTextColor = isLight || theme.accentColor === "#FF1744" || theme.accentColor === "#8E44FF" ? "#ffffff" : "#000000";
+  const isLight = theme.isLight;
+  const btnTextColor = "#ffffff";
 
   const panelShadow = isLight
     ? "0 12px 32px -4px rgba(0, 0, 0, 0.08), 0 4px 12px -3px rgba(0, 0, 0, 0.03)"
     : "0 16px 36px -4px rgba(0, 0, 0, 0.65), 0 6px 16px -4px rgba(0, 0, 0, 0.45)";
 
   return (
-    <div className={`min-h-screen ${theme.rootBg} ${theme.textColor} font-sans overflow-x-hidden transition-colors duration-300`}>
+    <div className={`min-h-screen ${theme.rootBg} ${theme.textColor} font-sans overflow-x-hidden p-3 sm:p-5 transition-colors duration-200`}>
       {/* Top User Navigation Header */}
       <UserHeader />
 
@@ -1210,29 +1211,24 @@ export default function App() {
       {/* Unauthenticated / Missing API Key Alert Banners */}
       {!user && (
         <div
-          className="border-b px-4 py-3 text-center text-xs font-mono flex flex-col sm:flex-row items-center justify-center gap-3 backdrop-blur-md shadow-md transition-colors duration-300"
+          className="border-b px-4 py-3 text-center text-xs font-mono flex flex-col sm:flex-row items-center justify-center gap-3 backdrop-blur-md shadow-md"
           style={{
-            backgroundColor: isLight ? "#ffffff" : "rgba(13, 17, 26, 0.88)",
-            borderColor: isLight ? "#cbd5e1" : `${theme.accentColor}50`,
-            color: isLight ? "#0f172a" : "#f8fafc",
-            boxShadow: isLight ? "0 2px 10px rgba(0,0,0,0.05)" : `0 4px 20px ${theme.accentColor}15`
+            backgroundColor: "#111111",
+            borderColor: "#2A2A2A",
+            color: "#FFFFFF",
           }}
         >
-          <span className="font-bold flex items-center gap-1.5" style={{ color: theme.accentColor }}>
-            <Lock className="h-4 w-4" style={{ color: theme.accentColor }} />
+          <span className="font-bold flex items-center gap-1.5" style={{ color: theme.secondaryAccentColor }}>
+            <Lock className="h-4 w-4" style={{ color: theme.secondaryAccentColor }} />
             <span>Authentication Required:</span>
           </span>
-          <span className="opacity-95 font-medium" style={{ color: isLight ? "#334155" : "#f1f5f9" }}>
+          <span className="opacity-95 font-medium text-[#BDBDBD]">
             Sign up or log in with Google / Email to generate scripts using your own personal Google AI API Key.
           </span>
           <button
             onClick={() => setIsAuthModalOpen(true)}
-            className="px-4 py-1.5 rounded-xl font-extrabold text-xs transition-all shadow-md hover:scale-105 active:scale-95 cursor-pointer flex items-center gap-1.5 shrink-0 border"
-            style={{
-              backgroundColor: theme.accentColor,
-              color: btnTextColor,
-              borderColor: `${theme.accentColor}`
-            }}
+            className="px-4 py-1.5 rounded-xl font-extrabold text-xs transition-all shadow-md cursor-pointer flex items-center gap-1.5 shrink-0 border text-white"
+            style={{ backgroundColor: theme.accentColor, borderColor: theme.accentColor }}
           >
             <LogIn className="h-3.5 w-3.5" />
             <span>Sign In / Register</span>
@@ -1242,21 +1238,18 @@ export default function App() {
 
       {user && !profile?.hasApiKey && (
         <div
-          className="border-b px-4 py-3 text-center text-xs font-mono flex flex-col sm:flex-row items-center justify-center gap-3 backdrop-blur-md transition-colors duration-300"
-          style={{
-            backgroundColor: isLight ? "#fffbeb" : "rgba(69, 26, 3, 0.9)",
-            borderColor: isLight ? "#fde68a" : "rgba(217, 119, 6, 0.8)",
-            color: isLight ? "#78350f" : "#fef3c7"
-          }}
+          className="border-b px-4 py-3 text-center text-xs font-mono flex flex-col sm:flex-row items-center justify-center gap-3 bg-[#111111] text-white"
+          style={{ borderColor: `${theme.accentColor}60` }}
         >
-          <span className="font-bold flex items-center gap-1.5 animate-pulse" style={{ color: isLight ? "#b45309" : "#fbbf24" }}>
+          <span className="font-bold flex items-center gap-1.5" style={{ color: theme.accentColor }}>
             <Key className="h-4 w-4" />
             <span>Personal API Key Needed:</span>
           </span>
-          <span className="opacity-95">Your account requires a Google AI Studio API Key before script generation can run.</span>
+          <span className="opacity-95 text-[#BDBDBD]">Your account requires a Google AI Studio API Key before script generation can run.</span>
           <button
             onClick={() => setIsApiKeyModalOpen(true)}
-            className="px-3.5 py-1.5 rounded-xl bg-amber-400 text-black font-extrabold text-xs hover:bg-white transition-all shadow-[0_0_10px_rgba(245,158,11,0.4)] cursor-pointer flex items-center gap-1.5 shrink-0"
+            className="px-3.5 py-1.5 rounded-xl text-white font-extrabold text-xs transition-all cursor-pointer flex items-center gap-1.5 shrink-0 border"
+            style={{ backgroundColor: theme.accentColor, borderColor: theme.accentColor }}
           >
             <Key className="h-3.5 w-3.5" />
             <span>Configure Key Now</span>
@@ -1264,25 +1257,19 @@ export default function App() {
         </div>
       )}
 
-      {/* Super high-tech radiant liquid morphing ambient background canvas */}
-      <div className="fixed top-10 -left-20 w-[550px] h-[550px] rounded-full blur-[140px] pointer-events-none opacity-25 animate-liquid-blob-1 transition-colors duration-1000 z-0" style={{ backgroundColor: theme.accentColor }} />
-      <div className="fixed top-1/3 -right-24 w-[600px] h-[600px] rounded-full blur-[160px] pointer-events-none opacity-20 animate-liquid-blob-2 transition-colors duration-1000 z-0" style={{ backgroundColor: theme.accentColor === "#00E5FF" ? "#8E44FF" : theme.accentColor === "#39FF14" ? "#00E5FF" : "#FF6F00" }} />
-      <div className="fixed -bottom-20 left-1/3 w-[650px] h-[650px] rounded-full blur-[180px] pointer-events-none opacity-20 animate-liquid-blob-3 transition-colors duration-1000 z-0" style={{ backgroundColor: theme.accentColor }} />
-      <div className="fixed inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:32px_32px] pointer-events-none z-0" />
-
       <div className="relative z-10 max-w-7xl mx-auto space-y-5">
         
-        {/* UPPER HEADER WITH GLASSMORPHISM LIQUID GLOW EFFECTS */}
+        {/* UPPER HEADER */}
         <header
-          className="glass-panel p-4 sm:p-5 rounded-3xl border backdrop-blur-2xl flex flex-col lg:flex-row items-center justify-between gap-4 transition-all duration-300"
+          className="glass-panel p-4 sm:p-5 rounded-3xl border flex flex-col lg:flex-row items-center justify-between gap-4"
           style={{
             borderColor: theme.accentColor,
             boxShadow: panelShadow
           }}
         >
           <div className="flex items-center gap-3.5">
-            <div className="h-12 w-12 rounded-2xl glass-card border flex items-center justify-center shadow-lg transition-transform duration-300 hover:scale-105" style={{ borderColor: `${theme.accentColor}60`, color: theme.accentColor }}>
-              <Sparkles className="h-6 w-6 animate-pulse" />
+            <div className="h-12 w-12 rounded-2xl glass-card border flex items-center justify-center shadow-lg" style={{ borderColor: `${theme.accentColor}60`, color: theme.accentColor }}>
+              <Sparkles className="h-6 w-6" />
             </div>
             <div>
               <h1 className="text-xl md:text-2xl font-display font-extrabold tracking-tight flex items-center gap-2" style={{ color: theme.accentColor }}>
@@ -1338,7 +1325,7 @@ export default function App() {
           <div className="lg:col-span-4 xl:col-span-4 space-y-4">
             
             {/* VOICE PERSONA CARD - ROUNDED GLASS TABS */}
-            <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-3 transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor, boxShadow: panelShadow }}>
+            <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-3 transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.cardBorderCode, boxShadow: panelShadow }}>
               <label className="text-xs font-mono uppercase tracking-widest block font-extrabold" style={{ color: theme.accentColor }}>
                 Voice Persona (Speaker)
               </label>
@@ -1351,9 +1338,9 @@ export default function App() {
                       ? "rounded-[17px] font-extrabold shadow-lg scale-100"
                       : "bg-transparent border-transparent hover:opacity-100 opacity-70 rounded-xl font-bold"
                   } hover:scale-102 active:scale-95`}
-                  style={voicePersona === "female" ? { backgroundColor: theme.accentColor, color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000", borderColor: theme.accentColor } : { color: theme.textColor }}
+                  style={voicePersona === "female" ? { backgroundColor: theme.accentColor, color: "#ffffff", borderColor: theme.accentColor } : { color: theme.textColor }}
                 >
-                  <span className={`h-2.5 w-2.5 rounded-full ${voicePersona === "female" ? "bg-black" : "bg-purple-400 animate-pulse"}`} />
+                  <span className={`h-2.5 w-2.5 rounded-full ${voicePersona === "female" ? "bg-black" : "bg-purple-400"}`} />
                   FEMALE
                 </button>
                 <button
@@ -1364,16 +1351,16 @@ export default function App() {
                       ? "rounded-[17px] font-extrabold shadow-lg scale-100"
                       : "bg-transparent border-transparent hover:opacity-100 opacity-70 rounded-xl font-bold"
                   } hover:scale-102 active:scale-95`}
-                  style={voicePersona === "male" ? { backgroundColor: theme.accentColor, color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000", borderColor: theme.accentColor } : { color: theme.textColor }}
+                  style={voicePersona === "male" ? { backgroundColor: theme.accentColor, color: "#ffffff", borderColor: theme.accentColor } : { color: theme.textColor }}
                 >
-                  <span className={`h-2.5 w-2.5 rounded-full ${voicePersona === "male" ? "bg-black" : "bg-sky-400 animate-pulse"}`} />
+                  <span className={`h-2.5 w-2.5 rounded-full ${voicePersona === "male" ? "bg-black" : "bg-sky-400"}`} />
                   MALE
                 </button>
               </div>
             </div>
 
             {/* TOPIC DOMAIN / NICHE */}
-            <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-3 transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor, boxShadow: panelShadow }}>
+            <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-3 transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.cardBorderCode, boxShadow: panelShadow }}>
               <label className="text-xs font-mono uppercase tracking-widest flex items-center gap-1.5 font-extrabold" style={{ color: theme.accentColor }}>
                 <TrendingUp className="h-3.5 w-3.5" style={{ color: theme.accentColor }} />
                 Domain
@@ -1386,7 +1373,7 @@ export default function App() {
                   setContentCategory(e.target.value);
                 }}
                 className="glass-input w-full rounded-xl py-2.5 px-4 text-xs font-mono cursor-pointer transition-all duration-300 focus:outline-none"
-                style={{ backgroundColor: theme.inputBg, borderColor: theme.accentColor, borderWidth: '1px', borderStyle: 'solid', color: theme.textColor }}
+                style={{ backgroundColor: theme.inputBg, borderColor: theme.isLight ? "#E5E5E5" : "transparent", color: theme.textColor }}
               >
                 {CATEGORIES.map((cat) => (
                   <option key={cat} value={cat} style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>{cat}</option>
@@ -1395,7 +1382,7 @@ export default function App() {
             </div>
 
             {/* TUTORIAL & LITERATURE TONES */}
-            <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-3 transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor, boxShadow: panelShadow }}>
+            <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-3 transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.cardBorderCode, boxShadow: panelShadow }}>
               <label className="text-xs font-mono uppercase tracking-widest block font-extrabold" style={{ color: theme.accentColor }}>
                 Tutorial & Literature Tool
               </label>
@@ -1404,7 +1391,7 @@ export default function App() {
                 value={tutorialTone}
                 onChange={(e) => setTutorialTone(e.target.value)}
                 className="glass-input w-full rounded-xl py-2.5 px-4 text-xs font-mono cursor-pointer transition-all duration-300 focus:outline-none"
-                style={{ backgroundColor: theme.inputBg, borderColor: theme.accentColor, borderWidth: '1px', borderStyle: 'solid', color: theme.textColor }}
+                style={{ backgroundColor: theme.inputBg, borderColor: theme.isLight ? "#E5E5E5" : "transparent", color: theme.textColor }}
               >
                 <option value="Warm Friendly Conversational" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Warm Friendly Conversational</option>
                 <option value="Islamic / Religious Tone" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Islamic / Religious Tone</option>
@@ -1425,7 +1412,7 @@ export default function App() {
             </div>
 
             {/* TRANSFORMATION OPTIONS */}
-            <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-3 transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor, boxShadow: panelShadow }}>
+            <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-3 transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.cardBorderCode, boxShadow: panelShadow }}>
               <label className="text-xs font-mono uppercase tracking-widest flex items-center gap-1.5 font-extrabold" style={{ color: theme.accentColor }}>
                 <Globe className="h-3.5 w-3.5" style={{ color: theme.accentColor }} />
                 Transformation Option
@@ -1435,7 +1422,7 @@ export default function App() {
                 value={transformation}
                 onChange={(e) => handleSelectLanguage(e.target.value)}
                 className="glass-input w-full rounded-xl py-2.5 px-4 text-xs font-mono cursor-pointer transition-all duration-300 focus:outline-none"
-                style={{ backgroundColor: theme.inputBg, borderColor: theme.accentColor, borderWidth: '1px', borderStyle: 'solid', color: theme.textColor }}
+                style={{ backgroundColor: theme.inputBg, borderColor: theme.isLight ? "#E5E5E5" : "transparent", color: theme.textColor }}
               >
                 <option value="hindi" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>🇮🇳 Hindi Script (Urdu Wording & Accent)</option>
                 <option value="urdu-roman" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>🇵🇰 Convert to Urdu Roman (Latin Alphabet)</option>
@@ -1445,7 +1432,7 @@ export default function App() {
             </div>
 
             {/* TARGET AUDIENCE */}
-            <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-3 transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor, boxShadow: panelShadow }}>
+            <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-3 transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.cardBorderCode, boxShadow: panelShadow }}>
               <label className="text-xs font-mono uppercase tracking-widest flex items-center gap-1.5 font-extrabold" style={{ color: theme.accentColor }}>
                 <Lock className="h-3.5 w-3.5" style={{ color: theme.accentColor }} />
                 Target Audience
@@ -1455,7 +1442,7 @@ export default function App() {
                 value={targetAudience}
                 onChange={(e) => setTargetAudience(e.target.value)}
                 className="glass-input w-full rounded-xl py-2.5 px-4 text-xs font-mono cursor-pointer transition-all duration-300 focus:outline-none"
-                style={{ backgroundColor: theme.inputBg, borderColor: theme.accentColor, borderWidth: '1px', borderStyle: 'solid', color: theme.textColor }}
+                style={{ backgroundColor: theme.inputBg, borderColor: theme.isLight ? "#E5E5E5" : "transparent", color: theme.textColor }}
               >
                 <option value="children" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>👶 Children up to 10 years old</option>
                 <option value="adults" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>💼 Adults up to 40 years old</option>
@@ -1464,7 +1451,7 @@ export default function App() {
             </div>
 
             {/* TARGET REGIONS / COUNTRIES */}
-            <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-3 transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor, boxShadow: panelShadow }}>
+            <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-3 transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.cardBorderCode, boxShadow: panelShadow }}>
               <div className="flex items-center justify-between">
                 <label className="text-xs font-mono uppercase tracking-widest flex items-center gap-1.5 font-extrabold" style={{ color: theme.accentColor }}>
                   <Globe className="h-3.5 w-3.5" style={{ color: theme.accentColor }} />
@@ -1482,7 +1469,7 @@ export default function App() {
                   value={countrySearchQuery}
                   onChange={(e) => setCountrySearchQuery(e.target.value)}
                   className="glass-input w-full rounded-xl py-2 pl-9 pr-4 text-xs font-mono transition-all duration-300 focus:outline-none"
-                  style={{ backgroundColor: theme.inputBg, borderColor: theme.accentColor, borderWidth: '1px', borderStyle: 'solid', color: theme.textColor }}
+                  style={{ backgroundColor: theme.inputBg, borderColor: theme.isLight ? "#E5E5E5" : "transparent", color: theme.textColor }}
                 />
                 {countrySearchQuery && (
                   <button
@@ -1587,7 +1574,7 @@ export default function App() {
             </div>
 
             {/* SCRIPT LENGTH TYPE & DETAILS */}
-            <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-4 transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor, boxShadow: panelShadow }}>
+            <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-4 transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.cardBorderCode, boxShadow: panelShadow }}>
               <div>
                 <label className="text-xs font-mono uppercase tracking-widest block mb-2 font-extrabold" style={{ color: theme.accentColor }}>
                   Script Length
@@ -1606,7 +1593,7 @@ export default function App() {
                       } hover:scale-102 active:scale-95`}
                       style={scriptLengthType === "word_count" ? {
                         backgroundColor: theme.accentColor,
-                        color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000",
+                        color: "#ffffff",
                         borderColor: theme.accentColor
                       } : {
                         backgroundColor: `${theme.accentColor}10`,
@@ -1625,7 +1612,7 @@ export default function App() {
                       } hover:scale-102 active:scale-95`}
                       style={scriptLengthType === "video_duration" ? {
                         backgroundColor: theme.accentColor,
-                        color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000",
+                        color: "#ffffff",
                         borderColor: theme.accentColor
                       } : {
                         backgroundColor: `${theme.accentColor}10`,
@@ -1661,7 +1648,7 @@ export default function App() {
                         } hover:scale-105 active:scale-95`}
                         style={wordCount === preset ? {
                           backgroundColor: theme.accentColor,
-                          color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000",
+                          color: "#ffffff",
                           borderColor: theme.accentColor
                         } : {
                           backgroundColor: `${theme.accentColor}10`,
@@ -1685,9 +1672,7 @@ export default function App() {
                       className="glass-input w-full rounded-xl py-2 px-4 text-xs font-mono transition-all duration-300 focus:outline-none"
                       style={{
                         backgroundColor: theme.inputBg,
-                        borderColor: theme.accentColor,
-                        borderWidth: "1px",
-                        borderStyle: "solid",
+                        borderColor: theme.isLight ? "#E5E5E5" : "transparent",
                         color: theme.textColor
                       }}
                       placeholder="Custom word length (e.g. 20000)..."
@@ -1717,9 +1702,7 @@ export default function App() {
                       className="glass-input w-full rounded-xl py-2.5 px-4 text-xs font-mono transition-all duration-300 focus:outline-none"
                       style={{
                         backgroundColor: theme.inputBg,
-                        borderColor: theme.accentColor,
-                        borderWidth: "1px",
-                        borderStyle: "solid",
+                        borderColor: theme.isLight ? "#E5E5E5" : "transparent",
                         color: theme.textColor
                       }}
                       placeholder="e.g., 15"
@@ -1733,7 +1716,7 @@ export default function App() {
             </div>
 
             {/* GREETINGS PREFIX / BEGINNING - ASSALAMU ALAIKUM FIRST */}
-            <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-3 transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor, boxShadow: panelShadow }}>
+            <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-3 transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.cardBorderCode, boxShadow: panelShadow }}>
               <div className="flex justify-between items-center">
                 <label className="text-xs font-mono uppercase tracking-widest block font-extrabold" style={{ color: theme.accentColor }}>
                   Greeting
@@ -1755,7 +1738,7 @@ export default function App() {
                     title={p}
                     style={greetingsPrefix === p ? {
                       backgroundColor: theme.accentColor,
-                      color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000",
+                      color: "#ffffff",
                       borderColor: theme.accentColor
                     } : {
                       backgroundColor: `${theme.accentColor}10`,
@@ -1775,9 +1758,7 @@ export default function App() {
                 className="glass-input w-full rounded-xl py-2 px-4 text-xs font-mono transition-all duration-300 focus:outline-none"
                 style={{
                   backgroundColor: theme.inputBg,
-                  borderColor: theme.accentColor,
-                  borderWidth: "1px",
-                  borderStyle: "solid",
+                  borderColor: theme.isLight ? "#E5E5E5" : "transparent",
                   color: theme.textColor
                 }}
                 placeholder="Custom greeting prefix..."
@@ -1785,7 +1766,7 @@ export default function App() {
             </div>
 
             {/* CUSTOM HOOK & STRUCTURING - DEFAULT WHAT DO YOU KNOW? */}
-            <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-3 transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor, boxShadow: panelShadow }}>
+            <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-3 transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.cardBorderCode, boxShadow: panelShadow }}>
               <div className="space-y-1">
                 <label className="text-xs font-mono uppercase tracking-widest block font-extrabold" style={{ color: theme.accentColor }}>
                   Custom Hook Input
@@ -1798,9 +1779,7 @@ export default function App() {
                   className="glass-input w-full rounded-xl py-2 px-4 text-xs font-mono transition-all duration-300 focus:outline-none"
                   style={{
                     backgroundColor: theme.inputBg,
-                    borderColor: theme.accentColor,
-                    borderWidth: "1px",
-                    borderStyle: "solid",
+                    borderColor: theme.isLight ? "#E5E5E5" : "transparent",
                     color: theme.textColor
                   }}
                   placeholder="e.g. What do you know?..."
@@ -1825,7 +1804,7 @@ export default function App() {
                     className={`w-4 h-4 rounded-xl shadow-md transition-all duration-300 transform ${
                       includeHooksBodyConclusion ? "translate-x-5" : "translate-x-0"
                     }`}
-                    style={{ backgroundColor: theme.cardBg.includes("bg-white") && includeHooksBodyConclusion ? "#ffffff" : "#000000" }}
+                    style={{ backgroundColor: theme.isLight && includeHooksBodyConclusion ? "#ffffff" : "#000000" }}
                   />
                 </button>
               </div>
@@ -1838,7 +1817,7 @@ export default function App() {
             <div className="border-b my-4" style={{ borderColor: `${theme.accentColor}20` }} />
 
             {/* MOVED: YouTube and social media growth strategist */}
-            <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-4 transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor, boxShadow: panelShadow }}>
+            <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-4 transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.cardBorderCode, boxShadow: panelShadow }}>
               <div className="border-b pb-2 flex items-center justify-between" style={{ borderColor: `${theme.accentColor}30` }}>
                 <span className="text-xs font-mono uppercase tracking-wider block font-extrabold" style={{ color: theme.accentColor }}>
                   YouTube and social media growth strategist
@@ -1868,7 +1847,7 @@ export default function App() {
                   >
                     <div className="w-4 h-4 rounded-xl shadow-md transition-all duration-300 transform"
                       style={{
-                        backgroundColor: theme.cardBg.includes("bg-white") && toggleTitle ? "#ffffff" : "#000000",
+                        backgroundColor: theme.isLight && toggleTitle ? "#ffffff" : "#000000",
                         transform: toggleTitle ? "translateX(1.125rem)" : "translateX(0)"
                       }}
                     />
@@ -1892,7 +1871,7 @@ export default function App() {
                   >
                     <div className="w-4 h-4 rounded-xl shadow-md transition-all duration-300 transform"
                       style={{
-                        backgroundColor: theme.cardBg.includes("bg-white") && toggleDescription ? "#ffffff" : "#000000",
+                        backgroundColor: theme.isLight && toggleDescription ? "#ffffff" : "#000000",
                         transform: toggleDescription ? "translateX(1.125rem)" : "translateX(0)"
                       }}
                     />
@@ -1916,7 +1895,7 @@ export default function App() {
                   >
                     <div className="w-4 h-4 rounded-xl shadow-md transition-all duration-300 transform"
                       style={{
-                        backgroundColor: theme.cardBg.includes("bg-white") && toggleTimestamps ? "#ffffff" : "#000000",
+                        backgroundColor: theme.isLight && toggleTimestamps ? "#ffffff" : "#000000",
                         transform: toggleTimestamps ? "translateX(1.125rem)" : "translateX(0)"
                       }}
                     />
@@ -1935,9 +1914,7 @@ export default function App() {
                       className="glass-input w-full rounded-lg py-1 px-2.5 text-xs font-mono focus:outline-none"
                       style={{
                         backgroundColor: theme.inputBg,
-                        borderColor: theme.accentColor,
-                        borderWidth: "1px",
-                        borderStyle: "solid",
+                        borderColor: theme.isLight ? "#E5E5E5" : "transparent",
                         color: theme.textColor
                       }}
                     />
@@ -1961,7 +1938,7 @@ export default function App() {
                   >
                     <div className="w-4 h-4 rounded-xl shadow-md transition-all duration-300 transform"
                       style={{
-                        backgroundColor: theme.cardBg.includes("bg-white") && toggleHashtags ? "#ffffff" : "#000000",
+                        backgroundColor: theme.isLight && toggleHashtags ? "#ffffff" : "#000000",
                         transform: toggleHashtags ? "translateX(1.125rem)" : "translateX(0)"
                       }}
                     />
@@ -1985,7 +1962,7 @@ export default function App() {
                   >
                     <div className="w-4 h-4 rounded-xl shadow-md transition-all duration-300 transform"
                       style={{
-                        backgroundColor: theme.cardBg.includes("bg-white") && toggleTags ? "#ffffff" : "#000000",
+                        backgroundColor: theme.isLight && toggleTags ? "#ffffff" : "#000000",
                         transform: toggleTags ? "translateX(1.125rem)" : "translateX(0)"
                       }}
                     />
@@ -1995,7 +1972,7 @@ export default function App() {
             </div>
 
             {/* MOVED: thumbnail director and Tagline */}
-            <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-4 transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor, boxShadow: panelShadow }}>
+            <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-4 transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.cardBorderCode, boxShadow: panelShadow }}>
               <div className="border-b pb-2 flex items-center justify-between" style={{ borderColor: `${theme.accentColor}30` }}>
                 <span className="text-xs font-mono uppercase tracking-wider block font-extrabold" style={{ color: theme.accentColor }}>
                   thumbnail director & Tagline
@@ -2016,9 +1993,7 @@ export default function App() {
                   className="glass-input w-full rounded-xl py-1.5 px-3 text-xs font-mono cursor-pointer focus:outline-none"
                   style={{
                     backgroundColor: theme.inputBg,
-                    borderColor: theme.accentColor,
-                    borderWidth: "1px",
-                    borderStyle: "solid",
+                    borderColor: theme.isLight ? "#E5E5E5" : "transparent",
                     color: theme.textColor
                   }}
                 >
@@ -2041,9 +2016,7 @@ export default function App() {
                   className="glass-input w-full rounded-xl py-1.5 px-3 text-xs font-mono focus:outline-none"
                   style={{
                     backgroundColor: theme.inputBg,
-                    borderColor: theme.accentColor,
-                    borderWidth: "1px",
-                    borderStyle: "solid",
+                    borderColor: theme.isLight ? "#E5E5E5" : "transparent",
                     color: theme.textColor
                   }}
                 />
@@ -2062,9 +2035,7 @@ export default function App() {
                   className="glass-input w-full rounded-xl py-1.5 px-3 text-xs font-mono focus:outline-none"
                   style={{
                     backgroundColor: theme.inputBg,
-                    borderColor: theme.accentColor,
-                    borderWidth: "1px",
-                    borderStyle: "solid",
+                    borderColor: theme.isLight ? "#E5E5E5" : "transparent",
                     color: theme.textColor
                   }}
                 />
@@ -2088,7 +2059,7 @@ export default function App() {
                       }`}
                       style={bgType === type ? {
                         backgroundColor: theme.accentColor,
-                        color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000",
+                        color: "#ffffff",
                         borderColor: theme.accentColor
                       } : {
                         color: theme.textColor
@@ -2198,7 +2169,7 @@ export default function App() {
                       }`}
                       style={textType === type ? {
                         backgroundColor: theme.accentColor,
-                        color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000",
+                        color: "#ffffff",
                         borderColor: theme.accentColor
                       } : {
                         color: theme.textColor
@@ -2221,7 +2192,7 @@ export default function App() {
                         className={`py-1 px-1.5 text-[9px] font-mono border text-center cursor-pointer transition-all`}
                         style={thumbTextColor === item.name ? {
                           backgroundColor: theme.accentColor,
-                          color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000",
+                          color: "#ffffff",
                           borderColor: theme.accentColor,
                           borderRadius: "17px",
                           fontWeight: "bold"
@@ -2332,7 +2303,7 @@ export default function App() {
           <div className="lg:col-span-8 xl:col-span-8 space-y-5">
             
             {/* INPUT SOURCE EXTRACTOR & GENERATOR TABS */}
-            <div className="glass-card p-5 rounded-2xl backdrop-blur-xl space-y-4 transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor, boxShadow: panelShadow }}>
+            <div className="glass-card p-5 rounded-2xl backdrop-blur-xl space-y-4 transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.cardBorderCode, boxShadow: panelShadow }}>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b pb-3" style={{ borderColor: `${theme.accentColor}30` }}>
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-mono font-extrabold tracking-wider uppercase" style={{ color: theme.accentColor }}>Input Source:</span>
@@ -2346,7 +2317,7 @@ export default function App() {
                         }`}
                         style={inputSource === source ? {
                           backgroundColor: theme.accentColor,
-                          color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000",
+                          color: "#ffffff",
                           borderColor: theme.accentColor
                         } : {
                           color: theme.textColor
@@ -2387,9 +2358,7 @@ export default function App() {
                           className="glass-input w-full rounded-xl py-2 pl-4 pr-10 text-xs font-mono focus:outline-none transition-all duration-300"
                           style={{
                             backgroundColor: theme.inputBg,
-                            borderColor: theme.accentColor,
-                            borderWidth: "1px",
-                            borderStyle: "solid",
+                            borderColor: theme.isLight ? "#E5E5E5" : "transparent",
                             color: theme.textColor
                           }}
                         />
@@ -2469,9 +2438,7 @@ export default function App() {
                         className="glass-input w-full rounded-xl py-2 px-4 text-xs font-mono focus:outline-none transition-all duration-300"
                         style={{
                           backgroundColor: theme.inputBg,
-                          borderColor: theme.accentColor,
-                          borderWidth: "1px",
-                          borderStyle: "solid",
+                          borderColor: theme.isLight ? "#E5E5E5" : "transparent",
                           color: theme.textColor
                         }}
                       />
@@ -2484,7 +2451,7 @@ export default function App() {
                         style={topicName.trim() && !topicGenerating ? {
                           backgroundColor: theme.accentColor,
                           borderColor: theme.accentColor,
-                          color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000"
+                          color: "#ffffff"
                         } : {
                           backgroundColor: `${theme.accentColor}08`,
                           borderColor: `${theme.accentColor}25`,
@@ -2534,7 +2501,7 @@ export default function App() {
                         style={videoUrl.trim() && !isExtractingUrl ? {
                           backgroundColor: theme.accentColor,
                           borderColor: theme.accentColor,
-                          color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000"
+                          color: "#ffffff"
                         } : {
                           backgroundColor: `${theme.accentColor}08`,
                           borderColor: `${theme.accentColor}25`,
@@ -2587,7 +2554,7 @@ export default function App() {
                 "Place the 'fast light mood' and 'generative script' above the download tabs and the output Tab."
                 Here is the stunning, horizontal generation and options bar! Positioned prominently right on top of the workspaces.
             */}
-            <div className="glass-card p-4 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4 transition-all duration-300 border" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor, boxShadow: panelShadow }}>
+            <div className="glass-card p-4 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4 transition-all duration-300 border" style={{ backgroundColor: theme.cardBg, borderColor: theme.cardBorderCode, boxShadow: panelShadow }}>
               
               <div className="flex items-center gap-3">
                 <div className="h-9 w-9 rounded-xl flex items-center justify-center animate-pulse glass-card" style={{ backgroundColor: `${theme.accentColor}15`, color: theme.accentColor }}>
@@ -2632,7 +2599,7 @@ export default function App() {
                   style={rawScript.trim() ? {
                     backgroundColor: theme.accentColor,
                     borderColor: theme.accentColor,
-                    color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000"
+                    color: "#ffffff"
                   } : {
                     backgroundColor: `${theme.accentColor}08`,
                     borderColor: `${theme.accentColor}25`,
@@ -2659,7 +2626,7 @@ export default function App() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               
               {/* RAW SOURCE SCRIPT BOX */}
-              <div className="glass-card flex flex-col h-[480px] rounded-2xl overflow-hidden transition-all duration-150 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor, boxShadow: panelShadow }}>
+              <div className="glass-card flex flex-col h-[480px] rounded-2xl overflow-hidden transition-all duration-150 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.cardBorderCode, boxShadow: panelShadow }}>
                 <div className="px-5 py-3 border-b flex items-center justify-between glass-card" style={{ borderColor: `${theme.accentColor}30`, backgroundColor: `${theme.accentColor}08` }}>
                   <span className="text-xs font-mono font-extrabold tracking-wider flex items-center gap-2" style={{ color: theme.accentColor }}>
                     <FileText className="h-4 w-4" style={{ color: theme.accentColor }} />
@@ -2763,7 +2730,7 @@ export default function App() {
               </div>
 
               {/* POLISHED V.O. SCRIPT / OUTPUT BOX */}
-              <div className="glass-card flex flex-col h-[480px] rounded-2xl overflow-hidden relative transition-all duration-150 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor, boxShadow: panelShadow }}>
+              <div className="glass-card flex flex-col h-[480px] rounded-2xl overflow-hidden relative transition-all duration-150 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.cardBorderCode, boxShadow: panelShadow }}>
                 {/* Active glowing ambient frame segment */}
                 <div className="absolute top-0 left-0 right-0 h-[1.5px]" style={{ background: `linear-gradient(to right, transparent, ${theme.accentColor}80, transparent)` }} />
                 
@@ -2835,7 +2802,7 @@ export default function App() {
                       className="glass-button px-3 py-1 text-[10px] font-mono font-bold tracking-tight flex items-center gap-1 transition-all duration-300 cursor-pointer border active:scale-95 rounded-xl"
                       style={polishedScript ? {
                         backgroundColor: theme.accentColor,
-                        color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000",
+                        color: "#ffffff",
                         borderColor: theme.accentColor
                       } : {
                         color: "rgb(107, 114, 128)",
@@ -2896,7 +2863,7 @@ export default function App() {
                       className="glass-button py-1.5 px-2 text-[9px] font-mono transition-all duration-300 border hover:scale-103 active:scale-95 disabled:opacity-45 disabled:cursor-not-allowed rounded-xl font-bold"
                       style={transformation === "hindi" && polishedScript ? {
                         backgroundColor: theme.accentColor,
-                        color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000",
+                        color: "#ffffff",
                         borderColor: theme.accentColor
                       } : {
                         backgroundColor: `${theme.accentColor}10`,
@@ -2913,7 +2880,7 @@ export default function App() {
                       className="glass-button py-1.5 px-2 text-[9px] font-mono transition-all duration-300 border hover:scale-103 active:scale-95 disabled:opacity-45 disabled:cursor-not-allowed rounded-xl font-bold"
                       style={transformation === "urdu-roman" && polishedScript ? {
                         backgroundColor: theme.accentColor,
-                        color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000",
+                        color: "#ffffff",
                         borderColor: theme.accentColor
                       } : {
                         backgroundColor: `${theme.accentColor}10`,
@@ -2930,7 +2897,7 @@ export default function App() {
                       className="glass-button py-1.5 px-2 text-[11px] font-urdu transition-all duration-300 border hover:scale-103 active:scale-95 disabled:opacity-45 disabled:cursor-not-allowed rounded-xl font-bold"
                       style={transformation === "urdu-writing" && polishedScript ? {
                         backgroundColor: theme.accentColor,
-                        color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000",
+                        color: "#ffffff",
                         borderColor: theme.accentColor
                       } : {
                         backgroundColor: `${theme.accentColor}10`,
@@ -2947,7 +2914,7 @@ export default function App() {
                       className="glass-button py-1.5 px-2 text-[9px] font-mono transition-all duration-300 border hover:scale-103 active:scale-95 disabled:opacity-45 disabled:cursor-not-allowed rounded-xl font-bold"
                       style={transformation === "english" && polishedScript ? {
                         backgroundColor: theme.accentColor,
-                        color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000",
+                        color: "#ffffff",
                         borderColor: theme.accentColor
                       } : {
                         backgroundColor: `${theme.accentColor}10`,
@@ -3022,10 +2989,10 @@ export default function App() {
             </div>
 
             {/* CINEMATIC STORYBOARD & SCENE PROMPT CREATOR SECTION */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mt-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-5">
               
               {/* SECTION 1: TRANSCRIPT INPUT */}
-              <div className="glass-card flex flex-col h-[480px] rounded-2xl overflow-hidden transition-all duration-300 border hover:border-white/30 backdrop-blur-xl" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor, boxShadow: panelShadow }}>
+              <div className="glass-card flex flex-col h-[480px] rounded-2xl overflow-hidden transition-all duration-300 border hover:border-white/30 backdrop-blur-xl" style={{ backgroundColor: theme.cardBg, borderColor: theme.cardBorderCode, boxShadow: panelShadow }}>
                 <div className="px-5 py-3 border-b flex flex-col xl:flex-row xl:items-start justify-between gap-3 glass-card" style={{ borderColor: `${theme.accentColor}30`, backgroundColor: `${theme.accentColor}08` }}>
                   <div className="flex flex-col gap-1">
                     <span className="text-xs font-mono font-extrabold tracking-wider flex items-center gap-2" style={{ color: theme.accentColor }}>
@@ -3099,7 +3066,7 @@ export default function App() {
                         className="glass-button py-1 px-3 rounded-xl font-mono text-[9px] font-extrabold tracking-wider uppercase transition-all duration-300 flex items-center gap-1 border cursor-pointer"
                         style={polishedScript ? {
                           backgroundColor: theme.accentColor,
-                          color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000",
+                          color: "#ffffff",
                           borderColor: theme.accentColor
                         } : {
                           color: "rgb(107, 114, 128)",
@@ -3334,7 +3301,7 @@ export default function App() {
               </div>
 
               {/* SECTION 2: GENERATED SCENE PROMPTS */}
-              <div className="glass-card flex flex-col h-[480px] rounded-2xl overflow-hidden relative transition-all duration-300 border hover:border-white/30 backdrop-blur-xl" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor, boxShadow: panelShadow }}>
+              <div className="glass-card flex flex-col h-[480px] rounded-2xl overflow-hidden relative transition-all duration-300 border hover:border-white/30 backdrop-blur-xl" style={{ backgroundColor: theme.cardBg, borderColor: theme.cardBorderCode, boxShadow: panelShadow }}>
                 <div className="px-5 py-3 border-b flex flex-col xl:flex-row xl:items-center justify-between gap-3 glass-card" style={{ borderColor: `${theme.accentColor}30`, backgroundColor: `${theme.accentColor}08` }}>
                   <span className="text-xs font-mono font-extrabold tracking-wider flex items-center gap-1.5" style={{ color: theme.accentColor }}>
                     <Sparkles className="h-4 w-4" style={{ color: theme.accentColor }} />
@@ -3349,7 +3316,7 @@ export default function App() {
                       className="glass-button py-1.5 px-4 rounded-xl font-mono text-[10px] font-black tracking-wider uppercase transition-all duration-300 flex items-center gap-1.5 border cursor-pointer"
                       style={transcriptInput.trim() && !scenesLoading ? {
                         backgroundColor: theme.accentColor,
-                        color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000",
+                        color: "#ffffff",
                         borderColor: theme.accentColor
                       } : {
                         color: "rgb(107, 114, 128)",
@@ -3465,7 +3432,7 @@ export default function App() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   
                   {/* Left Column: Video Transcript Input */}
-                  <div className="glass-card flex flex-col h-[480px] rounded-2xl overflow-hidden transition-all duration-300 border hover:border-white/30 backdrop-blur-xl" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor, boxShadow: panelShadow }}>
+                  <div className="glass-card flex flex-col h-[480px] rounded-2xl overflow-hidden transition-all duration-300 border hover:border-white/30 backdrop-blur-xl" style={{ backgroundColor: theme.cardBg, borderColor: theme.cardBorderCode, boxShadow: panelShadow }}>
                     <div className="px-5 py-3 border-b flex items-center justify-between glass-card" style={{ borderColor: `${theme.accentColor}30`, backgroundColor: `${theme.accentColor}08` }}>
                       <span className="text-xs font-mono font-extrabold tracking-wider flex items-center gap-2" style={{ color: theme.accentColor }}>
                         <FileText className="h-4 w-4" />
@@ -3482,7 +3449,7 @@ export default function App() {
                           className="glass-button py-1 px-2.5 rounded-xl font-mono text-[9px] font-extrabold tracking-tight flex items-center gap-1 border cursor-pointer transition-all"
                           style={polishedScript ? {
                             backgroundColor: theme.accentColor,
-                            color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000",
+                            color: "#ffffff",
                             borderColor: theme.accentColor
                           } : {
                             color: "rgb(107, 114, 128)",
@@ -3621,7 +3588,7 @@ export default function App() {
                   </div>
 
                   {/* Right Column: CTR YT & SM output */}
-                  <div className="glass-card flex flex-col h-[480px] rounded-2xl overflow-hidden relative transition-all duration-150 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor, boxShadow: panelShadow }}>
+                  <div className="glass-card flex flex-col h-[480px] rounded-2xl overflow-hidden relative transition-all duration-150 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.cardBorderCode, boxShadow: panelShadow }}>
                     <div className="px-4 py-3 border-b flex items-center justify-between glass-card" style={{ borderColor: `${theme.accentColor}30`, backgroundColor: `${theme.accentColor}08` }}>
                       <span className="text-xs font-mono font-extrabold tracking-wider flex items-center gap-1.5" style={{ color: theme.accentColor }}>
                         <Sparkles className="h-4 w-4" style={{ color: theme.accentColor }} />
@@ -3635,7 +3602,7 @@ export default function App() {
                           className="glass-button py-1 px-3 rounded-xl font-mono text-[9px] font-black tracking-wider uppercase transition-all duration-300 flex items-center gap-1 border cursor-pointer"
                           style={videoTranscriptInput.trim() && !ctrLoading ? {
                             backgroundColor: theme.accentColor,
-                            color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000",
+                            color: "#ffffff",
                             borderColor: theme.accentColor
                           } : {
                             backgroundColor: "transparent",
@@ -3881,7 +3848,7 @@ export default function App() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   
                   {/* Left Column: Thumbnail Transcript Input */}
-                  <div className="glass-card flex flex-col h-[480px] rounded-2xl overflow-hidden transition-all duration-150 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor, boxShadow: panelShadow }}>
+                  <div className="glass-card flex flex-col h-[480px] rounded-2xl overflow-hidden transition-all duration-150 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.cardBorderCode, boxShadow: panelShadow }}>
                     <div className="px-5 py-3 border-b flex items-center justify-between glass-card" style={{ borderColor: `${theme.accentColor}30`, backgroundColor: `${theme.accentColor}08` }}>
                       <span className="text-xs font-mono font-extrabold tracking-wider flex items-center gap-2" style={{ color: theme.accentColor }}>
                         <FileText className="h-4 w-4" />
@@ -3898,7 +3865,7 @@ export default function App() {
                           className="glass-button py-1 px-2.5 rounded-xl font-mono text-[9px] font-extrabold tracking-tight flex items-center gap-1 border cursor-pointer transition-all"
                           style={polishedScript ? {
                             backgroundColor: theme.accentColor,
-                            color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000",
+                            color: "#ffffff",
                             borderColor: theme.accentColor
                           } : {
                             color: "rgb(107, 114, 128)",
@@ -4076,7 +4043,7 @@ export default function App() {
                   </div>
 
                   {/* Right Column: YT Thumbnails Prompt output */}
-                  <div className="glass-card flex flex-col h-[480px] rounded-2xl overflow-hidden relative transition-all duration-150 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.accentColor, boxShadow: panelShadow }}>
+                  <div className="glass-card flex flex-col h-[480px] rounded-2xl overflow-hidden relative transition-all duration-150 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.cardBorderCode, boxShadow: panelShadow }}>
                     <div className="px-4 py-3 border-b flex items-center justify-between glass-card" style={{ borderColor: `${theme.accentColor}30`, backgroundColor: `${theme.accentColor}08` }}>
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-xs font-mono font-extrabold tracking-wider flex items-center gap-1.5 shrink-0" style={{ color: theme.accentColor }}>
@@ -4090,7 +4057,7 @@ export default function App() {
                           className="glass-button inline-flex items-center gap-1 text-[9px] font-mono px-2 py-0.5 rounded-full border font-bold cursor-pointer transition-all duration-300 hover:scale-105 active:scale-95 shrink-0"
                           style={{
                             backgroundColor: theme.accentColor,
-                            color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000",
+                            color: "#ffffff",
                             borderColor: theme.accentColor
                           }}
                           title="Open Google Flow Nano Banana 2 & Flux 1"
@@ -4107,7 +4074,7 @@ export default function App() {
                           className="glass-button py-1 px-3 rounded-xl font-mono text-[9px] font-black tracking-wider uppercase transition-all duration-300 flex items-center gap-1 border cursor-pointer"
                           style={thumbnailTranscriptInput.trim() && !thumbnailLoading ? {
                             backgroundColor: theme.accentColor,
-                            color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000",
+                            color: "#ffffff",
                             borderColor: theme.accentColor
                           } : {
                             backgroundColor: "transparent",
@@ -4178,7 +4145,7 @@ export default function App() {
                                       className="glass-button px-2 py-1 text-[10px] font-extrabold rounded-lg cursor-pointer transition-all flex items-center gap-1 border"
                                       style={{
                                         backgroundColor: theme.accentColor,
-                                        color: theme.cardBg.includes("bg-white") ? "#ffffff" : "#000000",
+                                        color: "#ffffff",
                                         borderColor: theme.accentColor
                                       }}
                                     >
@@ -4343,7 +4310,7 @@ export default function App() {
                         </div>
                       ) : (
                         <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-3">
-                          <div className="h-10 w-10 rounded-2xl border border-dashed flex items-center justify-center animate-pulse glass-card" style={{ borderColor: `${theme.accentColor}35`, color: theme.accentColor }}>
+                          <div className="h-10 w-10 rounded-2xl border border-dashed flex items-center justify-center glass-card" style={{ borderColor: `${theme.accentColor}35`, color: theme.accentColor }}>
                             <Sparkles className="h-5 w-5" />
                           </div>
                           <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: theme.textColor }}>Graphics Suite Empty</p>
@@ -4392,7 +4359,7 @@ export default function App() {
 
             {/* ERROR LOG PRESENTATION */}
             {error && (
-              <div className="glass-card p-4 rounded-2xl bg-red-950/20 border border-red-500/40 text-red-200 text-xs font-mono flex items-start gap-2.5 shadow-md animate-pulse">
+              <div className="glass-card p-4 rounded-2xl bg-red-950/20 border border-red-500/40 text-red-200 text-xs font-mono flex items-start gap-2.5 shadow-md">
                 <span className="h-2.5 w-2.5 rounded-xl bg-red-500 mt-1.5 shrink-0" />
                 <div className="space-y-1">
                   <p className="font-bold uppercase tracking-wider text-red-400">System Log Warning</p>
@@ -4410,7 +4377,7 @@ export default function App() {
                 boxShadow: panelShadow
               }}
             >
-              <RefreshCw className="h-5 w-5 shrink-0 animate-spin" style={{ animationDuration: "12s", color: theme.accentColor }} />
+              <RefreshCw className="h-5 w-5 shrink-0" style={{ color: theme.accentColor }} />
               <div className="space-y-0.5">
                 <p className="text-xs font-mono font-bold uppercase tracking-wider" style={{ color: theme.accentColor }}>
                   Guaranteed Dynamic Variations
@@ -4434,7 +4401,7 @@ export default function App() {
               color: theme.textColor,
               backgroundColor: `${theme.accentColor}12`,
               borderColor: `${theme.accentColor}35`,
-              boxShadow: theme.cardBg.includes("bg-white")
+              boxShadow: theme.isLight
                 ? "0 6px 16px -3px rgba(0,0,0,0.06)"
                 : "0 8px 20px -3px rgba(0,0,0,0.4)"
             }}

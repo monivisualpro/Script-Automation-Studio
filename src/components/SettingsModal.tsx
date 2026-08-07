@@ -35,9 +35,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
     updateModelSettings,
     availableModels,
     fetchAvailableModels,
-    currentTheme
+    currentTheme,
+    currentBrand
   } = useAuth();
-  const theme = getThemeConfig(currentTheme);
+  const theme = getThemeConfig(currentTheme, currentBrand);
 
   const [activeTab, setActiveTab] = useState<"models" | "api" | "account">("models");
   const [localModels, setLocalModels] = useState<FeatureModelConfig>(modelSettings);
@@ -110,21 +111,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
     }
   };
 
-  const isLight = currentTheme === "Pure Light";
-  const modalBg = isLight ? "#ffffff" : "#0d111a";
-  const modalTextColor = isLight ? "#0f172a" : "#f8fafc";
+  const isLight = theme.isLight;
+  const modalBg = isLight ? "#FFFFFF" : "#111111";
+  const modalTextColor = isLight ? "#000000" : "#FFFFFF";
 
   return (
-    <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto backdrop-blur-md ${isLight ? "bg-slate-200/80" : "bg-black/75"}`}>
+    <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto backdrop-blur-md ${isLight ? "bg-black/30" : "bg-black/75"}`}>
 
       <div 
         className="w-full max-w-2xl rounded-3xl p-6 sm:p-8 relative my-auto border transition-all duration-300" 
         style={{ 
           color: modalTextColor,
           backgroundColor: modalBg,
-          borderColor: theme.accentColor,
+          borderColor: isLight ? "#E5E5E5" : "#2A2A2A",
           boxShadow: isLight
-            ? "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)"
+            ? "0 20px 25px -5px rgba(0, 0, 0, 0.08), 0 10px 10px -5px rgba(0, 0, 0, 0.03)"
             : `0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 0 1px ${theme.accentColor}40, 0 0 20px ${theme.accentColor}15`
         }}
       >
@@ -134,8 +135,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
           className="absolute top-5 right-5 p-2.5 rounded-2xl transition-transform duration-150 hover:scale-105 active:scale-90 z-10 cursor-pointer border"
           style={{ 
             color: modalTextColor,
-            backgroundColor: isLight ? "#f1f5f9" : "#1e293b",
-            borderColor: isLight ? "#e2e8f0" : "rgba(255, 255, 255, 0.1)"
+            backgroundColor: isLight ? "#F7F7F7" : "#1A1A1A",
+            borderColor: isLight ? "#E5E5E5" : "#2A2A2A"
           }}
           title="Close modal"
         >
@@ -144,27 +145,27 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
 
         {/* Modal Title */}
         <div className="flex items-center gap-3 mb-6 relative z-10">
-          <div className="p-3 rounded-2xl border shadow-lg flex items-center justify-center" style={{ backgroundColor: isLight ? "#f8fafc" : "#1e293b", borderColor: `${theme.accentColor}60`, color: theme.accentColor }}>
+          <div className="p-3 rounded-2xl border shadow-lg flex items-center justify-center" style={{ backgroundColor: isLight ? "#F7F7F7" : "#1A1A1A", borderColor: isLight ? "#E5E5E5" : "#2A2A2A", color: theme.accentColor }}>
             <Sliders className="h-6 w-6" />
           </div>
           <div>
             <h3 className="text-xl font-extrabold font-sans tracking-tight" style={{ color: theme.accentColor }}>
               Settings & AI Preferences
             </h3>
-            <p className="text-xs font-mono opacity-80 mt-0.5" style={{ color: modalTextColor }}>
+            <p className="text-xs font-mono opacity-80 mt-0.5" style={{ color: isLight ? "#444444" : "#BDBDBD" }}>
               Configure per-feature AI models, API keys, and account details
             </p>
           </div>
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex rounded-full p-1.5 border mb-6 font-mono text-xs relative z-10" style={{ backgroundColor: isLight ? "#f1f5f9" : "rgba(0,0,0,0.3)", borderColor: isLight ? "#e2e8f0" : `${theme.accentColor}40` }}>
+        <div className="flex rounded-full p-1.5 border mb-6 font-mono text-xs relative z-10" style={{ backgroundColor: isLight ? "#F7F7F7" : "#1A1A1A", borderColor: isLight ? "#E5E5E5" : "#2A2A2A" }}>
           <button
             onClick={() => { setActiveTab("models"); setMessage(null); }}
             className="flex-1 py-2.5 rounded-full font-bold transition-all flex items-center justify-center gap-2 cursor-pointer"
             style={{
               backgroundColor: activeTab === "models" ? theme.accentColor : "transparent",
-              color: activeTab === "models" ? (isLight ? "#ffffff" : "#000000") : modalTextColor,
+              color: activeTab === "models" ? "#FFFFFF" : modalTextColor,
               boxShadow: activeTab === "models" ? `0 4px 15px ${theme.accentColor}50` : "none"
             }}
           >
@@ -176,7 +177,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
             className="flex-1 py-2.5 rounded-full font-bold transition-all flex items-center justify-center gap-2 cursor-pointer"
             style={{
               backgroundColor: activeTab === "api" ? theme.accentColor : "transparent",
-              color: activeTab === "api" ? (isLight ? "#ffffff" : "#000000") : modalTextColor,
+              color: activeTab === "api" ? "#FFFFFF" : modalTextColor,
               boxShadow: activeTab === "api" ? `0 4px 15px ${theme.accentColor}50` : "none"
             }}
           >
@@ -428,7 +429,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
               className="w-full py-3 px-4 rounded-2xl font-extrabold text-xs transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 mt-2"
               style={{
                 backgroundColor: theme.accentColor,
-                color: currentTheme === "Pure Light" ? "#ffffff" : "#000000"
+                color: "#ffffff"
               }}
             >
               {savingModels ? (
@@ -485,7 +486,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                   className="flex-1 py-2.5 px-3 rounded-xl font-bold text-xs transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
                   style={{
                     backgroundColor: theme.accentColor,
-                    color: isLight ? "#ffffff" : "#000000"
+                    color: "#ffffff"
                   }}
                 >
                   <Key className="h-3.5 w-3.5" />

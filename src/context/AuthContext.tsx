@@ -49,6 +49,8 @@ interface AuthContextType {
   fetchAvailableModels: () => Promise<void>;
   currentTheme: string;
   setCurrentTheme: (theme: string) => void;
+  currentBrand: string;
+  setCurrentBrand: (brand: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -75,8 +77,10 @@ const AuthContext = createContext<AuthContextType>({
   updateModelSettings: async () => {},
   availableModels: [],
   fetchAvailableModels: async () => {},
-  currentTheme: "Neon Green",
+  currentTheme: "Night",
   setCurrentTheme: () => {},
+  currentBrand: "orange",
+  setCurrentBrand: () => {},
 });
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -95,13 +99,48 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const saved = localStorage.getItem("script_automation_app_theme");
       if (saved) return saved;
     } catch {}
-    return "Neon Green";
+    return "Night";
   });
+  const [currentBrand, setCurrentBrandState] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem("script_automation_app_brand");
+      if (saved) return saved;
+    } catch {}
+    return "orange";
+  });
+
+  useEffect(() => {
+    if (currentTheme === "Day" || currentTheme === "Day Mode") {
+      document.body.classList.add("day-theme");
+      document.body.classList.remove("night-theme");
+    } else {
+      document.body.classList.add("night-theme");
+      document.body.classList.remove("day-theme");
+    }
+  }, [currentTheme]);
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-brand", currentBrand);
+    if (currentBrand === "blue") {
+      document.documentElement.style.setProperty("--color-primary", "#0B9EFE");
+      document.documentElement.style.setProperty("--color-secondary", "#FF3E00");
+    } else {
+      document.documentElement.style.setProperty("--color-primary", "#FF3E00");
+      document.documentElement.style.setProperty("--color-secondary", "#0B9EFE");
+    }
+  }, [currentBrand]);
 
   const setCurrentTheme = (theme: string) => {
     setCurrentThemeState(theme);
     try {
       localStorage.setItem("script_automation_app_theme", theme);
+    } catch {}
+  };
+
+  const setCurrentBrand = (brand: string) => {
+    setCurrentBrandState(brand);
+    try {
+      localStorage.setItem("script_automation_app_brand", brand);
     } catch {}
   };
 
@@ -295,6 +334,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         fetchAvailableModels,
         currentTheme,
         setCurrentTheme,
+        currentBrand,
+        setCurrentBrand,
       }}
     >
       {children}

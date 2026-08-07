@@ -1,11 +1,145 @@
-@import url('https://fonts.googleapis.com/css2?family=Noto+Nastaliq+Urdu:wght@400;700&family=Roboto+Mono:wght@400;500;700&family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@400;600;700;800&family=Noto+Nastaliq+Urdu:wght@400;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
+:root {
+  --color-primary: #FF3E00;
+  --color-secondary: #0B9EFE;
+}
+
+[data-brand="blue"] {
+  --color-primary: #0B9EFE;
+  --color-secondary: #FF3E00;
+}
+
 @theme {
-  --font-sans: "Roboto", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "Roboto Mono", "Roboto", ui-monospace, SFMono-Regular, monospace;
-  --font-display: "Roboto", sans-serif;
-  --font-urdu: "Noto Nastaliq Urdu", "Roboto", serif;
+  --font-sans: "Inter", "Sora", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", "Roboto Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-display: "Inter", "Sora", ui-sans-serif, system-ui, sans-serif;
+  --font-urdu: "Noto Nastaliq Urdu", "Inter", serif;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: #141414;
+  color: #FFFFFF;
+  line-height: 1.6;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+body.day-theme {
+  background-color: #FAFAFA !important;
+  color: #000000 !important;
+  font-weight: 450;
+}
+
+body.night-theme {
+  background-color: #141414 !important;
+  color: #FFFFFF !important;
+}
+
+/* Typography Hierarchy Utilities */
+.hero-title {
+  font-family: var(--font-display);
+  font-size: clamp(2.5rem, 5vw, 3.5rem); /* 40px - 56px */
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: -0.025em;
+}
+
+.page-title {
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 4vw, 2.5rem); /* 32px - 40px */
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+}
+
+.section-title {
+  font-family: var(--font-display);
+  font-size: clamp(1.375rem, 2.5vw, 1.75rem); /* 22px - 28px */
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.015em;
+}
+
+.card-title {
+  font-family: var(--font-display);
+  font-size: clamp(1.125rem, 2vw, 1.25rem); /* 18px - 20px */
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+}
+
+.body-text {
+  font-size: 0.9375rem; /* 15px - 16px */
+  line-height: 1.6;
+  font-weight: 400;
+}
+
+body.day-theme .body-text {
+  font-weight: 500;
+  color: #111111;
+}
+
+.secondary-text {
+  font-size: 0.875rem; /* 14px */
+  line-height: 1.5;
+  font-weight: 400;
+}
+
+body.day-theme .secondary-text {
+  color: #333333;
+}
+
+.label-text {
+  font-size: 0.84375rem; /* 13.5px */
+  line-height: 1.4;
+  font-weight: 500;
+}
+
+body.day-theme .label-text {
+  color: #111111;
+  font-weight: 600;
+}
+
+.button-text {
+  font-size: 0.90625rem; /* 14.5px */
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+}
+
+.caption-text {
+  font-size: 0.8125rem; /* 13px */
+  line-height: 1.5;
+  font-weight: 400;
+}
+
+body.day-theme .caption-text {
+  color: #444444;
+}
+
+.badge-text {
+  font-size: 0.75rem; /* 12px */
+  font-weight: 500;
+  line-height: 1;
+}
+
+/* Day Mode Readability Enhancements for Inputs & Forms */
+body.day-theme input,
+body.day-theme select,
+body.day-theme textarea {
+  color: #000000 !important;
+  font-weight: 500 !important;
+}
+
+body.day-theme input::placeholder,
+body.day-theme textarea::placeholder {
+  color: #555555 !important;
+  font-weight: 400 !important;
 }
 
 /* Fast lightweight scrollbars */
@@ -14,105 +148,128 @@
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.15);
+  background: #111111;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
+  background: #2A2A2A;
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.35);
+  background: var(--color-secondary);
+}
+
+body.day-theme ::-webkit-scrollbar-track {
+  background: #F5F5F5;
+}
+body.day-theme ::-webkit-scrollbar-thumb {
+  background: #D4D4D4;
 }
 
 /* Nastaliq Urdu style */
 .font-nastaliq {
-  font-family: "Noto Nastaliq Urdu", "Roboto", serif;
+  font-family: "Noto Nastaliq Urdu", "Inter", serif;
 }
 
-/* Static, high performance zero-lag utility styles */
-*, *::before, *::after {
-  animation: none !important;
-  transition: none !important;
-  box-shadow: none !important;
+/* Clean, crisp static UI styles - no aggressive animated glows */
+button, input, select, textarea, a {
+  box-shadow: none;
 }
 
 /* Ensure dropdown options have proper standard background and color states */
 select option {
-  background-color: #ffffff;
-  color: #000000;
-}
-.dark select option,
-[class*="bg-black"] select option,
-[class*="from-[#0"] select option {
-  background-color: #121212;
-  color: #ffffff;
+  background-color: #1A1A1A;
+  color: #FFFFFF;
+  border: none !important;
 }
 
-/* Fast, static transparent glossy glass styles similar to Guaranteed Dynamic Variations but without stroke/shadow */
+body.day-theme select option {
+  background-color: #FFFFFF !important;
+  color: #000000 !important;
+}
+
+/* Night Mode (Black/Dark Theme): Remove borders from all divs, selects, dropdown options, inputs, buttons, cards, headers */
+body:not(.day-theme) *,
+body.night-theme * {
+  border-color: transparent !important;
+}
+
+body:not(.day-theme) select,
+body:not(.day-theme) option,
+body.night-theme select,
+body.night-theme option {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Unified Enterprise Card / Panel utilities */
 .glass-panel {
-  background: rgba(255, 255, 255, 0.05) !important;
-  backdrop-filter: blur(8px) !important;
-  -webkit-backdrop-filter: blur(8px) !important;
+  background-color: #1A1A1A;
+  border-color: transparent;
+}
+
+body.day-theme .glass-panel {
+  background-color: #FFFFFF !important;
+  border-color: #E5E5E5 !important;
+  color: #000000 !important;
 }
 
 .glass-card {
-  background: rgba(255, 255, 255, 0.04) !important;
-  backdrop-filter: blur(8px) !important;
-  -webkit-backdrop-filter: blur(8px) !important;
+  background-color: #1A1A1A;
+  border-color: transparent;
+}
+
+body.day-theme .glass-card {
+  background-color: #FFFFFF !important;
+  border-color: #E5E5E5 !important;
+  color: #000000 !important;
 }
 
 .glass-button {
-  background: rgba(255, 255, 255, 0.08) !important;
-  backdrop-filter: blur(8px) !important;
-  -webkit-backdrop-filter: blur(8px) !important;
+  background-color: #111111;
+  border-color: transparent;
+  color: #FFFFFF;
+  font-weight: 600;
 }
 
-.glass-input {
-  background: rgba(0, 0, 0, 0.15) !important;
-  backdrop-filter: blur(8px) !important;
-  -webkit-backdrop-filter: blur(8px) !important;
+body.day-theme .glass-button {
+  background-color: #F5F5F5 !important;
+  border-color: #E5E5E5 !important;
+  color: #000000 !important;
+  font-weight: 600 !important;
 }
 
 .glass-button:hover:not(:disabled) {
-  opacity: 0.95;
+  border-color: var(--color-secondary) !important;
+  color: var(--color-secondary) !important;
 }
 
-.glass-button:active:not(:disabled) {
-  transform: scale(0.99);
+.glass-input {
+  background-color: #111111;
+  border-color: transparent;
+  color: #FFFFFF;
+}
+
+body.day-theme .glass-input {
+  background-color: #F5F5F5 !important;
+  border-color: #E5E5E5 !important;
+  color: #000000 !important;
+  font-weight: 500 !important;
+}
+
+body.day-theme .glass-input::placeholder {
+  color: #555555 !important;
 }
 
 .glass-input:focus {
-  background: rgba(0, 0, 0, 0.25) !important;
+  border-color: var(--color-secondary) !important;
+  outline: none !important;
 }
 
 .glow-on-hover:hover:not(:disabled) {
   opacity: 0.95 !important;
 }
 
-/* Pure Light Theme Overrides for Transparent Glossy Elements */
-[class*="from-[#F5F7FA]"] .glass-panel {
-  background: rgba(0, 0, 0, 0.04) !important;
-  backdrop-filter: blur(8px) !important;
-  -webkit-backdrop-filter: blur(8px) !important;
-}
 
-[class*="from-[#F5F7FA]"] .glass-card {
-  background: rgba(0, 0, 0, 0.03) !important;
-  backdrop-filter: blur(8px) !important;
-  -webkit-backdrop-filter: blur(8px) !important;
-}
-
-[class*="from-[#F5F7FA]"] .glass-button {
-  background: rgba(0, 0, 0, 0.06) !important;
-  backdrop-filter: blur(8px) !important;
-  -webkit-backdrop-filter: blur(8px) !important;
-}
-
-[class*="from-[#F5F7FA]"] .glass-input {
-  background: rgba(0, 0, 0, 0.05) !important;
-  color: #000000 !important;
-  backdrop-filter: blur(8px) !important;
-  -webkit-backdrop-filter: blur(8px) !important;
-}
 
 

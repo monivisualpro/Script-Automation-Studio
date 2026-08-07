@@ -101,8 +101,8 @@ export const ImageStudioModal: React.FC<ImageStudioModalProps> = ({
   onClose,
   initialPrompt = "",
 }) => {
-  const { idToken, profile, setIsApiKeyModalOpen, modelSettings, currentTheme } = useAuth();
-  const theme = getThemeConfig(currentTheme);
+  const { idToken, profile, setIsApiKeyModalOpen, modelSettings, currentTheme, currentBrand } = useAuth();
+  const theme = getThemeConfig(currentTheme, currentBrand);
 
   const [activeTab, setActiveTab] = useState<"generate" | "history">("generate");
   const [prompt, setPrompt] = useState<string>(initialPrompt);
@@ -346,42 +346,45 @@ export const ImageStudioModal: React.FC<ImageStudioModalProps> = ({
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const isLight = currentTheme === "Pure Light";
-  const modalBg = isLight ? "#ffffff" : "#0d111a";
-  const modalTextColor = isLight ? "#0f172a" : "#f8fafc";
+  const isLight = theme.isLight;
+  const modalBg = isLight ? "#FFFFFF" : "#1A1A1A";
+  const modalTextColor = isLight ? "#000000" : "#FFFFFF";
 
   if (!isOpen) return null;
 
   return (
-    <div className={`fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto backdrop-blur-md ${isLight ? "bg-slate-200/80" : "bg-black/75"}`}>
-
+    <div className={`fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto backdrop-blur-md ${isLight ? "bg-black/30" : "bg-black/85"}`}>
       <div 
-        className="w-full max-w-5xl rounded-3xl flex flex-col max-h-[92vh] sm:max-h-[90vh] overflow-hidden relative my-auto border transition-all duration-300" 
-        style={{ 
-          color: modalTextColor,
-          backgroundColor: modalBg,
-          borderColor: theme.accentColor,
-          boxShadow: isLight
-            ? "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)"
-            : `0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 0 1px ${theme.accentColor}40, 0 0 20px ${theme.accentColor}15`
-        }}
+        className={`w-full max-w-5xl rounded-2xl flex flex-col max-h-[92vh] sm:max-h-[90vh] overflow-hidden relative my-auto border shadow-2xl transition-all duration-300 ${
+          isLight ? "border-[#E5E5E5] bg-[#FFFFFF] text-[#000000]" : "border-[#2A2A2A] bg-[#1A1A1A] text-white"
+        }`}
       >
         {/* Header */}
-        <div className="px-4 py-3 sm:px-6 sm:py-4 border-b flex flex-wrap items-center justify-between gap-3 select-none relative z-10" style={{ borderColor: isLight ? "#e2e8f0" : "rgba(255,255,255,0.1)", backgroundColor: isLight ? "#f8fafc" : "rgba(0,0,0,0.2)" }}>
+        <div className={`px-4 py-3 sm:px-6 sm:py-4 border-b flex flex-wrap items-center justify-between gap-3 select-none relative z-10 ${
+          isLight ? "border-[#E5E5E5] bg-[#F7F7F7]" : "border-[#2A2A2A] bg-[#111111]"
+        }`}>
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-2xl border shadow-lg flex items-center justify-center shrink-0" style={{ backgroundColor: isLight ? "#ffffff" : "#1e293b", borderColor: `${theme.accentColor}60`, color: theme.accentColor }}>
+            <div 
+              className={`p-2.5 rounded-2xl border shadow-lg flex items-center justify-center shrink-0 ${
+                isLight ? "border-[#E5E5E5] bg-[#FFFFFF]" : "border-[#2A2A2A] bg-[#111111]"
+              }`}
+              style={{ color: theme.accentColor }}
+            >
               <Sparkles className="h-5 w-5" />
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-base sm:text-lg font-extrabold tracking-tight flex items-center gap-2" style={{ color: theme.accentColor }}>
+                <h2 className={`text-base sm:text-lg font-extrabold tracking-tight flex items-center gap-2 ${isLight ? "text-[#000000]" : "text-white"}`}>
                   <span>Google Flow Image Studio</span>
-                  <span className="text-[10px] font-mono px-2.5 py-0.5 rounded-full border font-bold shadow-sm" style={{ backgroundColor: `${theme.accentColor}25`, color: theme.accentColor, borderColor: `${theme.accentColor}60` }}>
+                  <span 
+                    className="text-[10px] font-mono px-2.5 py-0.5 rounded-full border font-bold shadow-sm"
+                    style={{ borderColor: `${theme.secondaryAccentColor}66`, backgroundColor: `${theme.secondaryAccentColor}1A`, color: theme.secondaryAccentColor }}
+                  >
                     Imagen 3 Native
                   </span>
                 </h2>
               </div>
-              <p className="text-xs font-mono opacity-80 mt-0.5" style={{ color: modalTextColor }}>
+              <p className={`text-xs font-mono mt-0.5 ${isLight ? "text-[#444444]" : "text-[#BDBDBD]"}`}>
                 Official Google AI Studio Imagen 3 Engine with AI Prompt Enhancement
               </p>
             </div>
@@ -389,16 +392,16 @@ export const ImageStudioModal: React.FC<ImageStudioModalProps> = ({
 
           <div className="flex items-center gap-2 shrink-0">
             {/* View Liquid Tab Switcher */}
-            <div className="flex p-1.5 rounded-full border" style={{ borderColor: isLight ? "#cbd5e1" : `${theme.accentColor}40`, backgroundColor: isLight ? "#f1f5f9" : "rgba(0,0,0,0.3)" }}>
+            <div className={`flex p-1.5 rounded-full border ${isLight ? "border-[#E5E5E5] bg-[#FFFFFF]" : "border-[#2A2A2A] bg-[#111111]"}`}>
               <button
                 type="button"
                 onClick={() => setActiveTab("generate")}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-mono transition-all duration-300 cursor-pointer font-bold"
-                style={{
-                  backgroundColor: activeTab === "generate" ? theme.accentColor : "transparent",
-                  color: activeTab === "generate" ? (isLight ? "#ffffff" : "#000000") : modalTextColor,
-                  boxShadow: activeTab === "generate" ? `0 4px 15px ${theme.accentColor}50` : "none"
-                }}
+                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-mono transition-all duration-300 cursor-pointer font-bold ${
+                  activeTab === "generate" 
+                    ? "text-white shadow-md" 
+                    : (isLight ? "text-[#444444] hover:text-[#000000]" : "text-[#BDBDBD] hover:text-white")
+                }`}
+                style={activeTab === "generate" ? { backgroundColor: theme.accentColor } : {}}
               >
                 <Wand2 className="h-3.5 w-3.5" />
                 <span>Studio</span>
@@ -406,12 +409,12 @@ export const ImageStudioModal: React.FC<ImageStudioModalProps> = ({
               <button
                 type="button"
                 onClick={() => setActiveTab("history")}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-mono transition-all duration-300 cursor-pointer font-bold"
-                style={{
-                  backgroundColor: activeTab === "history" ? theme.accentColor : "transparent",
-                  color: activeTab === "history" ? (isLight ? "#ffffff" : "#000000") : modalTextColor,
-                  boxShadow: activeTab === "history" ? `0 4px 15px ${theme.accentColor}50` : "none"
-                }}
+                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-mono transition-all duration-300 cursor-pointer font-bold ${
+                  activeTab === "history" 
+                    ? "text-white shadow-md" 
+                    : (isLight ? "text-[#444444] hover:text-[#000000]" : "text-[#BDBDBD] hover:text-white")
+                }`}
+                style={activeTab === "history" ? { backgroundColor: theme.accentColor } : {}}
               >
                 <History className="h-3.5 w-3.5" />
                 <span>Gallery ({history.length})</span>
@@ -421,8 +424,9 @@ export const ImageStudioModal: React.FC<ImageStudioModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="p-2.5 rounded-2xl border transition-transform duration-200 hover:scale-110 active:scale-90 cursor-pointer"
-              style={{ color: modalTextColor, backgroundColor: isLight ? "#f1f5f9" : "#1e293b", borderColor: isLight ? "#cbd5e1" : "rgba(255,255,255,0.2)" }}
+              className={`p-2.5 rounded-xl border transition-all cursor-pointer ${
+                isLight ? "border-[#E5E5E5] bg-[#FFFFFF] text-[#000000]" : "border-[#2A2A2A] bg-[#111111] text-white"
+              }`}
               title="Close Image Studio"
             >
               <X className="h-5 w-5" />
@@ -431,9 +435,11 @@ export const ImageStudioModal: React.FC<ImageStudioModalProps> = ({
         </div>
 
         {/* Notice Banner explaining Official Integration Architecture */}
-        <div className="border-b px-4 py-2 text-[11px] font-mono flex flex-wrap items-center justify-between gap-2 relative z-10" style={{ borderColor: isLight ? "#cbd5e1" : `${theme.accentColor}25`, backgroundColor: isLight ? "#f8fafc" : "rgba(0,0,0,0.15)", color: modalTextColor }}>
+        <div className={`border-b px-4 py-2 text-[11px] font-mono flex flex-wrap items-center justify-between gap-2 relative z-10 ${
+          isLight ? "border-[#E5E5E5] bg-[#F0F0F0] text-[#444444]" : "border-[#2A2A2A] bg-[#000000] text-[#BDBDBD]"
+        }`}>
           <div className="flex items-center gap-2">
-            <Info className="h-3.5 w-3.5 shrink-0" style={{ color: theme.accentColor }} />
+            <Info className="h-3.5 w-3.5 shrink-0" style={{ color: theme.secondaryAccentColor }} />
             <span>
               <strong>Google Flow Sync Architecture:</strong> Runs directly via official Google AI Studio Imagen 3 API with full theme synchronization.
             </span>
@@ -443,7 +449,7 @@ export const ImageStudioModal: React.FC<ImageStudioModalProps> = ({
             target="_blank"
             rel="noreferrer"
             className="hover:underline flex items-center gap-1 shrink-0 font-bold"
-            style={{ color: theme.accentColor }}
+            style={{ color: theme.secondaryAccentColor }}
           >
             <span>Docs</span>
           </a>
@@ -452,12 +458,15 @@ export const ImageStudioModal: React.FC<ImageStudioModalProps> = ({
         {/* Modal Body Content */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
           {error && (
-            <div className="p-4 rounded-2xl bg-red-950/80 border border-red-800/80 text-red-200 text-xs font-mono flex items-center justify-between gap-3">
+            <div 
+              className="p-4 rounded-2xl border text-xs font-mono flex items-center justify-between gap-3"
+              style={{ backgroundColor: `${theme.accentColor}1A`, borderColor: theme.accentColor, color: theme.accentColor }}
+            >
               <div className="flex items-center gap-2">
-                <Info className="h-4 w-4 text-red-400 shrink-0" />
+                <Info className="h-4 w-4 shrink-0" style={{ color: theme.accentColor }} />
                 <span>{error}</span>
               </div>
-              <button onClick={() => setError(null)} className="text-red-400 hover:text-white">
+              <button onClick={() => setError(null)} style={{ color: theme.accentColor }}>
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -469,25 +478,20 @@ export const ImageStudioModal: React.FC<ImageStudioModalProps> = ({
               <div className="lg:col-span-6 space-y-5">
                 {/* Domain / Niche Field */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold font-mono flex items-center justify-between" style={{ color: modalTextColor }}>
+                  <label className={`text-xs font-bold font-mono flex items-center justify-between ${isLight ? "text-[#444444]" : "text-[#BDBDBD]"}`}>
                     <span className="flex items-center gap-1.5">
-                      <Globe className="h-3.5 w-3.5" style={{ color: theme.accentColor }} />
+                      <Globe className="h-3.5 w-3.5" style={{ color: theme.secondaryAccentColor }} />
                       <span>Domain / Niche</span>
                     </span>
-                    <span className="text-[10px] font-mono font-bold" style={{ color: theme.accentColor }}>Synced with Main Suite</span>
+                    <span className="text-[10px] font-mono font-bold" style={{ color: theme.secondaryAccentColor }}>Synced with Main Suite</span>
                   </label>
                   <select
                     value={domain}
                     onChange={(e) => setDomain(e.target.value)}
-                    className="w-full p-2.5 rounded-xl border text-xs font-mono focus:outline-none transition-all cursor-pointer"
-                    style={{
-                      backgroundColor: isLight ? "#ffffff" : "rgba(0,0,0,0.5)",
-                      borderColor: isLight ? "#cbd5e1" : `${theme.accentColor}40`,
-                      color: modalTextColor
-                    }}
+                    className={`w-full p-2.5 rounded-xl border text-xs font-mono focus:outline-none transition-all cursor-pointer ${isLight ? "border-[#E5E5E5] bg-[#F5F5F5] text-[#000000]" : "border-[#2A2A2A] bg-[#111111] text-white"}`}
                   >
                     {STUDIO_CATEGORIES.map((cat) => (
-                      <option key={cat} value={cat} style={{ backgroundColor: isLight ? "#ffffff" : "#1e293b", color: isLight ? "#0f172a" : "#ffffff" }}>{cat}</option>
+                      <option key={cat} value={cat} className={isLight ? "bg-[#FFFFFF] text-[#000000]" : "bg-[#111111] text-white"}>{cat}</option>
                     ))}
                   </select>
                 </div>
@@ -495,36 +499,31 @@ export const ImageStudioModal: React.FC<ImageStudioModalProps> = ({
                 {/* Prompt Input Box with Magic Enhancer */}
                 <div className="space-y-2">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <label className="text-xs font-bold font-mono flex items-center gap-1.5" style={{ color: modalTextColor }}>
+                    <label className={`text-xs font-bold font-mono flex items-center gap-1.5 ${isLight ? "text-[#444444]" : "text-[#BDBDBD]"}`}>
                       <Wand2 className="h-3.5 w-3.5" style={{ color: theme.accentColor }} />
                       <span>Image Prompt</span>
                     </label>
                     <div className="flex items-center gap-2 flex-wrap">
-                      <label className="px-2.5 py-1 rounded-xl border transition-all cursor-pointer text-[11px] font-mono flex items-center gap-1" style={{ backgroundColor: isLight ? "#f1f5f9" : `${theme.accentColor}15`, borderColor: isLight ? "#cbd5e1" : `${theme.accentColor}40`, color: modalTextColor }}>
-                        <Upload className="h-3 w-3" style={{ color: theme.accentColor }} />
+                      <label className={`px-2.5 py-1 rounded-xl border transition-all cursor-pointer text-[11px] font-mono flex items-center gap-1 ${isLight ? "border-[#E5E5E5] bg-[#F5F5F5] text-[#444444] hover:text-[#000000]" : "border-[#2A2A2A] bg-[#111111] text-[#BDBDBD] hover:text-white"}`}>
+                        <Upload className="h-3 w-3" style={{ color: theme.secondaryAccentColor }} />
                         <span>Import (.txt/.pdf)</span>
                         <input type="file" accept=".txt,.pdf" onChange={handleImportPromptFile} className="hidden" />
                       </label>
                       <button
                         type="button"
                         onClick={handleInsertPrompt}
-                        className="px-2.5 py-1 rounded-xl border transition-all cursor-pointer text-[11px] font-mono flex items-center gap-1"
-                        style={{ backgroundColor: isLight ? "#f1f5f9" : `${theme.accentColor}15`, borderColor: isLight ? "#cbd5e1" : `${theme.accentColor}40`, color: modalTextColor }}
+                        className={`px-2.5 py-1 rounded-xl border transition-all cursor-pointer text-[11px] font-mono flex items-center gap-1 ${isLight ? "border-[#E5E5E5] bg-[#F5F5F5] text-[#444444] hover:text-[#000000]" : "border-[#2A2A2A] bg-[#111111] text-[#BDBDBD] hover:text-white"}`}
                         title="Insert prompt from generated YT Thumbnail generator"
                       >
-                        <FileText className="h-3 w-3" style={{ color: theme.accentColor }} />
+                        <FileText className="h-3 w-3" style={{ color: theme.secondaryAccentColor }} />
                         <span>Insert</span>
                       </button>
                       <button
                         type="button"
                         onClick={handleEnhancePrompt}
                         disabled={enhancing || !prompt.trim()}
-                        className="px-2.5 py-1 rounded-xl border transition-all cursor-pointer text-[11px] font-mono font-bold flex items-center gap-1.5 disabled:opacity-50"
-                        style={{
-                          backgroundColor: theme.accentColor,
-                          color: isLight ? "#ffffff" : "#000000",
-                          borderColor: theme.accentColor
-                        }}
+                        className="px-2.5 py-1 rounded-xl border text-white transition-all cursor-pointer text-[11px] font-mono font-bold flex items-center gap-1.5 disabled:opacity-50"
+                        style={{ backgroundColor: theme.secondaryAccentColor, borderColor: theme.secondaryAccentColor }}
                         title="AI Expand raw text into a detailed Google Flow prompt"
                       >
                         {enhancing ? (
@@ -547,37 +546,32 @@ export const ImageStudioModal: React.FC<ImageStudioModalProps> = ({
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
                     placeholder="Describe your vision (e.g. A hyper-realistic YouTube thumbnail of a creator holding a cup of tea with glowing energy, cinematic studio lighting...)"
-                    className="w-full p-3.5 rounded-2xl border text-sm focus:outline-none transition-all resize-none font-sans"
-                    style={{
-                      backgroundColor: isLight ? "#ffffff" : "rgba(0,0,0,0.5)",
-                      borderColor: isLight ? "#cbd5e1" : `${theme.accentColor}40`,
-                      color: modalTextColor
-                    }}
+                    className={`w-full p-3.5 rounded-2xl border text-sm focus:outline-none transition-all resize-none font-sans ${isLight ? "border-[#E5E5E5] bg-[#F5F5F5] text-[#000000] placeholder:text-[#666666]" : "border-[#2A2A2A] bg-[#111111] text-white placeholder:text-gray-500"}`}
                   />
                 </div>
 
                 {/* Import Reference / Sample Image Box */}
                 <div className="space-y-2">
-                  <label className="text-xs font-bold font-mono flex items-center justify-between" style={{ color: modalTextColor }}>
+                  <label className={`text-xs font-bold font-mono flex items-center justify-between ${isLight ? "text-[#444444]" : "text-[#BDBDBD]"}`}>
                     <span className="flex items-center gap-1.5">
-                      <ImagePlus className="h-3.5 w-3.5" style={{ color: theme.accentColor }} />
+                      <ImagePlus className="h-3.5 w-3.5" style={{ color: theme.secondaryAccentColor }} />
                       <span>Import Reference / Sample Image</span>
                     </span>
                     <span className="text-[10px] opacity-70 font-normal">Optional Subject / Style Guide</span>
                   </label>
 
                   {referenceImage ? (
-                    <div className="p-3 rounded-2xl border flex items-center justify-between gap-3" style={{ backgroundColor: isLight ? "#f8fafc" : `${theme.accentColor}15`, borderColor: isLight ? "#cbd5e1" : `${theme.accentColor}50` }}>
+                    <div className={`p-3 rounded-2xl border flex items-center justify-between gap-3 ${isLight ? "border-[#E5E5E5] bg-[#F5F5F5]" : "border-[#2A2A2A] bg-[#111111]"}`}>
                       <div className="flex items-center gap-3 overflow-hidden">
                         <img
                           src={referenceImage.data}
                           alt="Reference Sample"
                           className="w-12 h-12 object-cover rounded-xl border shrink-0"
-                          style={{ borderColor: theme.accentColor }}
+                          style={{ borderColor: theme.secondaryAccentColor }}
                         />
                         <div className="min-w-0">
-                          <p className="text-xs font-mono font-bold truncate" style={{ color: modalTextColor }}>{referenceImage.name}</p>
-                          <p className="text-[10px] font-mono font-bold" style={{ color: theme.accentColor }}>
+                          <p className="text-xs font-mono font-bold truncate text-white">{referenceImage.name}</p>
+                          <p className="text-[10px] font-mono font-bold" style={{ color: theme.secondaryAccentColor }}>
                             Reference Image Attached ✓
                           </p>
                         </div>
@@ -585,25 +579,26 @@ export const ImageStudioModal: React.FC<ImageStudioModalProps> = ({
                       <button
                         type="button"
                         onClick={() => setReferenceImage(null)}
-                        className="p-1.5 rounded-xl bg-red-950/80 text-red-300 border border-red-800 hover:bg-red-900 hover:text-white transition-all cursor-pointer shrink-0"
+                        className="p-1.5 rounded-xl border transition-all cursor-pointer shrink-0"
+                        style={{ backgroundColor: `${theme.accentColor}33`, color: theme.accentColor, borderColor: theme.accentColor }}
                         title="Remove reference image"
                       >
                         <X className="h-4 w-4" />
                       </button>
                     </div>
                   ) : (
-                    <label className="block p-3.5 rounded-2xl border border-dashed transition-all cursor-pointer text-center group" style={{ backgroundColor: isLight ? "#ffffff" : "rgba(0,0,0,0.3)", borderColor: isLight ? "#cbd5e1" : `${theme.accentColor}40` }}>
+                    <label className={`block p-3.5 rounded-2xl border border-dashed transition-all cursor-pointer text-center ${isLight ? "border-[#E5E5E5] bg-[#F5F5F5]" : "border-[#2A2A2A] bg-[#111111]"}`}>
                       <input
                         type="file"
                         accept="image/*"
                         onChange={handleReferenceImageUpload}
                         className="hidden"
                       />
-                      <div className="flex items-center justify-center gap-2 text-xs font-mono" style={{ color: modalTextColor }}>
-                        <Upload className="h-4 w-4" style={{ color: theme.accentColor }} />
+                      <div className="flex items-center justify-center gap-2 text-xs font-mono text-[#BDBDBD]">
+                        <Upload className="h-4 w-4" style={{ color: theme.secondaryAccentColor }} />
                         <span>Click to Upload Creator Photo, Style Sample, or Thumbnail Base</span>
                       </div>
-                      <p className="text-[10px] opacity-60 font-mono mt-1">
+                      <p className="text-[10px] text-[#BDBDBD] opacity-60 font-mono mt-1">
                         PNG, JPG, or WEBP up to 8MB. Gemini image models will match subject features & style.
                       </p>
                     </label>
@@ -612,22 +607,17 @@ export const ImageStudioModal: React.FC<ImageStudioModalProps> = ({
 
                 {/* Style Presets Dropdown */}
                 <div className="space-y-2">
-                  <label className="text-xs font-bold font-mono flex items-center gap-1.5" style={{ color: modalTextColor }}>
+                  <label className={`text-xs font-bold font-mono flex items-center gap-1.5 ${isLight ? "text-[#444444]" : "text-[#BDBDBD]"}`}>
                     <Layers className="h-3.5 w-3.5" style={{ color: theme.accentColor }} />
                     <span>Style Preset</span>
                   </label>
                   <select
                     value={selectedStyle}
                     onChange={(e) => setSelectedStyle(e.target.value)}
-                    className="w-full p-3 rounded-2xl border text-xs font-mono focus:outline-none transition-all cursor-pointer"
-                    style={{
-                      backgroundColor: isLight ? "#ffffff" : "rgba(0,0,0,0.5)",
-                      borderColor: isLight ? "#cbd5e1" : `${theme.accentColor}40`,
-                      color: modalTextColor
-                    }}
+                    className={`w-full p-3 rounded-2xl border text-xs font-mono focus:outline-none transition-all cursor-pointer ${isLight ? "border-[#E5E5E5] bg-[#F5F5F5] text-[#000000]" : "border-[#2A2A2A] bg-[#111111] text-white"}`}
                   >
                     {STYLE_PRESETS.map((preset) => (
-                      <option key={preset.id} value={preset.id} style={{ backgroundColor: isLight ? "#ffffff" : "#1e293b", color: isLight ? "#0f172a" : "#ffffff" }}>
+                      <option key={preset.id} value={preset.id} className={isLight ? "bg-[#FFFFFF] text-[#000000]" : "bg-[#111111] text-white"}>
                         {preset.name}
                       </option>
                     ))}
@@ -636,8 +626,8 @@ export const ImageStudioModal: React.FC<ImageStudioModalProps> = ({
 
                 {/* Aspect Ratio Picker */}
                 <div className="space-y-2">
-                  <label className="text-xs font-bold font-mono flex items-center gap-1.5" style={{ color: modalTextColor }}>
-                    <Sliders className="h-3.5 w-3.5" style={{ color: theme.accentColor }} />
+                  <label className={`text-xs font-bold font-mono flex items-center gap-1.5 ${isLight ? "text-[#444444]" : "text-[#BDBDBD]"}`}>
+                    <Sliders className="h-3.5 w-3.5" style={{ color: theme.secondaryAccentColor }} />
                     <span>Aspect Ratio</span>
                   </label>
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
@@ -646,15 +636,19 @@ export const ImageStudioModal: React.FC<ImageStudioModalProps> = ({
                         key={ar.id}
                         type="button"
                         onClick={() => setAspectRatio(ar.id)}
-                        className="p-2.5 rounded-2xl border text-left transition-all cursor-pointer flex flex-col items-center justify-center text-center gap-1"
-                        style={{
-                          backgroundColor: aspectRatio === ar.id ? `${theme.accentColor}25` : (isLight ? "#f1f5f9" : "rgba(0,0,0,0.3)"),
-                          borderColor: aspectRatio === ar.id ? theme.accentColor : (isLight ? "#cbd5e1" : `${theme.accentColor}30`),
-                          color: modalTextColor
-                        }}
+                        className={`p-2.5 rounded-2xl border text-left transition-all cursor-pointer flex flex-col items-center justify-center text-center gap-1 ${
+                          aspectRatio === ar.id 
+                            ? "text-white shadow-md" 
+                            : (isLight ? "bg-[#F5F5F5] border-[#E5E5E5] text-[#444444]" : "bg-[#111111] border-[#2A2A2A] text-[#BDBDBD]")
+                        }`}
+                        style={
+                          aspectRatio === ar.id
+                            ? { backgroundColor: `${theme.secondaryAccentColor}33`, borderColor: theme.secondaryAccentColor }
+                            : {}
+                        }
                       >
                         <span className="text-base">{ar.icon}</span>
-                        <span className="text-xs font-bold font-mono" style={{ color: aspectRatio === ar.id ? theme.accentColor : modalTextColor }}>{ar.id}</span>
+                        <span className="text-xs font-bold font-mono" style={{ color: aspectRatio === ar.id ? theme.secondaryAccentColor : "#FFFFFF" }}>{ar.id}</span>
                         <span className="text-[9px] opacity-70 truncate w-full">{ar.desc}</span>
                       </button>
                     ))}
@@ -663,44 +657,39 @@ export const ImageStudioModal: React.FC<ImageStudioModalProps> = ({
 
                 {/* Model Selection */}
                 <div className="space-y-2">
-                  <label className="text-xs font-bold font-mono flex items-center justify-between" style={{ color: modalTextColor }}>
+                  <label className={`text-xs font-bold font-mono flex items-center justify-between ${isLight ? "text-[#444444]" : "text-[#BDBDBD]"}`}>
                     <span className="flex items-center gap-1.5">
-                      <Globe className="h-3.5 w-3.5" style={{ color: theme.accentColor }} />
+                      <Globe className="h-3.5 w-3.5" style={{ color: theme.secondaryAccentColor }} />
                       <span>Google AI Image Model</span>
                     </span>
-                    <span className="text-[10px] font-normal" style={{ color: theme.accentColor }}>
+                    <span className="text-[10px] font-normal" style={{ color: theme.secondaryAccentColor }}>
                       Synced from Preferences
                     </span>
                   </label>
                   <select
                     value={model}
                     onChange={(e) => setModel(e.target.value)}
-                    className="w-full p-3 rounded-2xl border text-xs font-mono focus:outline-none transition-all cursor-pointer"
-                    style={{
-                      backgroundColor: isLight ? "#ffffff" : "rgba(0,0,0,0.5)",
-                      borderColor: isLight ? "#cbd5e1" : `${theme.accentColor}40`,
-                      color: modalTextColor
-                    }}
+                    className={`w-full p-3 rounded-2xl border text-xs font-mono focus:outline-none transition-all cursor-pointer ${isLight ? "border-[#E5E5E5] bg-[#F5F5F5] text-[#000000]" : "border-[#2A2A2A] bg-[#111111] text-white"}`}
                   >
-                    <option value="gemini-3.1-flash-image" style={{ backgroundColor: isLight ? "#ffffff" : "#1e293b", color: isLight ? "#0f172a" : "#ffffff" }}>
+                    <option value="gemini-3.1-flash-image" className={isLight ? "bg-[#FFFFFF] text-[#000000]" : "bg-[#111111] text-white"}>
                       Gemini 3.1 Flash Image (Balanced & High Quality)
                     </option>
-                    <option value="gemini-3-pro-image" style={{ backgroundColor: isLight ? "#ffffff" : "#1e293b", color: isLight ? "#0f172a" : "#ffffff" }}>
+                    <option value="gemini-3-pro-image" className={isLight ? "bg-[#FFFFFF] text-[#000000]" : "bg-[#111111] text-white"}>
                       Gemini 3 Pro Image (Maximum Detail & Realism)
                     </option>
-                    <option value="gemini-3.1-flash-lite-image" style={{ backgroundColor: isLight ? "#ffffff" : "#1e293b", color: isLight ? "#0f172a" : "#ffffff" }}>
+                    <option value="gemini-3.1-flash-lite-image" className={isLight ? "bg-[#FFFFFF] text-[#000000]" : "bg-[#111111] text-white"}>
                       Gemini 3.1 Flash Lite Image (Ultra Speed)
                     </option>
-                    <option value="imagen-3.0-generate-002" style={{ backgroundColor: isLight ? "#ffffff" : "#1e293b", color: isLight ? "#0f172a" : "#ffffff" }}>
+                    <option value="imagen-3.0-generate-002" className={isLight ? "bg-[#FFFFFF] text-[#000000]" : "bg-[#111111] text-white"}>
                       Imagen 3 Studio (High-Res Photorealistic)
                     </option>
-                    <option value="imagen-3.0-fast-generate-001" style={{ backgroundColor: isLight ? "#ffffff" : "#1e293b", color: isLight ? "#0f172a" : "#ffffff" }}>
+                    <option value="imagen-3.0-fast-generate-001" className={isLight ? "bg-[#FFFFFF] text-[#000000]" : "bg-[#111111] text-white"}>
                       Imagen 3 Fast (Rapid Generation)
                     </option>
-                    <option value="nano-banana-2" style={{ backgroundColor: isLight ? "#ffffff" : "#1e293b", color: isLight ? "#0f172a" : "#ffffff" }}>
+                    <option value="nano-banana-2" className={isLight ? "bg-[#FFFFFF] text-[#000000]" : "bg-[#111111] text-white"}>
                       Nano banana 2 (High Fidelity & Speed)
                     </option>
-                    <option value="nano-banana-pro" style={{ backgroundColor: isLight ? "#ffffff" : "#1e293b", color: isLight ? "#0f172a" : "#ffffff" }}>
+                    <option value="nano-banana-pro" className={isLight ? "bg-[#FFFFFF] text-[#000000]" : "bg-[#111111] text-white"}>
                       Nano Banana Pro (Professional Creator Studio)
                     </option>
                   </select>
@@ -711,18 +700,18 @@ export const ImageStudioModal: React.FC<ImageStudioModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setShowAdvanced(!showAdvanced)}
-                    className="text-xs font-mono flex items-center gap-1.5 transition-colors cursor-pointer opacity-80 hover:opacity-100"
-                    style={{ color: theme.accentColor }}
+                    className="text-xs font-mono flex items-center gap-1.5 transition-colors cursor-pointer hover:underline"
+                    style={{ color: theme.secondaryAccentColor }}
                   >
                     <SlidersHorizontal className="h-3.5 w-3.5" />
                     <span>{showAdvanced ? "Hide Advanced Settings" : "Show Advanced Settings (Negative Prompt, Batch Size)"}</span>
                   </button>
 
                   {showAdvanced && (
-                    <div className="mt-3 p-4 rounded-2xl border space-y-4" style={{ backgroundColor: isLight ? "#f8fafc" : "rgba(0,0,0,0.4)", borderColor: isLight ? "#cbd5e1" : `${theme.accentColor}30` }}>
+                    <div className={`mt-3 p-4 rounded-2xl border space-y-4 ${isLight ? "border-[#E5E5E5] bg-[#F5F5F5]" : "border-[#2A2A2A] bg-[#111111]"}`}>
                       {/* Negative Prompt */}
                       <div>
-                        <label className="text-[11px] font-mono block mb-1 opacity-80">
+                        <label className="text-[11px] font-mono block mb-1 text-[#BDBDBD]">
                           Negative Prompt (Items to exclude)
                         </label>
                         <input
@@ -730,19 +719,14 @@ export const ImageStudioModal: React.FC<ImageStudioModalProps> = ({
                           value={negativePrompt}
                           onChange={(e) => setNegativePrompt(e.target.value)}
                           placeholder="e.g. text, blur, low resolution, extra limbs, ugly"
-                          className="w-full p-2.5 rounded-xl border text-xs focus:outline-none"
-                          style={{
-                            backgroundColor: isLight ? "#ffffff" : "rgba(0,0,0,0.5)",
-                            borderColor: isLight ? "#cbd5e1" : `${theme.accentColor}40`,
-                            color: modalTextColor
-                          }}
+                          className={`w-full p-2.5 rounded-xl border text-xs focus:outline-none ${isLight ? "border-[#E5E5E5] bg-[#FFFFFF] text-[#000000]" : "border-[#2A2A2A] bg-[#000000] text-white"}`}
                         />
                       </div>
 
                       {/* Number of Samples */}
                       <div>
-                        <div className="flex items-center justify-between text-[11px] font-mono mb-1">
-                          <span className="opacity-80">Images to Generate:</span>
+                        <div className="flex items-center justify-between text-[11px] font-mono mb-1 text-[#BDBDBD]">
+                          <span>Images to Generate:</span>
                           <span className="font-bold" style={{ color: theme.accentColor }}>{numberOfImages}</span>
                         </div>
                         <input
@@ -752,7 +736,6 @@ export const ImageStudioModal: React.FC<ImageStudioModalProps> = ({
                           value={numberOfImages}
                           onChange={(e) => setNumberOfImages(parseInt(e.target.value))}
                           className="w-full cursor-pointer"
-                          style={{ accentColor: theme.accentColor }}
                         />
                       </div>
                     </div>
@@ -764,11 +747,8 @@ export const ImageStudioModal: React.FC<ImageStudioModalProps> = ({
                   type="button"
                   onClick={handleGenerate}
                   disabled={loading || !prompt.trim()}
-                  className="w-full py-3.5 px-6 rounded-2xl font-extrabold text-sm transition-all cursor-pointer shadow-lg flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-50"
-                  style={{
-                    backgroundColor: theme.accentColor,
-                    color: isLight ? "#ffffff" : "#000000"
-                  }}
+                  className="w-full py-3.5 px-6 rounded-2xl font-extrabold text-sm transition-all cursor-pointer shadow-lg flex items-center justify-center gap-2 border text-white disabled:opacity-50"
+                  style={{ backgroundColor: theme.accentColor, borderColor: theme.accentColor }}
                 >
                   {loading ? (
                     <>
@@ -787,38 +767,38 @@ export const ImageStudioModal: React.FC<ImageStudioModalProps> = ({
               {/* Right Output Gallery Stage Column */}
               <div className="lg:col-span-6 flex flex-col space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-bold font-mono flex items-center gap-1.5" style={{ color: modalTextColor }}>
+                  <h3 className={`text-xs font-bold font-mono flex items-center gap-1.5 ${isLight ? "text-[#444444]" : "text-[#BDBDBD]"}`}>
                     <ImageIcon className="h-3.5 w-3.5" style={{ color: theme.accentColor }} />
                     <span>Generated Results</span>
                   </h3>
                   {generatedImages.length > 0 && (
-                    <span className="text-[10px] font-mono opacity-70">
+                    <span className="text-[10px] font-mono text-[#BDBDBD]">
                       {generatedImages.length} image(s) generated
                     </span>
                   )}
                 </div>
 
                 {loading ? (
-                  <div className="flex-1 min-h-[280px] sm:min-h-[380px] rounded-3xl border flex flex-col items-center justify-center p-8 text-center space-y-4" style={{ backgroundColor: isLight ? "#f8fafc" : "rgba(0,0,0,0.4)", borderColor: isLight ? "#cbd5e1" : `${theme.accentColor}30` }}>
+                  <div className={`flex-1 min-h-[280px] sm:min-h-[380px] rounded-2xl border flex flex-col items-center justify-center p-8 text-center space-y-4 ${isLight ? "border-[#E5E5E5] bg-[#F5F5F5]" : "border-[#2A2A2A] bg-[#111111]"}`}>
                     <div className="relative">
-                      <div className="w-14 h-14 border-4 rounded-full animate-spin" style={{ borderColor: `${theme.accentColor}30`, borderTopColor: theme.accentColor }} />
+                      <div className="w-14 h-14 border-4 border-[#2A2A2A] rounded-full animate-spin" style={{ borderTopColor: theme.accentColor }} />
                       <Sparkles className="h-6 w-6 absolute inset-0 m-auto animate-pulse" style={{ color: theme.accentColor }} />
                     </div>
                     <div>
-                      <h4 className="text-sm font-bold font-mono" style={{ color: modalTextColor }}>Synthesizing Imagery</h4>
-                      <p className="text-xs font-mono opacity-70 mt-1">
+                      <h4 className="text-sm font-bold font-mono text-white">Synthesizing Imagery</h4>
+                      <p className="text-xs font-mono text-[#BDBDBD] mt-1">
                         Google Imagen 3 is rendering photorealistic details...
                       </p>
                     </div>
                   </div>
                 ) : generatedImages.length === 0 ? (
-                  <div className="flex-1 min-h-[280px] sm:min-h-[380px] rounded-3xl border flex flex-col items-center justify-center p-8 text-center space-y-3" style={{ backgroundColor: isLight ? "#f8fafc" : "rgba(0,0,0,0.3)", borderColor: isLight ? "#cbd5e1" : `${theme.accentColor}25` }}>
-                    <div className="p-4 rounded-2xl border" style={{ backgroundColor: `${theme.accentColor}15`, borderColor: `${theme.accentColor}40`, color: theme.accentColor }}>
+                  <div className={`flex-1 min-h-[280px] sm:min-h-[380px] rounded-2xl border flex flex-col items-center justify-center p-8 text-center space-y-3 ${isLight ? "border-[#E5E5E5] bg-[#F5F5F5]" : "border-[#2A2A2A] bg-[#111111]"}`}>
+                    <div className="p-4 rounded-2xl border border-[#2A2A2A] bg-[#1A1A1A]" style={{ color: theme.accentColor }}>
                       <Wand2 className="h-8 w-8" />
                     </div>
                     <div>
-                      <h4 className="text-sm font-bold font-mono" style={{ color: modalTextColor }}>No images generated yet</h4>
-                      <p className="text-xs font-mono opacity-60 mt-1 max-w-xs">
+                      <h4 className="text-sm font-bold font-mono text-white">No images generated yet</h4>
+                      <p className="text-xs font-mono text-[#BDBDBD] mt-1 max-w-xs">
                         Enter your prompt or click "AI Enhance" to generate images using Google's Imagen 3 model.
                       </p>
                     </div>
@@ -828,8 +808,7 @@ export const ImageStudioModal: React.FC<ImageStudioModalProps> = ({
                     {generatedImages.map((img) => (
                       <div
                         key={img.id}
-                        className="group relative rounded-2xl border overflow-hidden shadow-lg transition-all"
-                        style={{ backgroundColor: isLight ? "#ffffff" : "#000000", borderColor: `${theme.accentColor}40` }}
+                        className="group relative rounded-2xl border border-[#2A2A2A] bg-[#000000] overflow-hidden shadow-lg transition-all"
                       >
                         <img
                           src={img.url}
@@ -840,15 +819,18 @@ export const ImageStudioModal: React.FC<ImageStudioModalProps> = ({
                         />
 
                         {/* Overlay Controls on Hover */}
-                        <div className="absolute inset-0 bg-black/75 opacity-0 group-hover:opacity-100 transition-opacity p-3 flex flex-col justify-between backdrop-blur-xs">
+                        <div className="absolute inset-0 bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity p-3 flex flex-col justify-between backdrop-blur-xs">
                           <div className="flex items-center justify-between">
-                            <span className="text-[10px] font-mono px-2 py-0.5 rounded-md font-bold" style={{ backgroundColor: theme.accentColor, color: isLight ? "#ffffff" : "#000000" }}>
+                            <span 
+                              className="text-[10px] font-mono px-2 py-0.5 rounded-md font-bold text-white"
+                              style={{ backgroundColor: theme.accentColor }}
+                            >
                               {img.aspectRatio}
                             </span>
                             <button
                               type="button"
                               onClick={() => setLightboxImage(img)}
-                              className="p-1.5 rounded-lg bg-black/60 text-white hover:opacity-80 transition-colors cursor-pointer"
+                              className="p-1.5 rounded-lg bg-black/60 text-white transition-colors cursor-pointer"
                               title="Fullscreen Preview"
                             >
                               <Maximize2 className="h-3.5 w-3.5" />
@@ -863,8 +845,8 @@ export const ImageStudioModal: React.FC<ImageStudioModalProps> = ({
                               <button
                                 type="button"
                                 onClick={() => handleDownload(img)}
-                                className="flex-1 py-1.5 px-2 rounded-xl font-extrabold text-[11px] transition-all flex items-center justify-center gap-1 cursor-pointer"
-                                style={{ backgroundColor: theme.accentColor, color: isLight ? "#ffffff" : "#000000" }}
+                                className="flex-1 py-1.5 px-2 rounded-xl font-extrabold text-[11px] transition-all flex items-center justify-center gap-1 cursor-pointer text-white"
+                                style={{ backgroundColor: theme.accentColor }}
                               >
                                 <Download className="h-3 w-3" />
                                 <span>Download</span>
@@ -872,11 +854,11 @@ export const ImageStudioModal: React.FC<ImageStudioModalProps> = ({
                               <button
                                 type="button"
                                 onClick={() => handleCopyPrompt(img.prompt, img.id)}
-                                className="p-1.5 rounded-xl bg-black/60 text-gray-300 hover:text-white border border-gray-700 cursor-pointer"
+                                className="p-1.5 rounded-xl bg-black/60 text-gray-300 hover:text-white border border-[#2A2A2A] cursor-pointer"
                                 title="Copy prompt"
                               >
                                 {copiedId === img.id ? (
-                                  <Check className="h-3.5 w-3.5" style={{ color: theme.accentColor }} />
+                                  <Check className="h-3.5 w-3.5" style={{ color: theme.secondaryAccentColor }} />
                                 ) : (
                                   <Copy className="h-3.5 w-3.5" />
                                 )}
@@ -894,15 +876,15 @@ export const ImageStudioModal: React.FC<ImageStudioModalProps> = ({
             /* Gallery / History Tab */
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-bold font-mono flex items-center gap-2" style={{ color: modalTextColor }}>
+                <h3 className="text-sm font-bold font-mono flex items-center gap-2 text-white">
                   <History className="h-4 w-4" style={{ color: theme.accentColor }} />
                   <span>My Saved Generations ({history.length})</span>
                 </h3>
                 <button
                   onClick={fetchHistory}
                   disabled={loadingHistory}
-                  className="text-xs font-mono flex items-center gap-1 transition-colors cursor-pointer opacity-80 hover:opacity-100"
-                  style={{ color: theme.accentColor }}
+                  className="text-xs font-mono flex items-center gap-1 transition-colors cursor-pointer hover:underline"
+                  style={{ color: theme.secondaryAccentColor }}
                 >
                   <RefreshCw className={`h-3.5 w-3.5 ${loadingHistory ? "animate-spin" : ""}`} />
                   <span>Refresh</span>
@@ -910,13 +892,13 @@ export const ImageStudioModal: React.FC<ImageStudioModalProps> = ({
               </div>
 
               {loadingHistory ? (
-                <div className="py-12 text-center font-mono text-xs opacity-70">
+                <div className="py-12 text-center font-mono text-xs text-[#BDBDBD]">
                   Loading your cloud image history...
                 </div>
               ) : history.length === 0 ? (
-                <div className="py-16 text-center rounded-3xl border p-8 space-y-2" style={{ backgroundColor: isLight ? "#f8fafc" : "rgba(0,0,0,0.3)", borderColor: isLight ? "#cbd5e1" : `${theme.accentColor}30` }}>
-                  <p className="text-sm font-mono font-bold" style={{ color: modalTextColor }}>No saved generations found</p>
-                  <p className="text-xs font-mono opacity-60">
+                <div className="py-16 text-center rounded-2xl border border-[#2A2A2A] bg-[#111111] p-8 space-y-2">
+                  <p className="text-sm font-mono font-bold text-white">No saved generations found</p>
+                  <p className="text-xs font-mono text-[#BDBDBD]">
                     Images you generate in the studio will automatically save here to your Google AI Studio account history.
                   </p>
                 </div>
@@ -925,8 +907,7 @@ export const ImageStudioModal: React.FC<ImageStudioModalProps> = ({
                   {history.map((img) => (
                     <div
                       key={img.id}
-                      className="group relative rounded-2xl border overflow-hidden shadow-lg transition-all"
-                      style={{ backgroundColor: isLight ? "#ffffff" : "#0a0a0c", borderColor: isLight ? "#e2e8f0" : "rgba(255,255,255,0.1)" }}
+                      className={`group relative rounded-2xl border overflow-hidden shadow-lg transition-all ${isLight ? "border-[#E5E5E5] bg-[#FFFFFF]" : "border-[#2A2A2A] bg-[#111111]"}`}
                     >
                       <img
                         src={img.url}
@@ -935,24 +916,25 @@ export const ImageStudioModal: React.FC<ImageStudioModalProps> = ({
                         className="w-full h-36 object-cover cursor-pointer"
                         onClick={() => setLightboxImage(img)}
                       />
-                      <div className="p-2.5" style={{ backgroundColor: isLight ? "#f8fafc" : "rgba(0,0,0,0.8)" }}>
-                        <p className="text-[10px] font-mono truncate" style={{ color: modalTextColor }} title={img.prompt}>
+                      <div className="p-2.5 bg-[#000000]">
+                        <p className="text-[10px] font-mono truncate text-[#BDBDBD]" title={img.prompt}>
                           {img.prompt}
                         </p>
-                        <div className="flex items-center justify-between mt-2 pt-2 border-t" style={{ borderColor: isLight ? "#cbd5e1" : `${theme.accentColor}20` }}>
-                          <span className="text-[9px] font-mono opacity-60">{img.aspectRatio}</span>
+                        <div className="flex items-center justify-between mt-2 pt-2 border-t border-[#2A2A2A]">
+                          <span className="text-[9px] font-mono text-[#BDBDBD]">{img.aspectRatio}</span>
                           <div className="flex items-center gap-1">
                             <button
                               onClick={() => handleDownload(img)}
-                              className="p-1 rounded transition-colors"
-                              style={{ backgroundColor: `${theme.accentColor}20`, color: theme.accentColor }}
+                              className="p-1 rounded transition-colors cursor-pointer"
+                              style={{ backgroundColor: `${theme.secondaryAccentColor}33`, color: theme.secondaryAccentColor }}
                               title="Download"
                             >
                               <Download className="h-3 w-3" />
                             </button>
                             <button
                               onClick={() => handleDeleteHistoryItem(img.id)}
-                              className="p-1 rounded bg-red-950/60 text-red-400 hover:bg-red-900 transition-colors"
+                              className="p-1 rounded transition-colors cursor-pointer"
+                              style={{ backgroundColor: `${theme.accentColor}33`, color: theme.accentColor }}
                               title="Delete"
                             >
                               <Trash2 className="h-3 w-3" />
@@ -972,16 +954,15 @@ export const ImageStudioModal: React.FC<ImageStudioModalProps> = ({
       {/* Lightbox Fullscreen Viewer */}
       {lightboxImage && (
         <div className="fixed inset-0 z-60 bg-black/90 backdrop-blur-2xl flex items-center justify-center p-4">
-          <div className="max-w-4xl w-full border rounded-3xl p-6 relative flex flex-col max-h-[90vh] space-y-4 shadow-2xl transition-all" style={{ backgroundColor: modalBg, color: modalTextColor, borderColor: theme.accentColor }}>
+          <div className={`max-w-4xl w-full border rounded-2xl p-6 relative flex flex-col max-h-[90vh] space-y-4 shadow-2xl transition-all ${isLight ? "border-[#E5E5E5] bg-[#FFFFFF] text-[#000000]" : "border-[#2A2A2A] bg-[#1A1A1A] text-white"}`}>
             <button
               onClick={() => setLightboxImage(null)}
-              className="absolute top-4 right-4 p-2 rounded-xl transition-all cursor-pointer"
-              style={{ color: modalTextColor }}
+              className="absolute top-4 right-4 p-2 rounded-xl text-[#BDBDBD] hover:text-white transition-all cursor-pointer"
             >
               <X className="h-5 w-5" />
             </button>
 
-            <div className="flex-1 overflow-hidden flex items-center justify-center rounded-2xl p-2" style={{ backgroundColor: isLight ? "#f1f5f9" : "rgba(0,0,0,0.6)" }}>
+            <div className="flex-1 overflow-hidden flex items-center justify-center rounded-2xl p-2 bg-[#111111]">
               <img
                 src={lightboxImage.url}
                 alt={lightboxImage.prompt}
@@ -991,13 +972,13 @@ export const ImageStudioModal: React.FC<ImageStudioModalProps> = ({
             </div>
 
             <div className="space-y-3">
-              <p className="text-xs font-mono p-3 rounded-xl border" style={{ backgroundColor: isLight ? "#f8fafc" : "rgba(0,0,0,0.5)", borderColor: isLight ? "#cbd5e1" : `${theme.accentColor}30`, color: modalTextColor }}>
+              <p className="text-xs font-mono p-3 rounded-xl border border-[#2A2A2A] bg-[#111111] text-[#BDBDBD]">
                 "{lightboxImage.prompt}"
               </p>
 
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <span className="text-xs font-mono opacity-80">
-                  Model: <span style={{ color: theme.accentColor }}>{lightboxImage.model}</span> | Aspect: {lightboxImage.aspectRatio}
+                <span className="text-xs font-mono text-[#BDBDBD]">
+                  Model: <span className="font-bold" style={{ color: theme.secondaryAccentColor }}>{lightboxImage.model}</span> | Aspect: {lightboxImage.aspectRatio}
                 </span>
 
                 <div className="flex items-center gap-2">
@@ -1007,15 +988,14 @@ export const ImageStudioModal: React.FC<ImageStudioModalProps> = ({
                       setActiveTab("generate");
                       setLightboxImage(null);
                     }}
-                    className="px-3 py-2 rounded-xl border text-xs font-mono transition-all cursor-pointer"
-                    style={{ backgroundColor: isLight ? "#f1f5f9" : `${theme.accentColor}15`, borderColor: isLight ? "#cbd5e1" : `${theme.accentColor}44`, color: modalTextColor }}
+                    className="px-3 py-2 rounded-xl border border-[#2A2A2A] bg-[#111111] text-[#BDBDBD] hover:text-white text-xs font-mono transition-all cursor-pointer"
                   >
                     Use Prompt in Studio
                   </button>
                   <button
                     onClick={() => handleDownload(lightboxImage)}
-                    className="px-4 py-2 rounded-xl font-extrabold text-xs flex items-center gap-1.5 transition-all cursor-pointer"
-                    style={{ backgroundColor: theme.accentColor, color: isLight ? "#ffffff" : "#000000" }}
+                    className="px-4 py-2 rounded-xl font-extrabold text-xs flex items-center gap-1.5 transition-all cursor-pointer border text-white"
+                    style={{ backgroundColor: theme.accentColor, borderColor: theme.accentColor }}
                   >
                     <Download className="h-4 w-4" />
                     <span>Download Image</span>

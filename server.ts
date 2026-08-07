@@ -55,6 +55,30 @@ interface AuthenticatedRequest extends express.Request {
   userApiKey?: string;
 }
 
+// Helper to create a GoogleGenAI client supporting both standard API keys (AIzaSy...) and OAuth access tokens (AQ..., ya29...)
+function createGoogleGenAIClient(apiKey: string): GoogleGenAI {
+  const trimmed = apiKey.trim();
+  if (trimmed.startsWith("AQ.") || trimmed.startsWith("ya29.")) {
+    return new GoogleGenAI({
+      apiKey: trimmed,
+      httpOptions: {
+        headers: {
+          "Authorization": `Bearer ${trimmed}`,
+          "User-Agent": "script-automation-studio",
+        },
+      },
+    });
+  }
+  return new GoogleGenAI({
+    apiKey: trimmed,
+    httpOptions: {
+      headers: {
+        "User-Agent": "script-automation-studio",
+      },
+    },
+  });
+}
+
 // Authentication Middleware - Enforces user login and personal API key configuration
 async function verifyUserAuth(req: AuthenticatedRequest, res: express.Response, next: express.NextFunction) {
   try {
@@ -94,14 +118,7 @@ async function verifyUserAuth(req: AuthenticatedRequest, res: express.Response, 
 
     // Create a new GoogleGenAI client exclusively using the logged-in user's API key
     req.userApiKey = plainKey;
-    req.userAiClient = new GoogleGenAI({
-      apiKey: plainKey,
-      httpOptions: {
-        headers: {
-          "User-Agent": "script-automation-studio",
-        },
-      },
-    });
+    req.userAiClient = createGoogleGenAIClient(plainKey);
 
     next();
   } catch (error: any) {
@@ -119,6 +136,27 @@ async function generateContentWithRetry(ai: GoogleGenAI, params: any, maxRetries
     } catch (error: any) {
       attempt++;
       console.error(`Gemini API call failed (attempt ${attempt}/${maxRetries}):`, error);
+
+      // Check if the error is due to model availability (e.g. model not found or unsupported)
+      const errStr = String(error).toLowerCase();
+      const isAvailabilityError = 
+        errStr.includes("not found") || 
+        errStr.includes("not_found") || 
+        errStr.includes("not supported") || 
+        errStr.includes("unsupported") || 
+        errStr.includes("404") ||
+        errStr.includes("invalid model") ||
+        errStr.includes("model is deprecated");
+
+      if (isAvailabilityError) {
+        if (params.model === "gemini-3.1-flash-lite") {
+          console.warn("Model gemini-3.1-flash-lite is not found/unsupported. Falling back to gemini-3.6-flash.");
+          params.model = "gemini-3.6-flash";
+        } else if (params.model === "gemini-3.6-flash") {
+          console.warn("Model gemini-3.6-flash is not found/unsupported. Falling back to gemini-3.1-flash-lite.");
+          params.model = "gemini-3.1-flash-lite";
+        }
+      }
 
       if (attempt >= maxRetries) {
         throw error;
@@ -148,17 +186,88 @@ app.post("/api/user/save-key", async (req, res) => {
 
     const trimmedKey = apiKey.trim();
 
-    // Validate the key against Gemini API with a test ping
-    const testAi = new GoogleGenAI({ apiKey: trimmedKey });
-    try {
-      await testAi.models.generateContent({
-        model: "gemini-3.1-flash-lite",
-        contents: "API Key Ping Test",
-      });
-    } catch (testErr: any) {
-      console.error("API Key Validation Ping Failed:", testErr);
+    // Validate the key against Gemini API with test pings supporting AIza and AQ tokens
+    let pingSuccess = false;
+    let lastError: any = null;
+    const testModels = ["gemini-3.6-flash", "gemini-3.1-flash-lite"];
+
+    // Try primary auto-configured client first
+    const testAi = createGoogleGenAIClient(trimmedKey);
+    for (const modelName of testModels) {
+      try {
+        await testAi.models.generateContent({
+          model: modelName,
+          contents: "API Key Ping Test",
+        });
+        pingSuccess = true;
+        break;
+      } catch (err) {
+        lastError = err;
+      }
+    }
+
+    // Fallback 1: Bearer token mode if initial ping failed
+    if (!pingSuccess) {
+      try {
+        const bearerAi = new GoogleGenAI({
+          apiKey: "",
+          httpOptions: {
+            headers: {
+              "Authorization": `Bearer ${trimmedKey}`,
+              "User-Agent": "script-automation-studio",
+            },
+          },
+        });
+        for (const modelName of testModels) {
+          try {
+            await bearerAi.models.generateContent({
+              model: modelName,
+              contents: "API Key Ping Test",
+            });
+            pingSuccess = true;
+            break;
+          } catch (err) {
+            lastError = err;
+          }
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    // Fallback 2: Standard API key mode
+    if (!pingSuccess) {
+      try {
+        const standardAi = new GoogleGenAI({
+          apiKey: trimmedKey,
+          httpOptions: {
+            headers: {
+              "User-Agent": "script-automation-studio",
+            },
+          },
+        });
+        for (const modelName of testModels) {
+          try {
+            await standardAi.models.generateContent({
+              model: modelName,
+              contents: "API Key Ping Test",
+            });
+            pingSuccess = true;
+            break;
+          } catch (err) {
+            lastError = err;
+          }
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    if (!pingSuccess) {
+      console.error("API Key Validation Ping Failed:", lastError);
+      const detailedMsg = lastError?.message || (typeof lastError === "object" ? JSON.stringify(lastError) : String(lastError));
       return res.status(400).json({
-        error: "API Key validation failed. Please check that your key is valid and active in Google AI Studio.",
+        error: `API Key validation failed: ${detailedMsg}. Please check that your key is valid, has correct permissions, and is active in Google AI Studio.`,
       });
     }
 
@@ -476,7 +585,7 @@ User Raw Prompt: "${prompt}"
 Return ONLY the enhanced prompt string. Do not include markdown headers, quotes, or conversational preamble.
 `;
 
-    const response = await ai.models.generateContent({
+    const response = await generateContentWithRetry(ai, {
       model: "gemini-3.1-flash-lite",
       contents: enhancementPrompt,
     });
@@ -593,11 +702,58 @@ Strict rules for formatting and content:
    - If the raw input is brief (e.g., a one-minute draft or 100 words) but the requested word count is high (e.g., 1,500, 10,000, or 20,000 words), you MUST creatively, eloquently, and dramatically expand the content. Elaborate heavily on every key point, introduce comprehensive scientific or historical background, share descriptive real-world anecdotes, list interesting subtopics, supply detailed step-by-step explanations, provide relevant analogies, and craft engaging narrative details. Keep generating content until you meet or exceed the ${wordCount} word limit.
    - If the raw input is extremely long (e.g., a one-hour script or 15,000 words) but the target word count is smaller (e.g., 300 words, 1,500 words), you must selectively extract, condense, and synthesize the most captivating highlights into a tight, high-density format matching the ${wordCount} word target.
    - Do not truncate abruptly; maintain a highly professional, well-rounded beginning, body, and conclusion that fits the specified target gracefully.
-7. Structure and Hooks:
+7. Structure, Hooks, and Dynamic Language-Aware Section Headings (CRITICAL):
    - Custom Hook requested: "${customHook || "None"}"
    - Greetings Prefix: "${greetingsPrefix || "None"}"
-   - Structure format: ${includeHooksBodyConclusion ? "Structure into Hook, Body, and Conclusion using clean plain text headers like Hook, Section 1, Conclusion without markdown bold or square brackets." : "Structure naturally without section headers."}
-   - Incorporate the custom hook "${customHook || ""}" and greeting "${greetingsPrefix && greetingsPrefix !== "None" ? greetingsPrefix : ""}" beautifully at the very beginning of the script to hook the listener instantly.
+   - SECTION STRUCTURE & LANGUAGE-AWARE TITLE FORMAT DIRECTIVE:
+${includeHooksBodyConclusion ? `     You MUST organize the script into distinct, well-structured sections.
+     EVERY section MUST start with a clean, plain text descriptive title written ENTIRELY IN THE TARGET LANGUAGE (${transOpt}).
+     Both the section prefix ("Section N – " / "سیکشن N – " / "सेक्शन N – ") AND the descriptive topic title MUST MATCH the selected output language ("${transOpt}") in script, vocabulary, and phrasing.
+
+     EXACT LANGUAGE-SPECIFIC EXAMPLES:
+     • English ("english"):
+       Section 1 – Hook
+       Section 1 – Introduction
+       Section 2 – Benefits of Water
+       Section 3 – Importance of Hydration
+       Section 4 – Common Mistakes
+       Section 5 – Practical Tips
+       Section 6 – Conclusion
+
+     • Urdu Script ("urdu-writing"):
+       سیکشن 1 – تعارف / ہک
+       سیکشن 2 – پانی کے فوائد
+       سیکشن 3 – جسم میں پانی کی اہمیت
+       سیکشن 4 – عام غلطیاں
+       سیکشن 5 – عملی مشورے
+       سیکشن 6 – نتیجہ
+
+     • Hindi Devanagari Script ("hindi"):
+       सेक्शन 1 – परिचय / हुक
+       सेक्शन 2 – पानी के फायदे
+       सेक्शन 3 – शरीर में पानी का महत्व
+       सेक्शन 4 – आम गलतियाँ
+       सेक्शन 5 – उपयोगी सुझाव
+       सेक्शन 6 – निष्कर्ष
+
+     • Roman Urdu ("urdu-roman"):
+       Section 1 – Ta'aruf / Hook
+       Section 2 – Pani ke Fawaid
+       Section 3 – Jism mein Pani ki Ahmiyat
+       Section 4 – Aam Ghaltiyan
+       Section 5 – Amali Mashwaray
+       Section 6 – Natija
+
+     • Other / Future Languages:
+       Dynamically localize both the section prefix word (e.g., Section / سیکشن / सेक्शन / Sezione / Sección) and the descriptive topic title into natural, native-quality phrasing matching that language.
+
+     MANDATORY LANGUAGE-AWARE HEADING RULES:
+     a) Every section heading MUST match the selected output language ("${transOpt}"). Automatically generate and translate both the section prefix and topic title in native-quality phrasing appropriate for "${transOpt}".
+     b) Introduction Heading: For the first section, use a localized descriptive title such as "Section 1 – Hook" / "Section 1 – Introduction" in English, "سیکشن 1 – تعارف" or "سیکشن 1 – ہک" in Urdu, "सेक्शन 1 – परिचय" or "सेक्शन 1 – हुक" in Hindi, "Section 1 – Ta'aruf" in Roman Urdu.
+     c) Body Headings: Generate unique, contextually accurate section titles summarizing the specific topic/theme of that paragraph dynamically localized in the target language (e.g. "سیکشن 2 – پانی کے فوائد", "सेक्शन 2 – पानी के फायदे", "Section 2 – Pani ke Fawaid").
+     d) Final Heading: For the final section, use a localized conclusion title such as "Section X – Conclusion" in English, "سیکشن X – نتیجہ" in Urdu, "सेक्शन X – निष्कर्ष" in Hindi, "Section X – Natija" in Roman Urdu (where X is the final section number).
+     e) STRICT FORMATTING CLEANLINESS: Do NOT use asterisks (*), hash symbols (#), markdown bold/italics, brackets (parentheses () or square brackets []), bullets, or any other formatting symbols in the section headings or text. Output ONLY clean, plain text headings on their own line, followed by the polished paragraph.` : `     Structure naturally into clean paragraphs. If section headings are included, ensure they are written entirely in the selected target language ("${transOpt}") in clean plain text format without asterisks (*), brackets (), or markdown symbols (#).`}
+   - Incorporate the custom hook "${customHook || ""}" and greeting "${greetingsPrefix && greetingsPrefix !== "None" ? greetingsPrefix : ""}" beautifully at the very beginning of Section 1 to hook the listener instantly.
    - At the very end of the Conclusion/outro section (or as the final block of the script output), you MUST always include the following call-to-action subscription text adapted to the selected language:
      * If the selected transformation option is "urdu-writing": "دوستو اگر ویڈیو پسند آئی ہو تو اسے لائک کریں اور ایسی مزید معلوماتی ویڈیوز کے لیے ہمارے چینل کو سبسکرائب ضرور کریں اور بیل آئیکن دبانا مت بھولیے گا۔"
      * If the selected transformation option is "hindi": "दोस्तों अगर वीडियो पसंद आई हो तो इसे लाइक करें और ऐसी मज़ीद मालूमती वीडियोज़ के लिए हमारे चैनल को सब्सक्राइब ज़रूर करें और बेल आइकन दबाना मत भूलिए गा।"
