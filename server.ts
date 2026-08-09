@@ -525,9 +525,12 @@ app.post("/api/image-studio/generate", verifyUserAuth as express.RequestHandler,
       return res.status(400).json({ error: "Image generation prompt is required." });
     }
 
-    const apiKey = req.userApiKey || process.env.GEMINI_API_KEY;
+    const apiKey = req.userApiKey;
     if (!apiKey) {
-      return res.status(403).json({ error: "API key required for image generation." });
+      return res.status(403).json({
+        error: "NO_API_KEY",
+        message: "No personal Google AI API Key set up for this account. Please add your API Key in Settings.",
+      });
     }
 
     const activeProvider = imageProviderRegistry.getActiveProvider();

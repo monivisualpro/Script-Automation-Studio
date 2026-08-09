@@ -110,12 +110,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
 
   useEffect(() => {
+    let faviconLink = document.querySelector("link[rel*='icon']") as HTMLLinkElement | null;
+    if (!faviconLink) {
+      faviconLink = document.createElement("link");
+      faviconLink.rel = "icon";
+      faviconLink.type = "image/svg+xml";
+      document.head.appendChild(faviconLink);
+    }
     if (currentTheme === "Day" || currentTheme === "Day Mode") {
       document.body.classList.add("day-theme");
       document.body.classList.remove("night-theme");
+      faviconLink.href = "/favicon.svg";
     } else {
       document.body.classList.add("night-theme");
       document.body.classList.remove("day-theme");
+      faviconLink.href = "/favicon-night.svg";
     }
   }, [currentTheme]);
 

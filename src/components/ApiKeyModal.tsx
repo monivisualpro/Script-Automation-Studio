@@ -113,7 +113,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, canDi
             <p className={`text-xs font-mono mt-1 leading-relaxed ${
               theme.isLight ? "text-[#444444]" : "text-[#BDBDBD]"
             }`}>
-              Script Automation Studio operates strictly with your own personal Google AI Key. Your key is stored with AES-256 encryption and is never shared.
+              Script Automation Studio operates strictly with your personal Google AI Studio Key for both Script Generation and Image Studio. Your key is encrypted with AES-256 and never shared.
             </p>
           </div>
         </div>

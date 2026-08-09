@@ -59,45 +59,22 @@ export const UserHeader: React.FC = () => {
     >
       {/* Left Branding / Title */}
       <div className="flex items-center gap-3">
-        <div 
-          className={`p-2.5 rounded-2xl border flex items-center justify-center shadow-lg ${
-            theme.isLight ? "bg-[#FFFFFF] border-[#E5E5E5]" : "bg-[#1A1A1A] border-[#2A2A2A]"
-          }`}
-          style={{ color: theme.accentColor }}
-        >
-          <Sparkles className="h-5 w-5" />
-        </div>
-        <div>
-          <h1 className={`text-sm font-extrabold tracking-tight font-sans flex items-center gap-1.5 ${
-            theme.isLight ? "text-[#000000]" : "text-white"
-          }`}>
-            <span>Script Automation Studio</span>
-            <span 
-              className={`text-[10px] font-mono px-2.5 py-0.5 rounded-full border font-bold ${
-                theme.isLight ? "border-[#E5E5E5] bg-[#FFFFFF]" : "border-[#2A2A2A] bg-[#1A1A1A]"
-              }`}
-              style={{ color: theme.secondaryAccentColor }}
-            >
-              v2.5
-            </span>
-            {profile && (profile.isAdmin || profile.role === "admin") && (
-              <span 
-                className={`text-[10px] font-mono px-2.5 py-0.5 rounded-full border font-bold flex items-center gap-1 shadow-sm ${
-                  theme.isLight ? "bg-[#FFFFFF]" : "bg-[#111111]"
-                }`}
-                style={{ color: theme.secondaryAccentColor, borderColor: `${theme.secondaryAccentColor}80` }}
-              >
-                <Crown className="h-3 w-3" style={{ color: theme.secondaryAccentColor }} />
-                Admin
-              </span>
-            )}
-          </h1>
-          <p className={`text-[10px] font-mono hidden sm:block ${
-            theme.isLight ? "text-[#444444]" : "text-[#BDBDBD]"
-          }`}>
-            AI-Powered Scripting & Personal Key Automation
-          </p>
-        </div>
+        <img
+          src={theme.isLight ? "/LogoDay.svg" : "/LogoNight.svg"}
+          alt="Script Automation Studio Logo"
+          className="h-8 sm:h-9 w-auto object-contain cursor-pointer"
+        />
+        {profile && (profile.isAdmin || profile.role === "admin") && (
+          <span 
+            className={`text-[10px] font-mono px-2.5 py-0.5 rounded-full border font-bold flex items-center gap-1 shadow-sm ${
+              theme.isLight ? "bg-[#FFFFFF]" : "bg-[#111111]"
+            }`}
+            style={{ color: theme.secondaryAccentColor, borderColor: `${theme.secondaryAccentColor}80` }}
+          >
+            <Crown className="h-3 w-3" style={{ color: theme.secondaryAccentColor }} />
+            Admin
+          </span>
+        )}
       </div>
 
       {/* Right User Navigation & Controls */}

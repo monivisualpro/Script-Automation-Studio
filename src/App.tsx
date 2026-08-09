@@ -1274,9 +1274,6 @@ export default function App() {
             <div>
               <h1 className="text-xl md:text-2xl font-display font-extrabold tracking-tight flex items-center gap-2" style={{ color: theme.accentColor }}>
                 <span>Script Automation Studio</span>
-                <span className="text-[10px] font-mono px-2.5 py-0.5 rounded-full border font-bold glass-card" style={{ borderColor: `${theme.accentColor}60`, color: theme.accentColor }}>
-                  v2.5
-                </span>
               </h1>
               <p className="text-xs text-gray-400 font-mono mt-0.5">
                 Elite Anti-plagiarism rephrasing · Dynamic unique output generator
@@ -1290,7 +1287,7 @@ export default function App() {
               Script Automation Architect
             </p>
             <p className="text-xs md:text-sm font-display font-bold tracking-wide" style={{ color: theme.accentColor }}>
-              MUHAMMAD TEHSEEN IRSHAD (MONI VISUAL PRO)
+              MUHAMMAD TEHSEEN IRSHAD
             </p>
             {/* Clickable Social Icons under Muhammad Tehseen Irshad */}
             <div className="flex items-center justify-center lg:justify-end gap-3 pt-1">

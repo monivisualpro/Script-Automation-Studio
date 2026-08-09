@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="gradNight" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0F172A" />
+      <stop offset="100%" stop-color="#1E293B" />
+    </linearGradient>
+    <filter id="glowNight" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="16" flood-color="#0098FE" flood-opacity="0.6"/>
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="128" fill="url(#gradNight)" stroke="#0098FE" stroke-width="12" />
+  <!-- Main Magic Sparkle with Cyan Accent -->
+  <path d="M256 80 L282 190 L392 216 L282 242 L256 352 L230 242 L120 216 L230 190 Z" fill="#0098FE" filter="url(#glowNight)" />
+  <path d="M256 120 L272 198 L350 216 L272 234 L256 312 L240 234 L162 216 L240 198 Z" fill="#FFFFFF" />
+  <!-- Top Right Sparkle -->
+  <path d="M384 310 L397 360 L447 373 L397 386 L384 436 L371 386 L321 373 L371 360 Z" fill="#FE4103" />
+  <!-- Bottom Left Sparkle -->
+  <path d="M144 330 L153 368 L191 377 L153 386 L144 424 L135 386 L97 377 L135 368 Z" fill="#0098FE" />
+</svg>
