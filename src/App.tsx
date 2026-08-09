@@ -27,6 +27,8 @@ import {
   Sliders,
   Sparkle,
   Search,
+  ChevronDown,
+  ChevronUp,
   ExternalLink,
   Mic,
   MicOff,
@@ -73,7 +75,125 @@ const CATEGORIES = [
   "Software Engineering",
   "Technology",
   "Travel",
-  "Visual effects VFX"
+  "Visual effects VFX",
+  "3D Modeling, Printing & CAD Design",
+  "Agriculture & Modern Farming",
+  "Ancient Civilizations & Archaeology",
+  "Anime, Manga & Pop Culture",
+  "Aviation & Aerospace Engineering",
+  "Astronomy & Astrophysics",
+  "Biology, Genetics & Biotechnology",
+  "Blockchain, Crypto & Web3",
+  "Book Reviews & Literary Analysis",
+  "Carpentry, Woodworking & Crafting",
+  "Chemistry & Material Science",
+  "Cybersecurity & Ethical Hacking",
+  "Data Science & Machine Learning",
+  "Digital Marketing, SEO & Ads",
+  "DIY, Crafting & Home Repair",
+  "E-Commerce, Dropshipping & Retail",
+  "Economics & Macro Analysis",
+  "Entrepreneurship, Startups & Venture Capital",
+  "Environment, Climate & Ecology",
+  "Fashion, Beauty & Personal Styling",
+  "Filmmaking, Editing & Directing",
+  "Financial Literacy, Stocks & Crypto",
+  "Gardening, Houseplants & Landscaping",
+  "Geopolitics, World Affairs & Defense",
+  "Hospitality, Tourism & Hotel Vlogging",
+  "Human Psychology & Mental Health",
+  "Interior Design & Architecture",
+  "Investigative Journalism & Crime Stories",
+  "Law, Legal Explanations & Crime",
+  "Martial Arts, Self-Defense & Combat Sports",
+  "Mathematics, Logic & Statistics",
+  "Mindfulness, Meditation & Wellness",
+  "Music Production, Beatmaking & Theory",
+  "Mythology, Folklore & Urban Legends",
+  "Parenting, Childcare & Family Life",
+  "Pets, Animal Care & Veterinary Science",
+  "Philosophy, Ethics & Deep Thought",
+  "Photography, Camera Gear & Lighting",
+  "Physics & Quantum Mechanics",
+  "Productivity, Time Management & Habits",
+  "Robotics, Automation & Mechatronics",
+  "Self-Improvement, Discipline & Growth",
+  "Space Exploration & Rocketry",
+  "Sports Analytics, Football & Cricket",
+  "Supercars, Electric Vehicles & Racing",
+  "Survival Skills, Camping & Bushcraft",
+  "Tabletop RPGs, Board Games & Esports",
+  "Unexplained Mysteries & Paranormal",
+  "Urban Planning, Infrastructure & Megaprojects",
+  "Web Development & Frontend Engineering"
+];
+
+const TUTORIAL_TONES = [
+  "Warm Friendly Conversational",
+  "Islamic / Religious Tone",
+  "Engaging Food Blogger Vibe",
+  "Fast Paced Explainer (YouTube FB)",
+  "Informative Health Explainer",
+  "Exciting Tech Enthusiast",
+  "Passionate Story Teller",
+  "Poetic Relatable (Shayari Vibe)",
+  "Funny and Entertaining",
+  "Professional Clear Speaker",
+  "Science-Based Tutorial (Easy Explanation)",
+  "Professional & Technical",
+  "Casual & Conversational",
+  "Dramatic Narrative (Hyped)",
+  "Deep Informative (Analytical)",
+  "Inspiring & Motivational Masterclass",
+  "Cinematic & Epical Storyteller",
+  "Curious & Thought-Provoking",
+  "Empathetic & Supportive Guide",
+  "Humorous & Sarcastic Commentary",
+  "Direct & Actionable Step-by-Step",
+  "Authoritative & Academic Expert",
+  "Energetic & High-Octane Hype",
+  "Calm & Meditative Mindfulness",
+  "Philosophical & Reflective",
+  "Suspenseful & Thrilling Mystery",
+  "Sincere & Heartfelt Message",
+  "Witty & Playful Banter",
+  "Luxury & Sophisticated Elegance",
+  "Raw & Unfiltered Honest Review",
+  "Minimalist & Direct-to-the-Point",
+  "Investigative & Tabloid Style",
+  "Friendly Mentor & Big Brother/Sister",
+  "Bold & Controversial Stance",
+  "Nostalgic & Retro Flashback",
+  "Educational & Kid-Friendly",
+  "Skeptical & Myth-Busting",
+  "Relatable Everyday Pakistani/South Asian Vibe",
+  "Corporate & Boardroom Executive",
+  "Soothing Bedtime Story Style",
+  "High-Energy Fitness Coach",
+  "Geeky & In-Depth Deep-Dive",
+  "Provocative & Mind-Bending",
+  "Chill & Relaxed Lofi Vibe",
+  "Tactical & Strategic Advisor",
+  "Optimistic & Future-Focused",
+  "Cautionary & Warning Tale",
+  "Humorous Stand-up Style",
+  "Authentic Personal Journal",
+  "Persuasive Sales & Pitch",
+  "Spiritual & Philosophical Wisdom",
+  "Rebellious & Anti-Establishment",
+  "Warm Family-Friendly Story",
+  "Charming & Captivating Orator",
+  "Fast & Punchy TikTok/Reels Style",
+  "Historical Narrative & Reenactment",
+  "Friendly Local Tour Guide",
+  "Gourmet Culinary Expert",
+  "Scientific Curiosity & Wonders",
+  "Sharp Political & Economic Analyst",
+  "Gentle & Nurturing Teacher",
+  "Action-Packed Thriller Narrative",
+  "Candid Vlog & Behind-The-Scenes",
+  "High-Stakes Legal / Investigative",
+  "Futuristic Speculative Sci-Fi"
 ];
 
 const ALL_COUNTRIES = [
@@ -112,6 +232,55 @@ const ALL_COUNTRIES = [
   "Switzerland",
   "Netherlands",
   "New Zealand"
+];
+
+const TRANSFORMATION_LANGUAGES = [
+  { id: "urdu-writing", label: "🇵🇰 اردو تحریر (Nastaliq Script)", name: "Urdu (Nastaliq)" },
+  { id: "urdu-roman", label: "🇵🇰 Convert to Urdu Roman (Latin Alphabet)", name: "Urdu Roman" },
+  { id: "english", label: "🇬🇧 Convert to English (Polished/Fluent)", name: "English" },
+  { id: "hindi", label: "🇮🇳 Hindi Script (Urdu Wording & Accent)", name: "Hindi" },
+  { id: "spanish", label: "🇪🇸 Spanish (Español)", name: "Spanish" },
+  { id: "french", label: "🇫🇷 French (Français)", name: "French" },
+  { id: "german", label: "🇩🇪 German (Deutsch)", name: "German" },
+  { id: "arabic", label: "🇸🇦 Arabic (العربية)", name: "Arabic" },
+  { id: "bengali", label: "🇧🇩 Bengali (বাংলা)", name: "Bengali" },
+  { id: "portuguese", label: "🇧🇷 Portuguese (Português)", name: "Portuguese" },
+  { id: "russian", label: "🇷🇺 Russian (Русский)", name: "Russian" },
+  { id: "japanese", label: "🇯🇵 Japanese (日本語)", name: "Japanese" },
+  { id: "chinese-simplified", label: "🇨🇳 Chinese (Simplified / 简体中文)", name: "Chinese Simplified" },
+  { id: "chinese-traditional", label: "🇹🇼 Chinese (Traditional / 繁體中文)", name: "Chinese Traditional" },
+  { id: "indonesian", label: "🇮🇩 Indonesian (Bahasa Indonesia)", name: "Indonesian" },
+  { id: "turkish", label: "🇹🇷 Turkish (Türkçe)", name: "Turkish" },
+  { id: "italian", label: "🇮🇹 Italian (Italiano)", name: "Italian" },
+  { id: "korean", label: "🇰🇷 Korean (한국어)", name: "Korean" },
+  { id: "farsi", label: "🇮🇷 Persian / Farsi (فارسی)", name: "Persian / Farsi" },
+  { id: "pashto", label: "🇦🇫 Pashto (پښتو)", name: "Pashto" },
+  { id: "sindhi", label: "🇵🇰 Sindhi (سنڌي)", name: "Sindhi" },
+  { id: "punjabi", label: "🇮🇳 Punjabi (ਪੰਜਾਬੀ / پنجابی)", name: "Punjabi" },
+  { id: "vietnamese", label: "🇻🇳 Vietnamese (Tiếng Việt)", name: "Vietnamese" },
+  { id: "thai", label: "🇹🇭 Thai (ไทย)", name: "Thai" },
+  { id: "tagalog", label: "🇵🇭 Tagalog / Filipino", name: "Tagalog" },
+  { id: "dutch", label: "🇳🇱 Dutch (Nederlands)", name: "Dutch" },
+  { id: "polish", label: "🇵🇱 Polish (Polski)", name: "Polish" },
+  { id: "swedish", label: "🇸🇪 Swedish (Svenska)", name: "Swedish" },
+  { id: "norwegian", label: "🇳🇴 Norwegian (Norsk)", name: "Norwegian" },
+  { id: "finnish", label: "🇫🇮 Finnish (Suomi)", name: "Finnish" },
+  { id: "danish", label: "🇩🇰 Danish (Dansk)", name: "Danish" },
+  { id: "greek", label: "🇬🇷 Greek (Ελληνικά)", name: "Greek" },
+  { id: "hebrew", label: "🇮🇱 Hebrew (עברית)", name: "Hebrew" },
+  { id: "tamil", label: "🇮🇳 Tamil (தமிழ்)", name: "Tamil" },
+  { id: "telugu", label: "🇮🇳 Telugu (తెలుగు)", name: "Telugu" },
+  { id: "marathi", label: "🇮🇳 Marathi (मराठी)", name: "Marathi" },
+  { id: "gujarati", label: "🇮🇳 Gujarati (ગુજરાતી)", name: "Gujarati" },
+  { id: "malayalam", label: "🇮🇳 Malayalam (മലയാളം)", name: "Malayalam" },
+  { id: "kannada", label: "🇮🇳 Kannada (ಕನ್ನಡ)", name: "Kannada" },
+  { id: "malay", label: "🇲🇾 Malay (Bahasa Melayu)", name: "Malay" },
+  { id: "czech", label: "🇨🇿 Czech (Čeština)", name: "Czech" },
+  { id: "romanian", label: "🇷🇴 Romanian (Română)", name: "Romanian" },
+  { id: "hungarian", label: "🇭🇺 Hungarian (Magyar)", name: "Hungarian" },
+  { id: "ukrainian", label: "🇺🇦 Ukrainian (Українська)", name: "Ukrainian" },
+  { id: "afrikaans", label: "🇿🇦 Afrikaans", name: "Afrikaans" },
+  { id: "swahili", label: "🇰🇪 Swahili (Kiswahili)", name: "Swahili" }
 ];
 
 export default function App() {
@@ -174,6 +343,13 @@ export default function App() {
     } catch {}
   }, [topicNiche]);
   const [transformation, setTransformation] = useState("urdu-roman");
+  const [languageSearchQuery, setLanguageSearchQuery] = useState("");
+  const [isLangDropdownOpen, setIsLangDropdownOpen] = useState(false);
+  const [isCountryDropdownOpen, setIsCountryDropdownOpen] = useState(false);
+  const [isDomainDropdownOpen, setIsDomainDropdownOpen] = useState(false);
+  const [domainSearchQuery, setDomainSearchQuery] = useState("");
+  const [isToneDropdownOpen, setIsToneDropdownOpen] = useState(false);
+  const [toneSearchQuery, setToneSearchQuery] = useState("");
   const [targetAudience, setTargetAudience] = useState("adults");
   const [wordCount, setWordCount] = useState<number>(300);
   const [scriptLengthType, setScriptLengthType] = useState<"word_count" | "video_duration">("word_count");
@@ -417,6 +593,8 @@ export default function App() {
         body: JSON.stringify({
           model: modelSettings.scriptGeneration,
           rawScript,
+          transformation: activeTransformation,
+          language: activeTransformation,
           voicePersona,
           topicNiche,
           targetAudience,
@@ -441,7 +619,7 @@ export default function App() {
       }
       const scriptsMap = data.polishedScripts || {};
       setPolishedScripts(scriptsMap);
-      setPolishedScript(scriptsMap[activeTransformation] || "");
+      setPolishedScript(scriptsMap[activeTransformation] || data.polishedScript || Object.values(scriptsMap)[0] || "");
       
       // Plagiarism shield animation
       setTimeout(() => {
@@ -521,6 +699,8 @@ export default function App() {
         body: JSON.stringify({
           model: modelSettings.scriptGeneration,
           transcript: videoTranscriptInput,
+          language: transformation,
+          transformation: transformation,
           toggleTitle,
           toggleDescription,
           toggleTimestamps,
@@ -559,6 +739,8 @@ export default function App() {
           model: modelSettings.scriptGeneration,
           transcript: videoTranscriptInput,
           field,
+          language: transformation,
+          transformation: transformation,
           videoDuration: ytVideoDuration,
         }),
       });
@@ -597,6 +779,8 @@ export default function App() {
         body: JSON.stringify({
           model: modelSettings.promptGeneration,
           transcript: thumbnailTranscriptInput,
+          language: transformation,
+          transformation: transformation,
           bgColor: getActiveBgColor(),
           headline: thumbHeadline,
           smallTagline: thumbSmallTagline,
@@ -1358,74 +1542,329 @@ export default function App() {
 
             {/* TOPIC DOMAIN / NICHE */}
             <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-3 transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.cardBorderCode, boxShadow: panelShadow }}>
-              <label className="text-xs font-mono uppercase tracking-widest flex items-center gap-1.5 font-extrabold" style={{ color: theme.accentColor }}>
-                <TrendingUp className="h-3.5 w-3.5" style={{ color: theme.accentColor }} />
-                Domain
-              </label>
-              <select
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-mono uppercase tracking-widest flex items-center gap-1.5 font-extrabold" style={{ color: theme.accentColor }}>
+                  <TrendingUp className="h-3.5 w-3.5" style={{ color: theme.accentColor }} />
+                  Domain
+                </label>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full font-extrabold shadow-sm shrink-0" style={{ backgroundColor: `${theme.accentColor}25`, color: theme.accentColor }}>
+                  {topicNiche || "Select Domain"}
+                </span>
+              </div>
+
+              {/* Dropdown Box Trigger */}
+              <button
+                type="button"
                 id="select-niche"
-                value={topicNiche}
-                onChange={(e) => {
-                  setTopicNiche(e.target.value);
-                  setContentCategory(e.target.value);
+                onClick={() => setIsDomainDropdownOpen(!isDomainDropdownOpen)}
+                className="glass-input w-full rounded-xl py-2.5 px-4 text-xs font-mono cursor-pointer transition-all duration-300 flex items-center justify-between focus:outline-none border hover:border-white/40"
+                style={{
+                  backgroundColor: theme.inputBg,
+                  borderColor: isDomainDropdownOpen ? theme.accentColor : (theme.isLight ? "#E5E5E5" : "transparent"),
+                  color: theme.textColor
                 }}
-                className="glass-input w-full rounded-xl py-2.5 px-4 text-xs font-mono cursor-pointer transition-all duration-300 focus:outline-none"
-                style={{ backgroundColor: theme.inputBg, borderColor: theme.isLight ? "#E5E5E5" : "transparent", color: theme.textColor }}
               >
-                {CATEGORIES.map((cat) => (
-                  <option key={cat} value={cat} style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>{cat}</option>
-                ))}
-              </select>
+                <span className="truncate pr-2 font-bold">
+                  {topicNiche || "Select Domain / Niche..."}
+                </span>
+                {isDomainDropdownOpen ? (
+                  <ChevronUp className="h-4 w-4 shrink-0" style={{ color: theme.accentColor }} />
+                ) : (
+                  <ChevronDown className="h-4 w-4 shrink-0 opacity-70" style={{ color: theme.textColor }} />
+                )}
+              </button>
+
+              {/* Expandable Tab / Dropdown with Search */}
+              {isDomainDropdownOpen && (
+                <div className="space-y-2.5 pt-2 border-t animate-fade-in" style={{ borderColor: `${theme.accentColor}25` }}>
+                  {/* Search Box */}
+                  <div className="relative">
+                    <Search className="absolute left-3 top-2.5 h-3.5 w-3.5" style={{ color: theme.accentColor }} />
+                    <input
+                      type="text"
+                      placeholder="Search domain (e.g. AI, Medical, Finance, Gaming)..."
+                      value={domainSearchQuery}
+                      onChange={(e) => setDomainSearchQuery(e.target.value)}
+                      className="glass-input w-full rounded-xl py-2 pl-9 pr-8 text-xs font-mono transition-all duration-300 focus:outline-none"
+                      style={{ backgroundColor: theme.inputBg, borderColor: theme.isLight ? "#E5E5E5" : "transparent", color: theme.textColor }}
+                    />
+                    {domainSearchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setDomainSearchQuery("")}
+                        className="absolute right-3 top-2.5 text-[10px] cursor-pointer font-bold"
+                        style={{ color: theme.accentColor }}
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Filtered Scrollable List */}
+                  <div className="rounded-xl max-h-[170px] overflow-y-auto p-1.5 space-y-1 scrollbar-thin border glass-card" style={{ backgroundColor: theme.inputBg, borderColor: theme.accentColor }}>
+                    {CATEGORIES.filter(cat =>
+                      cat.toLowerCase().includes(domainSearchQuery.toLowerCase())
+                    ).map((cat) => {
+                      const isSelected = topicNiche === cat;
+                      return (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => {
+                            setTopicNiche(cat);
+                            setContentCategory(cat);
+                            setIsDomainDropdownOpen(false);
+                          }}
+                          className={`glass-button w-full text-left px-2.5 py-1.5 rounded-xl text-xs font-mono transition-all flex items-center justify-between cursor-pointer border ${
+                            isSelected
+                              ? "font-extrabold shadow-md scale-[1.01]"
+                              : "border-transparent opacity-80 hover:opacity-100"
+                          }`}
+                          style={isSelected ? {
+                            backgroundColor: `${theme.accentColor}25`,
+                            borderColor: theme.accentColor,
+                            color: theme.accentColor
+                          } : { color: theme.textColor }}
+                        >
+                          <span className="truncate pr-2">{cat}</span>
+                          {isSelected ? (
+                            <span className="text-[9px] px-2 py-0.5 rounded-full font-bold shadow-sm shrink-0" style={{ backgroundColor: theme.accentColor, color: "#ffffff" }}>
+                              ✓ Active
+                            </span>
+                          ) : (
+                            <span className="text-[9px] opacity-60 shrink-0">Select</span>
+                          )}
+                        </button>
+                      );
+                    })}
+                    {CATEGORIES.filter(cat =>
+                      cat.toLowerCase().includes(domainSearchQuery.toLowerCase())
+                    ).length === 0 && (
+                      <div className="text-[10px] text-gray-400 font-mono text-center py-4">
+                        No domains match "{domainSearchQuery}"
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* TUTORIAL & LITERATURE TONES */}
             <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-3 transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.cardBorderCode, boxShadow: panelShadow }}>
-              <label className="text-xs font-mono uppercase tracking-widest block font-extrabold" style={{ color: theme.accentColor }}>
-                Tutorial & Literature Tool
-              </label>
-              <select
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-mono uppercase tracking-widest block font-extrabold" style={{ color: theme.accentColor }}>
+                  Tutorial & Literature Tool
+                </label>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full font-extrabold shadow-sm shrink-0" style={{ backgroundColor: `${theme.accentColor}25`, color: theme.accentColor }}>
+                  Tone Active
+                </span>
+              </div>
+
+              {/* Dropdown Box Trigger */}
+              <button
+                type="button"
                 id="select-tone"
-                value={tutorialTone}
-                onChange={(e) => setTutorialTone(e.target.value)}
-                className="glass-input w-full rounded-xl py-2.5 px-4 text-xs font-mono cursor-pointer transition-all duration-300 focus:outline-none"
-                style={{ backgroundColor: theme.inputBg, borderColor: theme.isLight ? "#E5E5E5" : "transparent", color: theme.textColor }}
+                onClick={() => setIsToneDropdownOpen(!isToneDropdownOpen)}
+                className="glass-input w-full rounded-xl py-2.5 px-4 text-xs font-mono cursor-pointer transition-all duration-300 flex items-center justify-between focus:outline-none border hover:border-white/40"
+                style={{
+                  backgroundColor: theme.inputBg,
+                  borderColor: isToneDropdownOpen ? theme.accentColor : (theme.isLight ? "#E5E5E5" : "transparent"),
+                  color: theme.textColor
+                }}
               >
-                <option value="Warm Friendly Conversational" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Warm Friendly Conversational</option>
-                <option value="Islamic / Religious Tone" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Islamic / Religious Tone</option>
-                <option value="Engaging Food Blogger Vibe" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Engaging Food Blogger Vibe</option>
-                <option value="Fast Paced Explainer (YouTube FB)" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Fast Paced Explainer (YouTube FB)</option>
-                <option value="Informative Health Explainer" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Informative Health Explainer</option>
-                <option value="Exciting Tech Enthusiast" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Exciting Tech Enthusiast</option>
-                <option value="Passionate Story Teller" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Passionate Story Teller</option>
-                <option value="Poetic Relatable (Shayari Vibe)" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Poetic Relatable (Shayari Vibe)</option>
-                <option value="Funny and Entertaining" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Funny and Entertaining</option>
-                <option value="Professional Clear Speaker" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Professional Clear Speaker</option>
-                <option value="Science-Based Tutorial (Easy Explanation)" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Science-Based Tutorial (Easy Explanation)</option>
-                <option value="Professional & Technical" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Professional & Technical</option>
-                <option value="Casual & Conversational" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Casual & Conversational</option>
-                <option value="Dramatic Narrative (Hyped)" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Dramatic Narrative (Hyped)</option>
-                <option value="Deep Informative (Analytical)" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Deep Informative (Analytical)</option>
-              </select>
+                <span className="truncate pr-2 font-bold">
+                  {tutorialTone || "Select Tone / Style..."}
+                </span>
+                {isToneDropdownOpen ? (
+                  <ChevronUp className="h-4 w-4 shrink-0" style={{ color: theme.accentColor }} />
+                ) : (
+                  <ChevronDown className="h-4 w-4 shrink-0 opacity-70" style={{ color: theme.textColor }} />
+                )}
+              </button>
+
+              {/* Expandable Tab / Dropdown with Search */}
+              {isToneDropdownOpen && (
+                <div className="space-y-2.5 pt-2 border-t animate-fade-in" style={{ borderColor: `${theme.accentColor}25` }}>
+                  {/* Search Box */}
+                  <div className="relative">
+                    <Search className="absolute left-3 top-2.5 h-3.5 w-3.5" style={{ color: theme.accentColor }} />
+                    <input
+                      type="text"
+                      placeholder="Search tone (e.g. Conversational, Storyteller, Cinematic, Dramatic)..."
+                      value={toneSearchQuery}
+                      onChange={(e) => setToneSearchQuery(e.target.value)}
+                      className="glass-input w-full rounded-xl py-2 pl-9 pr-8 text-xs font-mono transition-all duration-300 focus:outline-none"
+                      style={{ backgroundColor: theme.inputBg, borderColor: theme.isLight ? "#E5E5E5" : "transparent", color: theme.textColor }}
+                    />
+                    {toneSearchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setToneSearchQuery("")}
+                        className="absolute right-3 top-2.5 text-[10px] cursor-pointer font-bold"
+                        style={{ color: theme.accentColor }}
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Filtered Scrollable List */}
+                  <div className="rounded-xl max-h-[170px] overflow-y-auto p-1.5 space-y-1 scrollbar-thin border glass-card" style={{ backgroundColor: theme.inputBg, borderColor: theme.accentColor }}>
+                    {TUTORIAL_TONES.filter(tone =>
+                      tone.toLowerCase().includes(toneSearchQuery.toLowerCase())
+                    ).map((tone) => {
+                      const isSelected = tutorialTone === tone;
+                      return (
+                        <button
+                          key={tone}
+                          type="button"
+                          onClick={() => {
+                            setTutorialTone(tone);
+                            setIsToneDropdownOpen(false);
+                          }}
+                          className={`glass-button w-full text-left px-2.5 py-1.5 rounded-xl text-xs font-mono transition-all flex items-center justify-between cursor-pointer border ${
+                            isSelected
+                              ? "font-extrabold shadow-md scale-[1.01]"
+                              : "border-transparent opacity-80 hover:opacity-100"
+                          }`}
+                          style={isSelected ? {
+                            backgroundColor: `${theme.accentColor}25`,
+                            borderColor: theme.accentColor,
+                            color: theme.accentColor
+                          } : { color: theme.textColor }}
+                        >
+                          <span className="truncate pr-2">{tone}</span>
+                          {isSelected ? (
+                            <span className="text-[9px] px-2 py-0.5 rounded-full font-bold shadow-sm shrink-0" style={{ backgroundColor: theme.accentColor, color: "#ffffff" }}>
+                              ✓ Active
+                            </span>
+                          ) : (
+                            <span className="text-[9px] opacity-60 shrink-0">Select</span>
+                          )}
+                        </button>
+                      );
+                    })}
+                    {TUTORIAL_TONES.filter(tone =>
+                      tone.toLowerCase().includes(toneSearchQuery.toLowerCase())
+                    ).length === 0 && (
+                      <div className="text-[10px] text-gray-400 font-mono text-center py-4">
+                        No tones match "{toneSearchQuery}"
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* TRANSFORMATION OPTIONS */}
+            {/* TRANSFORMATION OPTIONS & MULTI-LANGUAGE ENGINE */}
             <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-3 transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.cardBorderCode, boxShadow: panelShadow }}>
-              <label className="text-xs font-mono uppercase tracking-widest flex items-center gap-1.5 font-extrabold" style={{ color: theme.accentColor }}>
-                <Globe className="h-3.5 w-3.5" style={{ color: theme.accentColor }} />
-                Transformation Option
-              </label>
-              <select
-                id="select-transformation"
-                value={transformation}
-                onChange={(e) => handleSelectLanguage(e.target.value)}
-                className="glass-input w-full rounded-xl py-2.5 px-4 text-xs font-mono cursor-pointer transition-all duration-300 focus:outline-none"
-                style={{ backgroundColor: theme.inputBg, borderColor: theme.isLight ? "#E5E5E5" : "transparent", color: theme.textColor }}
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-mono uppercase tracking-widest flex items-center gap-1.5 font-extrabold" style={{ color: theme.accentColor }}>
+                  <Globe className="h-3.5 w-3.5" style={{ color: theme.accentColor }} />
+                  Transformation Option
+                </label>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full font-extrabold shadow-sm shrink-0" style={{ backgroundColor: `${theme.accentColor}25`, color: theme.accentColor }}>
+                  {TRANSFORMATION_LANGUAGES.find(l => l.id === transformation)?.name || "Language Selected"}
+                </span>
+              </div>
+
+              {/* Dropdown Box Trigger */}
+              <button
+                type="button"
+                onClick={() => setIsLangDropdownOpen(!isLangDropdownOpen)}
+                className="glass-input w-full rounded-xl py-2.5 px-4 text-xs font-mono cursor-pointer transition-all duration-300 flex items-center justify-between focus:outline-none border hover:border-white/40"
+                style={{
+                  backgroundColor: theme.inputBg,
+                  borderColor: isLangDropdownOpen ? theme.accentColor : (theme.isLight ? "#E5E5E5" : "transparent"),
+                  color: theme.textColor
+                }}
               >
-                <option value="hindi" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>🇮🇳 Hindi Script (Urdu Wording & Accent)</option>
-                <option value="urdu-roman" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>🇵🇰 Convert to Urdu Roman (Latin Alphabet)</option>
-                <option value="english" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>🇬🇧 Convert to English (Polished/Fluent)</option>
-                <option value="urdu-writing" className="font-urdu" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>🇵🇰 اردو تحریر (Nastaliq Script)</option>
-              </select>
+                <span className="truncate pr-2 font-bold">
+                  {TRANSFORMATION_LANGUAGES.find(l => l.id === transformation)?.label || "Select Language..."}
+                </span>
+                {isLangDropdownOpen ? (
+                  <ChevronUp className="h-4 w-4 shrink-0" style={{ color: theme.accentColor }} />
+                ) : (
+                  <ChevronDown className="h-4 w-4 shrink-0 opacity-70" style={{ color: theme.textColor }} />
+                )}
+              </button>
+
+              {/* Expandable Tab / Dropdown with Search */}
+              {isLangDropdownOpen && (
+                <div className="space-y-2.5 pt-2 border-t animate-fade-in" style={{ borderColor: `${theme.accentColor}25` }}>
+                  {/* Search Box for Languages */}
+                  <div className="relative">
+                    <Search className="absolute left-3 top-2.5 h-3.5 w-3.5" style={{ color: theme.accentColor }} />
+                    <input
+                      type="text"
+                      placeholder="Search language (e.g. English, Urdu, Spanish, Arabic)..."
+                      value={languageSearchQuery}
+                      onChange={(e) => setLanguageSearchQuery(e.target.value)}
+                      className="glass-input w-full rounded-xl py-2 pl-9 pr-8 text-xs font-mono transition-all duration-300 focus:outline-none"
+                      style={{ backgroundColor: theme.inputBg, borderColor: theme.isLight ? "#E5E5E5" : "transparent", color: theme.textColor }}
+                    />
+                    {languageSearchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setLanguageSearchQuery("")}
+                        className="absolute right-3 top-2.5 text-[10px] cursor-pointer font-bold"
+                        style={{ color: theme.accentColor }}
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Scrollable Filtered Language List */}
+                  <div className="rounded-xl max-h-[170px] overflow-y-auto p-1.5 space-y-1 scrollbar-thin border glass-card" style={{ backgroundColor: theme.inputBg, borderColor: theme.accentColor }}>
+                    {TRANSFORMATION_LANGUAGES.filter(lang =>
+                      lang.label.toLowerCase().includes(languageSearchQuery.toLowerCase()) ||
+                      lang.name.toLowerCase().includes(languageSearchQuery.toLowerCase()) ||
+                      lang.id.toLowerCase().includes(languageSearchQuery.toLowerCase())
+                    ).map((lang) => {
+                      const isSelected = transformation === lang.id;
+                      return (
+                        <button
+                          key={lang.id}
+                          type="button"
+                          onClick={() => {
+                            handleSelectLanguage(lang.id);
+                            setIsLangDropdownOpen(false);
+                          }}
+                          className={`glass-button w-full text-left px-2.5 py-1.5 rounded-xl text-xs font-mono transition-all flex items-center justify-between cursor-pointer border ${
+                            isSelected
+                              ? "font-extrabold shadow-md scale-[1.01]"
+                              : "border-transparent opacity-80 hover:opacity-100"
+                          }`}
+                          style={isSelected ? {
+                            backgroundColor: `${theme.accentColor}25`,
+                            borderColor: theme.accentColor,
+                            color: theme.accentColor
+                          } : { color: theme.textColor }}
+                        >
+                          <span className="truncate pr-2">{lang.label}</span>
+                          {isSelected ? (
+                            <span className="text-[9px] px-2 py-0.5 rounded-full font-bold shadow-sm shrink-0" style={{ backgroundColor: theme.accentColor, color: "#ffffff" }}>
+                              ✓ Active
+                            </span>
+                          ) : (
+                            <span className="text-[9px] opacity-60 shrink-0">Select</span>
+                          )}
+                        </button>
+                      );
+                    })}
+                    {TRANSFORMATION_LANGUAGES.filter(lang =>
+                      lang.label.toLowerCase().includes(languageSearchQuery.toLowerCase()) ||
+                      lang.name.toLowerCase().includes(languageSearchQuery.toLowerCase()) ||
+                      lang.id.toLowerCase().includes(languageSearchQuery.toLowerCase())
+                    ).length === 0 && (
+                      <div className="text-[10px] text-gray-400 font-mono text-center py-4">
+                        No languages match "{languageSearchQuery}"
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* TARGET AUDIENCE */}
@@ -1454,118 +1893,185 @@ export default function App() {
                   <Globe className="h-3.5 w-3.5" style={{ color: theme.accentColor }} />
                   Target Regions / Countries
                 </label>
-                <span className="text-[10px] font-mono opacity-80" style={{ color: theme.textColor }}>{selectedCountries.length} selected</span>
-              </div>
-              
-              {/* Search Option above countries list */}
-              <div className="relative">
-                <Search className="absolute left-3 top-2.5 h-3.5 w-3.5" style={{ color: theme.accentColor }} />
-                <input
-                  type="text"
-                  placeholder="Search countries (e.g. Pakistan)..."
-                  value={countrySearchQuery}
-                  onChange={(e) => setCountrySearchQuery(e.target.value)}
-                  className="glass-input w-full rounded-xl py-2 pl-9 pr-4 text-xs font-mono transition-all duration-300 focus:outline-none"
-                  style={{ backgroundColor: theme.inputBg, borderColor: theme.isLight ? "#E5E5E5" : "transparent", color: theme.textColor }}
-                />
-                {countrySearchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => setCountrySearchQuery("")}
-                    className="absolute right-3 top-2 text-[10px] cursor-pointer font-bold"
-                    style={{ color: theme.accentColor }}
-                  >
-                    Clear
-                  </button>
-                )}
+                <span className="text-[10px] font-mono opacity-80 shrink-0 font-bold" style={{ color: theme.accentColor }}>
+                  {selectedCountries.length} Selected
+                </span>
               </div>
 
-              {/* List of Countries (Filtered) */}
-              <div className="rounded-xl max-h-[140px] overflow-y-auto p-1.5 space-y-1 scrollbar-thin border glass-card" style={{ backgroundColor: theme.inputBg, borderColor: theme.accentColor }}>
-                {ALL_COUNTRIES.filter(country =>
-                  country.toLowerCase().includes(countrySearchQuery.toLowerCase())
-                ).map((country) => {
-                  const isSelected = selectedCountries.includes(country);
-                  const isPakistan = country.includes("Pakistan");
-                  return (
-                    <button
-                      key={country}
-                      type="button"
-                      onClick={() => {
-                        if (isSelected) {
-                          setSelectedCountries(selectedCountries.filter(c => c !== country));
-                        } else {
-                          setSelectedCountries([...selectedCountries, country]);
-                        }
-                      }}
-                      className={`glass-button w-full text-left px-2.5 py-1.5 rounded-xl text-xs font-mono transition-all flex items-center justify-between cursor-pointer border ${
-                        isSelected
-                          ? "font-extrabold shadow-md scale-[1.01]"
-                          : "border-transparent opacity-80 hover:opacity-100"
-                      }`}
-                      style={isSelected ? {
-                        backgroundColor: isPakistan ? "rgba(16, 185, 129, 0.2)" : `${theme.accentColor}25`,
-                        borderColor: isPakistan ? "#10b981" : theme.accentColor,
-                        color: isPakistan ? "#34d399" : theme.accentColor
-                      } : { color: theme.textColor }}
-                    >
-                      <span className="flex items-center gap-1.5">
-                        {country}
-                        {isPakistan && <span className="text-[10px] px-1 py-0.2 rounded bg-emerald-950/60 text-emerald-300 border border-emerald-500/40">🇵 monolithic</span>}
-                      </span>
-                      {isSelected ? (
-                        <span className="text-[9px] px-2 py-0.5 rounded-full font-bold shadow-sm" style={{ backgroundColor: isPakistan ? "#10b981" : theme.accentColor, color: "#ffffff" }}>
-                          ✓ Added
-                        </span>
-                      ) : (
-                        <span className="text-[9px] opacity-60">+ Add</span>
-                      )}
-                    </button>
-                  );
-                })}
-                {ALL_COUNTRIES.filter(country =>
-                  country.toLowerCase().includes(countrySearchQuery.toLowerCase())
-                ).length === 0 && (
-                  <div className="text-[10px] text-gray-500 font-mono text-center py-4">
-                    No countries match your search
+              {/* Dropdown Box Trigger */}
+              <button
+                type="button"
+                onClick={() => setIsCountryDropdownOpen(!isCountryDropdownOpen)}
+                className="glass-input w-full rounded-xl py-2.5 px-4 text-xs font-mono cursor-pointer transition-all duration-300 flex items-center justify-between focus:outline-none border hover:border-white/40"
+                style={{
+                  backgroundColor: theme.inputBg,
+                  borderColor: isCountryDropdownOpen ? theme.accentColor : (theme.isLight ? "#E5E5E5" : "transparent"),
+                  color: theme.textColor
+                }}
+              >
+                <span className="truncate pr-2 font-bold">
+                  {selectedCountries.length > 0
+                    ? `${selectedCountries.slice(0, 2).join(", ")}${selectedCountries.length > 2 ? ` (+${selectedCountries.length - 2} more)` : ""}`
+                    : "🌐 Global Audience (Select Countries...)"}
+                </span>
+                {isCountryDropdownOpen ? (
+                  <ChevronUp className="h-4 w-4 shrink-0" style={{ color: theme.accentColor }} />
+                ) : (
+                  <ChevronDown className="h-4 w-4 shrink-0 opacity-70" style={{ color: theme.textColor }} />
+                )}
+              </button>
+
+              {/* Expandable Tab / Dropdown with Search */}
+              {isCountryDropdownOpen && (
+                <div className="space-y-2.5 pt-2 border-t animate-fade-in" style={{ borderColor: `${theme.accentColor}25` }}>
+                  {/* Search Option */}
+                  <div className="relative">
+                    <Search className="absolute left-3 top-2.5 h-3.5 w-3.5" style={{ color: theme.accentColor }} />
+                    <input
+                      type="text"
+                      placeholder="Search countries (e.g. Pakistan, United States)..."
+                      value={countrySearchQuery}
+                      onChange={(e) => setCountrySearchQuery(e.target.value)}
+                      className="glass-input w-full rounded-xl py-2 pl-9 pr-8 text-xs font-mono transition-all duration-300 focus:outline-none"
+                      style={{ backgroundColor: theme.inputBg, borderColor: theme.isLight ? "#E5E5E5" : "transparent", color: theme.textColor }}
+                    />
+                    {countrySearchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setCountrySearchQuery("")}
+                        className="absolute right-3 top-2.5 text-[10px] cursor-pointer font-bold"
+                        style={{ color: theme.accentColor }}
+                      >
+                        Clear
+                      </button>
+                    )}
                   </div>
-                )}
-              </div>
 
-              {/* Selected Countries List Display */}
-              {selectedCountries.length > 0 ? (
-                <div className="space-y-1.5 pt-1 border-t" style={{ borderColor: `${theme.accentColor}30` }}>
-                  <span className="text-[9px] font-mono text-gray-400 uppercase tracking-wider block">
-                    Selected (V.O. Customizing):
-                  </span>
-                  <div className="flex flex-wrap gap-1">
-                    {selectedCountries.map((country) => {
+                  {/* List of Countries (Filtered) */}
+                  <div className="rounded-xl max-h-[160px] overflow-y-auto p-1.5 space-y-1 scrollbar-thin border glass-card" style={{ backgroundColor: theme.inputBg, borderColor: theme.accentColor }}>
+                    {ALL_COUNTRIES.filter(country =>
+                      country.toLowerCase().includes(countrySearchQuery.toLowerCase())
+                    ).map((country) => {
+                      const isSelected = selectedCountries.includes(country);
                       const isPakistan = country.includes("Pakistan");
                       return (
-                        <span
+                        <button
                           key={country}
-                          className="inline-flex items-center gap-1 text-[9px] font-mono px-2.5 py-1 rounded-full font-bold animate-fade-in glass-card shadow-md"
-                          style={{
-                            backgroundColor: isPakistan ? "#10b981" : theme.accentColor,
-                            color: "#ffffff"
+                          type="button"
+                          onClick={() => {
+                            if (isSelected) {
+                              setSelectedCountries(selectedCountries.filter(c => c !== country));
+                            } else {
+                              setSelectedCountries([...selectedCountries, country]);
+                            }
                           }}
+                          className={`glass-button w-full text-left px-2.5 py-1.5 rounded-xl text-xs font-mono transition-all flex items-center justify-between cursor-pointer border ${
+                            isSelected
+                              ? "font-extrabold shadow-md scale-[1.01]"
+                              : "border-transparent opacity-80 hover:opacity-100"
+                          }`}
+                          style={isSelected ? {
+                            backgroundColor: isPakistan ? "rgba(16, 185, 129, 0.2)" : `${theme.accentColor}25`,
+                            borderColor: isPakistan ? "#10b981" : theme.accentColor,
+                            color: isPakistan ? "#34d399" : theme.accentColor
+                          } : { color: theme.textColor }}
                         >
-                          {country}
-                          <button
-                            type="button"
-                            onClick={() => setSelectedCountries(selectedCountries.filter(c => c !== country))}
-                            className="hover:bg-black/30 text-white rounded-full w-3.5 h-3.5 flex items-center justify-center font-black cursor-pointer text-[9px]"
-                          >
-                            ×
-                          </button>
-                        </span>
+                          <span className="flex items-center gap-1.5">
+                            {country}
+                            {isPakistan && <span className="text-[10px] px-1 py-0.2 rounded bg-emerald-950/60 text-emerald-300 border border-emerald-500/40">🇵 monolithic</span>}
+                          </span>
+                          {isSelected ? (
+                            <span className="text-[9px] px-2 py-0.5 rounded-full font-bold shadow-sm shrink-0" style={{ backgroundColor: isPakistan ? "#10b981" : theme.accentColor, color: "#ffffff" }}>
+                              ✓ Added
+                            </span>
+                          ) : (
+                            <span className="text-[9px] opacity-60 shrink-0">+ Add</span>
+                          )}
+                        </button>
                       );
                     })}
+                    {ALL_COUNTRIES.filter(country =>
+                      country.toLowerCase().includes(countrySearchQuery.toLowerCase())
+                    ).length === 0 && (
+                      <div className="text-[10px] text-gray-500 font-mono text-center py-4">
+                        No countries match your search
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Selected Countries Pills inside expanded tab */}
+                  {selectedCountries.length > 0 && (
+                    <div className="space-y-1.5 pt-1 border-t" style={{ borderColor: `${theme.accentColor}20` }}>
+                      <span className="text-[9px] font-mono text-gray-400 uppercase tracking-wider block">
+                        Selected Regions ({selectedCountries.length}):
+                      </span>
+                      <div className="flex flex-wrap gap-1">
+                        {selectedCountries.map((country) => {
+                          const isPakistan = country.includes("Pakistan");
+                          return (
+                            <span
+                              key={country}
+                              className="inline-flex items-center gap-1 text-[9px] font-mono px-2.5 py-1 rounded-full font-bold animate-fade-in glass-card shadow-md"
+                              style={{
+                                backgroundColor: isPakistan ? "#10b981" : theme.accentColor,
+                                color: "#ffffff"
+                              }}
+                            >
+                              {country}
+                              <button
+                                type="button"
+                                onClick={() => setSelectedCountries(selectedCountries.filter(c => c !== country))}
+                                className="hover:bg-black/30 text-white rounded-full w-3.5 h-3.5 flex items-center justify-center font-black cursor-pointer text-[9px]"
+                              >
+                                ×
+                              </button>
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Done Button */}
+                  <div className="pt-1 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setIsCountryDropdownOpen(false)}
+                      className="text-[10px] font-mono font-bold px-3 py-1 rounded-lg border transition-all cursor-pointer hover:scale-105"
+                      style={{ backgroundColor: `${theme.accentColor}20`, borderColor: theme.accentColor, color: theme.accentColor }}
+                    >
+                      Done
+                    </button>
                   </div>
                 </div>
-              ) : (
-                <div className="text-[10px] text-gray-500 font-mono italic text-center pt-1">
-                  No countries selected (defaults to global audience)
+              )}
+
+              {/* Always show small selected pills summary when collapsed */}
+              {!isCountryDropdownOpen && selectedCountries.length > 0 && (
+                <div className="flex flex-wrap gap-1 pt-1">
+                  {selectedCountries.map((country) => {
+                    const isPakistan = country.includes("Pakistan");
+                    return (
+                      <span
+                        key={country}
+                        className="inline-flex items-center gap-1 text-[9px] font-mono px-2.5 py-0.5 rounded-full font-bold glass-card"
+                        style={{
+                          backgroundColor: isPakistan ? "#10b981" : `${theme.accentColor}20`,
+                          borderColor: isPakistan ? "#10b981" : theme.accentColor,
+                          color: isPakistan ? "#ffffff" : theme.accentColor
+                        }}
+                      >
+                        {country}
+                        <button
+                          type="button"
+                          onClick={() => setSelectedCountries(selectedCountries.filter(c => c !== country))}
+                          className="hover:bg-black/30 text-current rounded-full w-3 h-3 flex items-center justify-center font-black cursor-pointer text-[9px]"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    );
+                  })}
                 </div>
               )}
             </div>

@@ -640,6 +640,7 @@ app.post("/api/generate", verifyUserAuth as express.RequestHandler, async (req: 
   try {
     const {
       rawScript,
+      transformation,
       voicePersona,
       topicNiche,
       targetAudience,
@@ -660,10 +661,13 @@ app.post("/api/generate", verifyUserAuth as express.RequestHandler, async (req: 
     
     const modelToUse = req.body.model || "gemini-3.1-flash-lite";
 
-    // We will generate the following transformations in parallel:
-    const transformations = ["hindi", "urdu-roman", "urdu-writing", "english"];
+    // Build unique list of transformations ensuring user selected language is always included
+    const primaryTransform = transformation || "urdu-roman";
+    const defaultTransformations = ["hindi", "urdu-roman", "urdu-writing", "english"];
+    const transformations = Array.from(new Set([primaryTransform, ...defaultTransformations]));
 
     const generateForTransformation = async (transOpt: string) => {
+      const langInfo = resolveTargetLanguage(transOpt);
       const isIslamic = (topicNiche && topicNiche.toLowerCase().includes("islamic")) || 
                         (tutorialTone && tutorialTone.toLowerCase().includes("islamic"));
       const islamicInstruction = isIslamic ? `
@@ -681,110 +685,61 @@ Your goal is to completely transform the user's RAW input script into a pristine
 Strict rules for formatting and content:
 1. Avoid plagiarism. Rephrase every single sentence using the best possible wording, vocabulary, and sentence structures. Never copy phrases verbatim from the raw input unless they are highly specific medical/scientific names that cannot be translated or rephrased.
 2. Respect the VOICE PERSONA (Speaker) and GENDER persona:
-   - Voice Persona: ${voicePersona.toUpperCase()}
+   - Voice Persona: ${voicePersona ? voicePersona.toUpperCase() : "MALE"}
    - If Female: Use female grammatical conjugations, vocabulary, and styling (e.g. in Hindi/Urdu, use feminine gender verbs/pronouns like "kartii hoon", "rahii hoon", "merii", "jaungii", "sikhayungii"; in English, use warm, welcoming, friendly, empathetic, and inclusive vocabulary).
    - If Male: Use male grammatical conjugations, vocabulary, and styling (e.g. in Hindi/Urdu, use masculine gender verbs/pronouns like "karta hoon", "raha hoon", "mera", "jaunga", "sikhayunga"; in English, use confident, authoritative, energetic, and direct vocabulary).
 3. Apply the TRANSFORMATION option:
-   - Option selected: "${transOpt}"
-    - If "hindi": Translate/Rephrase entirely into Devanagari script (Hindi characters/writing). It MUST be written exactly in beautiful Hindi script (e.g. "अस्सलामु अलैकुम", "दोस्तों", "ज़िंदगी", "मुहब्बत", "ख़ुशामदीद", "शुक्रिया", "जनाब", "क्या आप जानते हैं", "आज हम बात करेंगे"). It is STRICTLY FORBIDDEN to use Roman Urdu or Latin letters for this option. The script must be in Devanagari characters but utilizing 100% beautiful spoken Urdu vocabulary, elegant Urdu sentence structures, and refined Urdu phonetic cadence. You MUST completely avoid pure, formal, or Sanskritized Hindi words (e.g., do NOT use 'नमस्ते', 'स्वागत', 'विषय', 'मित्र', 'सफलता', 'धन्यवाद', 'जीवन', 'ज्ञान', 'प्रयास', 'समय', 'महत्वपूर्ण', 'आवश्यकता', 'शिक्षक', 'कठिन', 'सरल', 'प्रश्न', 'उत्तर', 'विश्वास'). Instead, you MUST use their direct spoken Urdu equivalents written in Devanagari script: use 'अस्सलामु अलैकुम' instead of 'नमस्ते', 'ख़ुशामदीद' instead of 'स्वागत', 'दोस्तों'/'अज़ीज़ साथियों' instead of 'मित्रों', 'ज़िंदगी' instead of 'जीवन', 'इल्म'/'जानकारी' instead of 'ज्ञान', 'कोशिश' instead of 'प्रयास', 'वक़्त' instead of 'समय', 'ज़रूरी' instead of 'महत्वपूर्ण'/'आवश्यक', 'मुश्किल' instead of 'कठिन', 'आसान' instead of 'सरल', 'सवाल' instead of 'प्रश्न', 'जवाब' instead of 'उत्तर', 'यक़ीन' instead of 'विश्वास', 'कामयाबी' instead of 'सफलता', 'सफ़ر' instead of 'यात्रा', and 'शुक्रिया' instead of 'धन्यवाद'. The output must sound 100% like elegant spoken Urdu with a beautiful Urdu pronunciation, feelings, accent, and rhythm when read aloud, but written perfectly in Devanagari (Hindi) letters. Maintain highly natural video-script flow with warm, high-engagement phrasing.
+   - Option selected: "${transOpt}" (${langInfo.name}, ${langInfo.scriptHint})
+   - If "hindi": Translate/Rephrase entirely into Devanagari script (Hindi characters/writing). It MUST be written exactly in beautiful Hindi script (e.g. "अस्सलामु अलैकुम", "दोस्तों", "ज़िंदगी", "मुहब्बत", "ख़ुशामदीद", "शुक्रिया", "जनाब", "क्या आप जानते हैं", "आज हम बात करेंगे"). It is STRICTLY FORBIDDEN to use Roman Urdu or Latin letters for this option. The script must be in Devanagari characters but utilizing 100% beautiful spoken Urdu vocabulary, elegant Urdu sentence structures, and refined Urdu phonetic cadence. You MUST completely avoid pure, formal, or Sanskritized Hindi words.
    - If "urdu-roman": Translate/Rephrase entirely into Urdu written in Roman letters (e.g., "Assalamu Alaikum dosto, aaj hum baat karenge..."). Use conversational, native, and easy-to-read Roman Urdu wording.
    - If "english": Translate/Rephrase entirely into fluent, highly engaging English.
-   - If "urdu-writing": Translate/Rephrase entirely into beautiful, professional Urdu script (Nastaliq/Arabic script, using proper Urdu characters) in the authentic Pakistani Urdu language. You must use rich, elegant Pakistani Urdu vocabulary and proper Urdu Nastaliq punctuation, phrasing, and sentence structures. It is strictly forbidden to use English or Hindi words where proper Urdu equivalents exist. The output script must flow beautifully and natively in proper Urdu.
+   - If "urdu-writing": Translate/Rephrase entirely into beautiful, professional Urdu script (Nastaliq/Arabic script, using proper Urdu characters) in the authentic Pakistani Urdu language. You must use rich, elegant Pakistani Urdu vocabulary and proper Urdu Nastaliq punctuation, phrasing, and sentence structures.
+   - For all other target options (${langInfo.name}): Translate/Rephrase entirely into native, fluent, highly engaging ${langInfo.name} (${langInfo.scriptHint}).
 4. Adapt perfectly to the TARGET AUDIENCE:
-   - Option selected: "${targetAudience}"
+   - Option selected: "${targetAudience || "adults"}"
    - If "children": Target audience is Children up to 10 years old. Use very simple, exciting, energetic vocabulary. Include playful expressions and sound cue descriptors in square brackets (e.g. "[Gasp!]", "[Excited sound effect]", "[Cheerful laughter]") to guide the voice-over artist. Ensure the tone is friendly and highly educational yet fun.
    - If "adults": Target audience is Adults up to 40 years old. Use engaging, professional, analytical, and highly persuasive modern phrasing. Bring out interesting facts and maintain high narrative density.
    - If "seniors": Target audience is Men over 60 years old. Wording must be extremely respectful, polite, and paced. Use formal honorifics and mature vocabulary (e.g. in Hindi/Urdu, use "Aap", "Aadab", "Tashreef", "Shukriya", "Buzurgo"; in English, use clear, elegant, and classy prose with balanced, respectful phrasing).
 5. Tone / Niche Theme:
-   - Topic Niche: "${topicNiche}"
-   - Tutorial & Literature Tone: "${tutorialTone}"
+   - Topic Niche: "${topicNiche || "General"}"
+   - Tutorial & Literature Tone: "${tutorialTone || "Informative"}"
    - Align the rhythm, vocabulary, and metaphors with this category.
 6. Target Word Volume Expansion / Condensation Directive:
-   - The target word volume has been specified as: ${wordCount} words.
+   - The target word volume has been specified as: ${wordCount || 300} words.
    - You MUST ensure the final output script MEETS or EXCEEDS this target.
-   - If the raw input is brief (e.g., a one-minute draft or 100 words) but the requested word count is high (e.g., 1,500, 10,000, or 20,000 words), you MUST creatively, eloquently, and dramatically expand the content. Elaborate heavily on every key point, introduce comprehensive scientific or historical background, share descriptive real-world anecdotes, list interesting subtopics, supply detailed step-by-step explanations, provide relevant analogies, and craft engaging narrative details. Keep generating content until you meet or exceed the ${wordCount} word limit.
-   - If the raw input is extremely long (e.g., a one-hour script or 15,000 words) but the target word count is smaller (e.g., 300 words, 1,500 words), you must selectively extract, condense, and synthesize the most captivating highlights into a tight, high-density format matching the ${wordCount} word target.
-   - Do not truncate abruptly; maintain a highly professional, well-rounded beginning, body, and conclusion that fits the specified target gracefully.
+   - If the raw input is brief but the requested word count is high, expand creatively and thoroughly. If long, condense effectively while preserving high value.
 7. Structure, Hooks, and Dynamic Language-Aware Section Headings (CRITICAL):
    - Custom Hook requested: "${customHook || "None"}"
    - Greetings Prefix: "${greetingsPrefix || "None"}"
    - SECTION STRUCTURE & LANGUAGE-AWARE TITLE FORMAT DIRECTIVE:
-${includeHooksBodyConclusion ? `     You MUST organize the script into distinct, well-structured sections.
-     EVERY section MUST start with a clean, plain text descriptive title written ENTIRELY IN THE TARGET LANGUAGE (${transOpt}).
-     Both the section prefix ("Section N – " / "سیکشن N – " / "सेक्शन N – ") AND the descriptive topic title MUST MATCH the selected output language ("${transOpt}") in script, vocabulary, and phrasing.
-
-     EXACT LANGUAGE-SPECIFIC EXAMPLES:
-     • English ("english"):
-       Section 1 – Hook
-       Section 1 – Introduction
-       Section 2 – Benefits of Water
-       Section 3 – Importance of Hydration
-       Section 4 – Common Mistakes
-       Section 5 – Practical Tips
-       Section 6 – Conclusion
-
-     • Urdu Script ("urdu-writing"):
-       سیکشن 1 – تعارف / ہک
-       سیکشن 2 – پانی کے فوائد
-       سیکشن 3 – جسم میں پانی کی اہمیت
-       سیکشن 4 – عام غلطیاں
-       سیکشن 5 – عملی مشورے
-       سیکشن 6 – نتیجہ
-
-     • Hindi Devanagari Script ("hindi"):
-       सेक्शन 1 – परिचय / हुक
-       सेक्शन 2 – पानी के फायदे
-       सेक्शन 3 – शरीर में पानी का महत्व
-       सेक्शन 4 – आम गलतियाँ
-       सेक्शन 5 – उपयोगी सुझाव
-       सेक्शन 6 – निष्कर्ष
-
-     • Roman Urdu ("urdu-roman"):
-       Section 1 – Ta'aruf / Hook
-       Section 2 – Pani ke Fawaid
-       Section 3 – Jism mein Pani ki Ahmiyat
-       Section 4 – Aam Ghaltiyan
-       Section 5 – Amali Mashwaray
-       Section 6 – Natija
-
-     • Other / Future Languages:
-       Dynamically localize both the section prefix word (e.g., Section / سیکشن / सेक्शन / Sezione / Sección) and the descriptive topic title into natural, native-quality phrasing matching that language.
-
-     MANDATORY LANGUAGE-AWARE HEADING RULES:
-     a) Every section heading MUST match the selected output language ("${transOpt}"). Automatically generate and translate both the section prefix and topic title in native-quality phrasing appropriate for "${transOpt}".
-     b) Introduction Heading: For the first section, use a localized descriptive title such as "Section 1 – Hook" / "Section 1 – Introduction" in English, "سیکشن 1 – تعارف" or "سیکشن 1 – ہک" in Urdu, "सेक्शन 1 – परिचय" or "सेक्शन 1 – हुक" in Hindi, "Section 1 – Ta'aruf" in Roman Urdu.
-     c) Body Headings: Generate unique, contextually accurate section titles summarizing the specific topic/theme of that paragraph dynamically localized in the target language (e.g. "سیکشن 2 – پانی کے فوائد", "सेक्शन 2 – पानी के फायदे", "Section 2 – Pani ke Fawaid").
-     d) Final Heading: For the final section, use a localized conclusion title such as "Section X – Conclusion" in English, "سیکشن X – نتیجہ" in Urdu, "सेक्शन X – निष्कर्ष" in Hindi, "Section X – Natija" in Roman Urdu (where X is the final section number).
-     e) STRICT FORMATTING CLEANLINESS: Do NOT use asterisks (*), hash symbols (#), markdown bold/italics, brackets (parentheses () or square brackets []), bullets, or any other formatting symbols in the section headings or text. Output ONLY clean, plain text headings on their own line, followed by the polished paragraph.` : `     Structure naturally into clean paragraphs. If section headings are included, ensure they are written entirely in the selected target language ("${transOpt}") in clean plain text format without asterisks (*), brackets (), or markdown symbols (#).`}
-   - Incorporate the custom hook "${customHook || ""}" and greeting "${greetingsPrefix && greetingsPrefix !== "None" ? greetingsPrefix : ""}" beautifully at the very beginning of Section 1 to hook the listener instantly.
-   - At the very end of the Conclusion/outro section (or as the final block of the script output), you MUST always include the following call-to-action subscription text adapted to the selected language:
-     * If the selected transformation option is "urdu-writing": "دوستو اگر ویڈیو پسند آئی ہو تو اسے لائک کریں اور ایسی مزید معلوماتی ویڈیوز کے لیے ہمارے چینل کو سبسکرائب ضرور کریں اور بیل آئیکن دبانا مت بھولیے گا۔"
-     * If the selected transformation option is "hindi": "दोस्तों अगर वीडियो पसंद आई हो तो इसे लाइक करें और ऐसी मज़ीद मालूमती वीडियोज़ के लिए हमारे चैनल को सब्सक्राइब ज़रूर करें और बेल आइकन दबाना मत भूलिए गा।"
-     * If the selected transformation option is "urdu-roman": "Dosto agar video pasand aayi ho to ise like karein aur aisi mazeed malumaati videos ke liye humare channel ko subscribe zaroor karein aur bell icon dabana mat bhooliyega."
-     * If the selected transformation option is "english": "Friends, if you liked this video, please like it, and for more informative videos like this, be sure to subscribe to our channel and don't forget to press the bell icon."
+${includeHooksBodyConclusion ? `     You MUST organize the script into distinct, well-structured sections written ENTIRELY IN THE TARGET LANGUAGE (${langInfo.name}).
+     EVERY section MUST start with a clean, plain text descriptive title written ENTIRELY IN THE TARGET LANGUAGE (${langInfo.name}, ${langInfo.scriptHint}).
+     Both the section prefix AND the descriptive topic title MUST MATCH the selected output language ("${langInfo.name}") in script, vocabulary, and phrasing.
+     Do NOT use asterisks (*), hash symbols (#), markdown bold/italics, or brackets []. Output ONLY clean, plain text headings on their own line, followed by the polished paragraph.` : `     Structure naturally into clean paragraphs written in ${langInfo.name}. If section headings are included, ensure they are written entirely in ${langInfo.name} (${langInfo.scriptHint}) in clean plain text format without asterisks (*), brackets (), or markdown symbols (#).`}
+   - Incorporate the custom hook "${customHook || ""}" and greeting "${greetingsPrefix && greetingsPrefix !== "None" ? greetingsPrefix : ""}" beautifully at the very beginning to hook the listener instantly.
+   - At the very end of the Conclusion/outro section, you MUST always include a call-to-action subscription message encouraging viewers to like the video and subscribe to the channel, written natively in ${langInfo.name} (${langInfo.scriptHint}).
 
 8. ABSOLUTE DIVERSITY REQUIREMENT:
-   - Introduce a totally fresh, unique perspective, phrasing style, and layout for this script. Do not reuse similar phrasing patterns or sentence structures from previous generations. Every generation must be highly dynamic and unique.
+   - Introduce a totally fresh, unique perspective, phrasing style, and layout for this script.
    - Internal Entropy Seed: ${Math.random().toString(36).substring(2, 10)}
 
 9. TARGET REGIONS / COUNTRIES COMPLIANCE:
    - Selected Target Regions/Countries: ${selectedCountries && selectedCountries.length > 0 ? selectedCountries.join(", ") : "Global audience"}
-   - If specific countries or regions are selected, you MUST deeply customize the script's cultural references, local context, statistics, examples, dialects/idiomatic preferences, and vocabulary specifically to match and appeal to the native population of those regions. Incorporate region-specific nuances or locally relatable anecdotes of the selected countries to make the content highly localized and high-converting.
 
 ${islamicInstruction}
 
-Ensure the output is strictly the polished script itself, completely ready to read or perform, containing zero meta-commentary, zero "Sure, here is your script" or filler explanations. Just output the final polished script.
+Ensure the output is strictly the polished script itself, completely ready to read or perform, containing zero meta-commentary, zero filler explanations. Just output the final polished script in ${langInfo.name}.
 `;
 
       const prompt = `
-Please rephrase and transform the following raw source script.
+Please rephrase and transform the following raw source script into ${langInfo.name} (${langInfo.scriptHint}).
 
 RAW SOURCE SCRIPT:
 """
 ${rawScript}
 """
 
-Ensure the output is 100% plagiarism-free, customized for a ${voicePersona} speaker, written in the "${transOpt}" format, targeted at ${targetAudience}, following the "${topicNiche}" niche and "${tutorialTone}" tone, and starting with greeting "${greetingsPrefix || ""}" and hook "${customHook || ""}".
+Ensure the output is 100% plagiarism-free, customized for a ${voicePersona || "MALE"} speaker, written natively in ${langInfo.name} (${langInfo.scriptHint}), targeted at ${targetAudience || "adults"}, following the "${topicNiche || "General"}" niche and "${tutorialTone || "Informative"}" tone.
 `;
 
       const response = await generateContentWithRetry(ai, {
@@ -792,14 +747,14 @@ Ensure the output is 100% plagiarism-free, customized for a ${voicePersona} spea
         contents: prompt,
         config: {
           systemInstruction,
-          temperature: 0.82, // High temperature to force creative variations
+          temperature: 0.82,
         },
       });
 
       return (response.text || "").trim();
     };
 
-    // Execute all 4 generations in parallel to minimize response time
+    // Execute generations in parallel
     const results = await Promise.all(
       transformations.map(async (opt) => {
         try {
@@ -820,6 +775,7 @@ Ensure the output is 100% plagiarism-free, customized for a ${voicePersona} spea
     res.json({
       rawInput: rawScript,
       polishedScripts,
+      polishedScript: polishedScripts[primaryTransform] || Object.values(polishedScripts)[0] || "",
       modelUsed: modelToUse,
     });
   } catch (error: any) {
@@ -1125,11 +1081,43 @@ The prompt MUST be on a single contiguous line of text, containing ONLY the prom
   }
 });
 
+function resolveTargetLanguage(langInput: string): { name: string; scriptHint: string; isRtl: boolean } {
+  if (!langInput || !langInput.trim()) return { name: "English", scriptHint: "English language", isRtl: false };
+  const key = langInput.toLowerCase().trim();
+  if (key === "urdu-writing") return { name: "Urdu", scriptHint: "written in elegant Urdu Nastaliq script", isRtl: true };
+  if (key === "urdu-roman") return { name: "Urdu Roman", scriptHint: "written in Roman Urdu (Latin alphabet)", isRtl: false };
+  if (key === "hindi") return { name: "Hindi", scriptHint: "written in Devanagari script", isRtl: false };
+  if (key === "english") return { name: "English", scriptHint: "written in English", isRtl: false };
+  if (key === "spanish") return { name: "Spanish", scriptHint: "written in Spanish", isRtl: false };
+  if (key === "french") return { name: "French", scriptHint: "written in French", isRtl: false };
+  if (key === "german") return { name: "German", scriptHint: "written in German", isRtl: false };
+  if (key === "arabic") return { name: "Arabic", scriptHint: "written in Arabic script", isRtl: true };
+  if (key === "bengali") return { name: "Bengali", scriptHint: "written in Bengali script", isRtl: false };
+  if (key === "portuguese") return { name: "Portuguese", scriptHint: "written in Portuguese", isRtl: false };
+  if (key === "russian") return { name: "Russian", scriptHint: "written in Cyrillic Russian script", isRtl: false };
+  if (key === "japanese") return { name: "Japanese", scriptHint: "written in Japanese", isRtl: false };
+  if (key === "chinese-simplified") return { name: "Chinese (Simplified)", scriptHint: "written in Simplified Chinese", isRtl: false };
+  if (key === "chinese-traditional") return { name: "Chinese (Traditional)", scriptHint: "written in Traditional Chinese", isRtl: false };
+  if (key === "indonesian") return { name: "Indonesian", scriptHint: "written in Indonesian", isRtl: false };
+  if (key === "turkish") return { name: "Turkish", scriptHint: "written in Turkish", isRtl: false };
+  if (key === "italian") return { name: "Italian", scriptHint: "written in Italian", isRtl: false };
+  if (key === "korean") return { name: "Korean", scriptHint: "written in Hangul Korean", isRtl: false };
+  if (key === "farsi") return { name: "Persian / Farsi", scriptHint: "written in Persian script", isRtl: true };
+  if (key === "pashto") return { name: "Pashto", scriptHint: "written in Pashto script", isRtl: true };
+  if (key === "sindhi") return { name: "Sindhi", scriptHint: "written in Sindhi script", isRtl: true };
+  if (key === "punjabi") return { name: "Punjabi", scriptHint: "written in Punjabi script", isRtl: false };
+
+  const cap = langInput.charAt(0).toUpperCase() + langInput.slice(1);
+  return { name: cap, scriptHint: `written in ${cap}`, isRtl: false };
+}
+
 // YouTube & Social Media Growth Strategist Metadata API
 app.post("/api/generate-ctr", verifyUserAuth as express.RequestHandler, async (req: AuthenticatedRequest, res) => {
   try {
     const {
       transcript,
+      language,
+      transformation,
       toggleTitle,
       toggleDescription,
       toggleTimestamps,
@@ -1143,6 +1131,7 @@ app.post("/api/generate-ctr", verifyUserAuth as express.RequestHandler, async (r
     }
 
     const ai = req.userAiClient!;
+    const langInfo = resolveTargetLanguage(language || transformation);
     
     // Construct dynamic prompt based on toggles
     const prompt = `
@@ -1155,6 +1144,7 @@ ${transcript}
 """
 
 Video Duration: ${videoDuration || "10:00"}
+TARGET OUTPUT LANGUAGE: ${langInfo.name} (${langInfo.scriptHint}).
 
 Please generate only the requested metadata segments below (if set to true):
 - Generate Title Options (titles): ${toggleTitle ? "YES" : "NO"}
@@ -1164,11 +1154,11 @@ Please generate only the requested metadata segments below (if set to true):
 - Generate SEO Tags (tags): ${toggleTags ? "YES" : "NO"}
 
 Strict Requirements:
-1. "titles": (If YES) Generate exactly 10 high-CTR title options.
+1. "titles": (If YES) Generate exactly 10 high-CTR title options ENTIRELY IN THE TARGET LANGUAGE (${langInfo.name}).
    - Use power words: Secret, Exposed, Why, How, I Tried. Add [Brackets] if relevant.
    - Keep titles between 50-60 characters, utilizing curiosity gaps and putting high-value keywords first.
-   - Provide titles categorized beautifully by language: English, Urdu, and Hindi. Separated clearly by language, NOT mixed.
-2. "description": (If YES) SEO description of exactly 2 paragraphs.
+   - All titles MUST be written natively in ${langInfo.name} (${langInfo.scriptHint}) to match the target transcript language.
+2. "description": (If YES) SEO description of exactly 2 paragraphs written in ${langInfo.name}.
    - First line must be a highly engaging hook.
    - Include high-traffic keywords and a clear Call-To-Action (CTA). No fluff.
    - POLICY AND MONETIZATION SAFETY COMPLIANCE (CRITICAL): Do NOT use sensitive, overly dramatic medical claims, pseudo-medical claims, or unverified scientific statements that violate monetization policies. Specifically:
@@ -1176,20 +1166,20 @@ Strict Requirements:
      * NEVER claim direct biological cure/regulatory statements (e.g. do NOT write "works by regulating insulin resistance", "completely cures blood sugar spikes").
      * NEVER suggest bypassing standard healthcare or medications (e.g. do NOT write "without expensive medications", "avoid doctors", "alternatives to surgery").
      * Instead, frame all description insights safely and educationally, focusing on healthy habit discussions, scientific curiosity, educational exploration, and general lifestyle awareness. Use cautious, compliant, and supportive terminology.
-3. "timestamps": (If YES) Chronological list of timestamps outlining the video progression.
+3. "timestamps": (If YES) Chronological list of timestamps outlining the video progression with labels in ${langInfo.name}.
    - Automatically detect topic shifts from the transcript.
    - Provide between 8 to 12 chronological chapters starting at "00:00".
    - Estimate the timestamp times proportionally based on the transcript's logical progression and total duration of "${videoDuration || "10:00"}".
-   - Each timestamp must be an object with keys: "time" (e.g., "02:14") and "label" (e.g., "Topic Shift Label").
+   - Each timestamp must be an object with keys: "time" (e.g., "02:14") and "label" (e.g., "Topic Shift Label in ${langInfo.name}").
 4. "hashtags": (If YES) Exactly 15 high-ranking YouTube hashtags, each starting with the '#' symbol.
-5. "tags": (If YES) Exactly 15 highly-optimized SEO tags, returned as an array of comma-separated keyword strings.
+5. "tags": (If YES) Exactly 15 highly-optimized SEO tags, returned as an array of keyword strings relevant to ${langInfo.name}.
 
 All content must be 100% based on the transcript with NO hallucinations or outside filler.
 
 Return your response as a valid JSON object matching this schema:
 {
   "titles": ["Title 1", "Title 2", ...],
-  "description": "SEO description...",
+  "description": "SEO description in ${langInfo.name}...",
   "timestamps": [{"time": "00:00", "label": "Hook title"}, ...],
   "hashtags": ["#tag1", "#tag2", ...],
   "tags": ["tag1", "tag2", ...]
@@ -1273,6 +1263,8 @@ app.post("/api/generate-thumbnail-prompt", verifyUserAuth as express.RequestHand
   try {
     const {
       transcript,
+      language,
+      transformation,
       bgColor,
       headline,
       smallTagline,
@@ -1289,6 +1281,7 @@ app.post("/api/generate-thumbnail-prompt", verifyUserAuth as express.RequestHand
     }
 
     const ai = req.userAiClient!;
+    const langInfo = resolveTargetLanguage(language || transformation);
 
     // Prepare multimodal inline data if character image is attached
     let inlineDataPart: any = null;
@@ -1318,7 +1311,7 @@ app.post("/api/generate-thumbnail-prompt", verifyUserAuth as express.RequestHand
 - Create a cinematic YouTube thumbnail optimized for a 16:9 layout.
 - Composition Guidelines:
   * Keep the main character on the left or right third.
-  * Leave large clean negative space for bold headline text.
+  * Leave large clean negative space for bold headline text in ${langInfo.name}.
   * Position the main object (fruit, medicine, food, organ, etc.) opposite the character.
   * Everything should remain inside the safe area.
   * No important elements should touch the edges.
@@ -1330,19 +1323,18 @@ app.post("/api/generate-thumbnail-prompt", verifyUserAuth as express.RequestHand
 - Create a vertical thumbnail optimized for YouTube Shorts, Instagram Reels, and TikTok.
 - YOU MUST format the generated positive prompt strictly matching either of these two exact styles:
   * Style A (Structure-based with TOP/CENTER/SUBJECT/BACKGROUND/COLORS):
-    "Create a highly engaging YouTube [Niche/Category] vertical 9:16 thumbnail. TOP: Large bold Urdu headline '[Urdu Headline Text]' in elegant, thick Nastaliq font. CENTER: A high-quality, close-up portrait of [the character from the reference image / attached creator photo] with a [highly expressive emotion, e.g. intense curiosity and positive discovery, eyes wide and a slight smile], wearing [adapt attire to match occupation/field, integrated with traditional Pakistani dress, e.g., a professional doctor's lab coat styled over an elegant traditional Pakistani Shalwar Kameez]. SUBJECT: Below the character, [the main object, e.g., in her hand she is holding a steaming cup of coffee with a single, clear, whole clove resting on top, glowing with a soft neon green energy]. BACKGROUND: [Describe premium gradient background, e.g., a premium vertical linear gradient from #01c101 at the top to #004701 at the bottom], blended with [subtle visual effects, e.g., abstract floating health-related digital graphics]. COLORS: Use [List colors, e.g., Neon Green (#00FF01) and White (#FFFFFF)] for text accents. BOTTOM: A smaller, high-contrast Urdu tagline '[Urdu Tagline Text]'. Typography must be mobile-readable, ultra-realistic, cinematic studio lighting, high contrast, sharp focus, viral YouTube style, professional [Niche Theme] design, maximum CTR optimization, clean bold composition with [the character from the reference image / attached creator photo] as the primary focal point."
+    "Create a highly engaging YouTube [Niche/Category] vertical 9:16 thumbnail. TOP: Large bold headline '[Headline Text in ${langInfo.name}]' in elegant, high-impact font (${langInfo.scriptHint}). CENTER: A high-quality, close-up portrait of [the character from the reference image / attached creator photo] with a [highly expressive emotion, e.g. intense curiosity and positive discovery, eyes wide and a slight smile], wearing [adapt attire to match occupation/field]. SUBJECT: Below the character, [the main object, e.g., in her hand she is holding a steaming cup of coffee with a single, clear, whole clove resting on top, glowing with a soft neon green energy]. BACKGROUND: [Describe premium gradient background, e.g., a premium vertical linear gradient from #01c101 at the top to #004701 at the bottom], blended with [subtle visual effects, e.g., abstract floating health-related digital graphics]. COLORS: Use [List colors, e.g., Neon Green (#00FF01) and White (#FFFFFF)] for text accents. BOTTOM: A smaller, high-contrast tagline '[Tagline Text in ${langInfo.name}]'. Typography must be mobile-readable, ultra-realistic, cinematic studio lighting, high contrast, sharp focus, viral YouTube style, professional [Niche Theme] design, maximum CTR optimization, clean bold composition with [the character from the reference image / attached creator photo] as the primary focal point."
   
   * Style B (Sectional layout with TOP SECTION / MIDDLE/BOTTOM SECTION / BACKGROUND / STYLE):
-    "Create a highly engaging YouTube [Niche/Category] thumbnail in a 9:16 vertical aspect ratio. TOP SECTION: High-impact bold Urdu text overlays using [List colors, e.g. Neon Green (#00FF01)] for the main headline '[Urdu Headline Text]' and [List colors, e.g. White (#FFFFFF)] for the tagline '[Urdu Tagline Text]'. Typography must be ultra-readable and professional. MIDDLE/BOTTOM SECTION: A high-detail close-up of [the character from the reference image / attached creator photo], wearing [adapt attire to match occupation/field, e.g., clean white traditional Pakistani tunic/Shalwar Kameez or doctor's coat over traditional dress], looking at the camera with a [highly expressive emotion, e.g. shocked and cautionary] facial expression. [The character from the reference image / attached creator photo] is the primary focal point. Near or below them, [describe the items, fruits, medicines, or elements, e.g., a hyper-realistic cup of coffee with swirling steam transitions into glowing neon green medical symbols, such as a heartbeat pulse line]. BACKGROUND: [Describe premium gradient background, e.g., a premium linear gradient from #01c101 to #004701 with subtle abstract light leaks and high-tech health-inspired bokeh]. STYLE: Cinematic lighting, high contrast, sharp focus, viral YouTube Shorts thumbnail style, clean bold composition, maximum CTR optimization."
+    "Create a highly engaging YouTube [Niche/Category] thumbnail in a 9:16 vertical aspect ratio. TOP SECTION: High-impact bold text overlays in ${langInfo.name} (${langInfo.scriptHint}) using [List colors, e.g. Neon Green (#00FF01)] for the main headline '[Headline Text in ${langInfo.name}]' and [List colors, e.g. White (#FFFFFF)] for the tagline '[Tagline Text in ${langInfo.name}]'. Typography must be ultra-readable and professional. MIDDLE/BOTTOM SECTION: A high-detail close-up of [the character from the reference image / attached creator photo], wearing [adapt attire to match occupation/field], looking at the camera with a [highly expressive emotion, e.g. shocked and cautionary] facial expression. [The character from the reference image / attached creator photo] is the primary focal point. Near or below them, [describe the items, fruits, medicines, or elements]. BACKGROUND: [Describe premium gradient background, e.g., a premium linear gradient from #01c101 to #004701 with subtle abstract light leaks and high-tech health-inspired bokeh]. STYLE: Cinematic lighting, high contrast, sharp focus, viral YouTube Shorts thumbnail style, clean bold composition, maximum CTR optimization."
 
 - Strict Composition Rules:
-  * ALWAYS MENTION THE ATTACHED PHOTO / REFERENCE IMAGE: Always state that the generator must use the attached creator photo / reference image as the primary focal point (e.g., "portrait of the woman from the reference image" or "using the uploaded creator photo/reference image as the main subject").
-  * TEXT ON TOP: The main Urdu text / headline overlays must be placed in the upper part of the thumbnail, strictly above the character (in the top 20–30% of the vertical layout).
+  * ALWAYS MENTION THE ATTACHED PHOTO / REFERENCE IMAGE: Always state that the generator must use the attached creator photo / reference image as the primary focal point (e.g., "portrait of the person from the reference image" or "using the uploaded creator photo/reference image as the main subject").
+  * TEXT ON TOP: The main text / headline overlays MUST be written ENTIRELY IN THE TARGET LANGUAGE (${langInfo.name}), placed in the upper part of the thumbnail, strictly above the character.
   * CHARACTER IN CENTER: The human character (drawn from the reference image) must be in the middle / center of the vertical thumbnail layout.
   * CHARACTER DRESS / ATTIRE (CRITICAL):
     - Dynamically adapt the character's attire to match their field, occupation, or role in the script (for example, if the script/niche is about health/medical, they should wear a doctor's outfit like a white lab coat; if a mechanic, a mechanic's jumpsuit/outfit; if an organic farmer, suitable rustic clothes, etc.).
-    - Crucially, the attire must be a traditional Pakistani dress (Shalwar Kameez) adapted or integrated beautifully to fit that professional field (e.g. traditional Pakistani Shalwar Kameez style doctor's white coat or elegant traditional Pakistani attire representing that occupation/domain). Shalwar Kameez is the primary standard choice.
-  * ITEMS BELOW CHARACTER: Any items, products, or elements mentioned in the script (for example, fruits, cloves, medicines, organic herbs, supplements, tools, or relevant objects) must be positioned in the lower portion of the image, below the character's chest/hand area.
+  * ITEMS BELOW CHARACTER: Any items, products, or elements mentioned in the script must be positioned in the lower portion of the image, below the character's chest/hand area.
   * Ensure the character's face is never cropped and has a clear, powerful emotional expression.
   * Keep all critical elements inside the vertical safe area with zero empty side space.
   * Maintain a strong visual vertical hierarchy: Headline Text on top -> Character in middle/center -> Script Items below the character.
@@ -1353,7 +1345,7 @@ app.post("/api/generate-thumbnail-prompt", verifyUserAuth as express.RequestHand
 - Detected Selected Thumbnail Format: 1:1 (Square - Facebook / Instagram Feed).
 - Create a square thumbnail optimized for Facebook, Instagram Feed, and social media.
 - Composition Rules:
-  * Place the headline text across the upper portion.
+  * Place the headline text in ${langInfo.name} across the upper portion.
   * Place the main object near the upper-middle.
   * Place the human character in the center or lower-middle.
   * If necessary, slightly overlap the object and character to create depth.
@@ -1364,7 +1356,7 @@ app.post("/api/generate-thumbnail-prompt", verifyUserAuth as express.RequestHand
     } else {
       formatGuidelines = `
 - Detected Selected Thumbnail Format: Standard (No specific aspect ratio requested).
-- Create a premium YouTube-quality thumbnail with balanced composition, readable overlays, and high CTR focus.
+- Create a premium YouTube-quality thumbnail with balanced composition, readable overlays in ${langInfo.name}, and high CTR focus.
 `;
     }
 
@@ -1378,7 +1370,7 @@ Universal Rules (Apply to ALL Formats):
 - High contrast.
 - Dramatic cinematic lighting.
 - Sharp focus.
-- Large readable headline.
+- Large readable headline in ${langInfo.name}.
 - Clean composition.
 - No clutter.
 - No watermarks.
@@ -1416,12 +1408,16 @@ NO CHARACTER IMAGE ATTACHED:
     if (selectedEngine === "flux1") {
       const prompt = `
 You are an expert YouTube Thumbnail Director, Visual Designer, and CTR Optimization expert specializing in highly trained "FLUX 1" visual image generation prompts.
-Create a highly engaging, viral YouTube thumbnail concept, positive prompt, negative prompt, and Urdu poster text overlay parameters based on the provided video transcript.
+Create a highly engaging, viral YouTube thumbnail concept, positive prompt, negative prompt, and poster text overlay parameters based on the provided video transcript.
 
 TRANSCRIPT:
 """
 ${transcript}
 """
+
+TARGET OUTPUT LANGUAGE: ${langInfo.name} (${langInfo.scriptHint}).
+IMPORTANT RULE FOR TEXT OVERLAYS:
+All text overlays, headlines, taglines, and poster text parameters MUST be written ENTIRELY IN THE TARGET LANGUAGE (${langInfo.name}). Do NOT output in Urdu if the target language is ${langInfo.name}.
 
 Design parameters to integrate:
 - Background Colors: ${bgColor || "Slate black, dark green gradient"}
@@ -1437,16 +1433,16 @@ ${islamicThumbnailInstruction}
 ${imageInstruction}
 
 Strict Rules for FLUX 1 Prompt Creation:
-1. The "fluxScenePrompt" MUST be in English only, with NO Urdu/Arabic/Latin text/letters/words written in the image itself. It should describe the visual layout perfectly matching the selected format guidelines. It should be a single highly-detailed paragraphs, fully descriptive, cinematic, and clear.
+1. The "fluxScenePrompt" MUST be in English only (describing visual components), with NO embedded text/letters/words written in the image itself. It should describe the visual layout perfectly matching the selected format guidelines. It should be a single highly-detailed paragraph, fully descriptive, cinematic, and clear.
 2. It must explicitly include empty spaces reserved for text overlays:
    - For landscape (16:9): "Empty clear space reserved on the right side (or left side) for bold headline text. No text, no letters, no watermark."
    - For vertical (9:16): "Empty clear space reserved at the very top and very bottom for title text. No text, no letters, no words."
    - For square (1:1): "Empty clear space across the upper portion for headline text. No text, no letters, no watermark."
 3. The "fluxNegativePrompt" must be a robust set of negative terms to prevent text generation inside the FLUX 1 image:
    "low quality, blurry, bad anatomy, deformed hands, extra fingers, text, letters, words, watermark, gibberish script, distorted face, cartoon"
-4. Create high-impact Urdu translations for the overlay:
-   - "headlineUrdu": A bold, high-click-through Urdu headline in Nastaliq script (3-4 words max).
-   - "smallTaglineUrdu": A matching small Urdu tagline in Nastaliq script.
+4. Create high-impact text overlays in ${langInfo.name}:
+   - "headlineUrdu" / "headlineText": A bold, high-click-through headline written ENTIRELY in ${langInfo.name} (${langInfo.scriptHint}, 3-4 words max).
+   - "smallTaglineUrdu" / "smallTaglineText": A matching small tagline written ENTIRELY in ${langInfo.name} (${langInfo.scriptHint}).
 5. Determine the appropriate overlay node coordinate percentages, stroke styling, and hex color codes based on parameters:
    - For landscape: headingYPercent = 0.08, taglineYPercent = 0.22, strokeWidth = 5.
    - For vertical: headingYPercent = 0.10, taglineYPercent = 0.92 (or 0.20), strokeWidth = 6.
@@ -1461,8 +1457,8 @@ Return your response as a valid JSON object matching this schema:
 {
   "fluxScenePrompt": "The detailed English positive scene prompt...",
   "fluxNegativePrompt": "The negative prompt terms...",
-  "headlineUrdu": "High-impact Urdu headline...",
-  "smallTaglineUrdu": "Matching small Urdu tagline...",
+  "headlineUrdu": "High-impact headline in ${langInfo.name}...",
+  "smallTaglineUrdu": "Matching small tagline in ${langInfo.name}...",
   "textColor": "#FFFFFF or similar hex color",
   "strokeColor": "#00FF01 or similar hex color",
   "strokeWidth": 6,
@@ -1521,20 +1517,15 @@ Return your response as a valid JSON object matching this schema:
         const parsed = JSON.parse(response.text || "{}");
         data = {
           engine: "flux1",
-          thumbnailPrompt: parsed.fluxScenePrompt, // Fallback combined string
           fluxScenePrompt: parsed.fluxScenePrompt,
           fluxNegativePrompt: parsed.fluxNegativePrompt,
           headlineUrdu: parsed.headlineUrdu,
           smallTaglineUrdu: parsed.smallTaglineUrdu,
-          overlayFields: {
-            heading_text: parsed.headlineUrdu,
-            tagline_text: parsed.smallTaglineUrdu,
-            text_color: parsed.textColor,
-            stroke_color: parsed.strokeColor,
-            stroke_width: parsed.strokeWidth,
-            heading_y_percent: parsed.headingYPercent,
-            tagline_y_percent: parsed.taglineYPercent
-          },
+          textColor: parsed.textColor,
+          strokeColor: parsed.strokeColor,
+          strokeWidth: parsed.strokeWidth,
+          headingYPercent: parsed.headingYPercent,
+          taglineYPercent: parsed.taglineYPercent,
           emptyLatentImage: {
             width: parsed.emptyLatentImageWidth,
             height: parsed.emptyLatentImageHeight
@@ -1543,20 +1534,15 @@ Return your response as a valid JSON object matching this schema:
       } catch {
         data = {
           engine: "flux1",
-          thumbnailPrompt: "",
           fluxScenePrompt: "",
           fluxNegativePrompt: "",
           headlineUrdu: "",
           smallTaglineUrdu: "",
-          overlayFields: {
-            heading_text: "",
-            tagline_text: "",
-            text_color: "#FFFFFF",
-            stroke_color: "#00FF01",
-            stroke_width: 6,
-            heading_y_percent: 0.10,
-            tagline_y_percent: 0.92
-          },
+          textColor: "#FFFFFF",
+          strokeColor: "#00FF01",
+          strokeWidth: 6,
+          headingYPercent: 0.10,
+          taglineYPercent: 0.92,
           emptyLatentImage: {
             width: 1024,
             height: 1820
@@ -1569,12 +1555,16 @@ Return your response as a valid JSON object matching this schema:
       // Default: Nano Banana 2
       const prompt = `
 You are an expert YouTube Thumbnail Director, Visual Designer, and CTR Optimization expert specializing in highly trained "Nano Banana 2" visual image generation prompts.
-Create a highly engaging, viral YouTube thumbnail concept and Urdu text overlays based on the provided video transcript.
+Create a highly engaging, viral YouTube thumbnail concept and text overlays based on the provided video transcript.
 
 TRANSCRIPT:
 """
 ${transcript}
 """
+
+TARGET OUTPUT LANGUAGE: ${langInfo.name} (${langInfo.scriptHint}).
+IMPORTANT RULE FOR OVERLAY HEADLINES AND TAGLINES:
+All text overlays, headlines, and taglines MUST be written ENTIRELY IN THE TARGET LANGUAGE (${langInfo.name}). Do NOT output in Urdu if the selected target language is ${langInfo.name}.
 
 Design parameters to integrate:
 - Background Colors: ${bgColor || "Slate black, dark green gradient"}
@@ -1592,22 +1582,22 @@ Strict Rules for Thumbnail Prompt Creation:
 1. Describe EXACTLY 1 main subject with an extreme, highly expressive human emotion (surprise, shock, fear, concern, ultimate excitement) suitable for the niche and topic.
 2. The returned "thumbnailPrompt" MUST be structured as an extremely detailed, highly trained "Nano Banana 2 Prompt for an image generation model" following this EXACT layout format:
    "Create a highly engaging YouTube [Niche Theme] thumbnail using the uploaded creator photo as the main subject (preserve facial identity exactly).
-   LEFT SIDE: A large close-up of the creator [specify gender/clothing/appearance based on topic, ensuring Islamic dress if applicable], with a [specify expressive emotion, e.g. surprised and concerned] expression, pointing toward [specify high-impact visual object from transcript, e.g., fresh ginger root with glowing medical effects/device].
-   RIGHT SIDE: [Describe realistic visual representations of the main topic, e.g., realistic kidney illustration glowing with healthy neon green energy, or high-tech gadget glowing, or food element], and other secondary high-impact elements like [describe 2-3 supporting objects/icons].
-   BACKGROUND: [Describe a premium gradient blended with relevant graphics, e.g., a premium black and dark green gradient blended together with futuristic medical graphics, or cyber patterns, or organic textures] utilizing [Background Colors]. Use only [List specific color hexes/names from parameters, e.g. neon green (#00FF01), Black (#000000), White (#FFFFFF)].
-   Large bold Urdu headline with merged [Text Color overlays] text: \"[Headline in Urdu Nastaliq]\"
-   Small Urdu tagline underneath: \"[Tagline in Urdu Nastaliq]\".
+   LEFT SIDE: A large close-up of the creator [specify gender/clothing/appearance based on topic], with a [specify expressive emotion, e.g. surprised and concerned] expression, pointing toward [specify high-impact visual object from transcript].
+   RIGHT SIDE: [Describe realistic visual representations of the main topic], and other secondary high-impact elements like [describe 2-3 supporting objects/icons].
+   BACKGROUND: [Describe a premium gradient blended with relevant graphics] utilizing [Background Colors]. Use only [List specific color hexes/names from parameters].
+   Large bold ${langInfo.name} headline with merged [Text Color overlays] text: \"[Headline in ${langInfo.name}]\"
+   Small ${langInfo.name} tagline underneath: \"[Tagline in ${langInfo.name}]\".
    Typography should be mobile-readable, ultra-realistic, cinematic lighting, high contrast, sharp focus, viral YouTube thumbnail style, professional [Niche Theme] design, maximum CTR optimization, clean bold composition with the creator's face as the main focal point."
 
 3. Keep the visual composition bold, simple, mobile-readable, and optimized for maximum YouTube CTR, strictly adjusting the composition according to the selected format guidelines.
-4. Create a matching, extremely high-impact main headline in Urdu script ("headlineUrdu") (max 3-4 words for high readability).
-5. Create a matching small tagline in Urdu script ("smallTaglineUrdu").
+4. Create a matching, extremely high-impact main headline in ${langInfo.name} ("headlineUrdu") (max 3-4 words for high readability).
+5. Create a matching small tagline in ${langInfo.name} ("smallTaglineUrdu").
 
 Return your response as a valid JSON object matching this schema:
 {
   "thumbnailPrompt": "The detailed English Nano Banana 2 prompt following the precise layout above adapted to the selected format...",
-  "headlineUrdu": "Bold Urdu Headline...",
-  "smallTaglineUrdu": "Small Urdu Tagline..."
+  "headlineUrdu": "Bold headline in ${langInfo.name}...",
+  "smallTaglineUrdu": "Small tagline in ${langInfo.name}..."
 }
 `;
 
@@ -1663,23 +1653,24 @@ Return your response as a valid JSON object matching this schema:
 // Granular segment/key level regeneration for CTR
 app.post("/api/regenerate-ctr-field", verifyUserAuth as express.RequestHandler, async (req: AuthenticatedRequest, res) => {
   try {
-    const { transcript, field, videoDuration } = req.body;
+    const { transcript, field, videoDuration, language, transformation } = req.body;
     if (!transcript || !transcript.trim()) {
       return res.status(400).json({ error: "Transcript is required." });
     }
 
     const ai = req.userAiClient!;
+    const langInfo = resolveTargetLanguage(language || transformation);
     let fieldPrompt = "";
     let responseSchema: any = {};
 
     if (field === "titles") {
-      fieldPrompt = `Generate exactly 10 high-CTR title options based on this transcript:
+      fieldPrompt = `Generate exactly 10 high-CTR title options ENTIRELY IN THE TARGET LANGUAGE (${langInfo.name}, ${langInfo.scriptHint}) based on this transcript:
 """
 ${transcript}
 """
 - Use power words: Secret, Exposed, Why, How, I Tried. Add [Brackets] if relevant.
 - Keep titles between 50-60 characters with curiosity gap + keywords first.
-- Provide titles categorized beautifully by language: English, Urdu, and Hindi. Separated clearly by language, not mixed in a single title.
+- ALL titles MUST be written natively in ${langInfo.name} (${langInfo.scriptHint}).
 Return the output in the "titles" array.`;
       responseSchema = {
         type: Type.OBJECT,
@@ -1692,17 +1683,13 @@ Return the output in the "titles" array.`;
         required: ["titles"]
       };
     } else if (field === "description") {
-      fieldPrompt = `Generate an SEO description of exactly 2 paragraphs based on this transcript:
+      fieldPrompt = `Generate an SEO description of exactly 2 paragraphs ENTIRELY IN THE TARGET LANGUAGE (${langInfo.name}, ${langInfo.scriptHint}) based on this transcript:
 """
 ${transcript}
 """
 - First line must be an engaging hook.
 - Include high-traffic keywords + clear Call-To-Action (CTA). No fluff.
-- POLICY AND MONETIZATION SAFETY COMPLIANCE (CRITICAL): Do NOT use sensitive, overly dramatic medical claims, pseudo-medical claims, or unverified scientific statements that violate monetization policies. Specifically:
-  * NEVER claim quick cures or reverse-health milestones (e.g. do NOT use "in just three weeks", "rapidly reversing", "restoring crystal clear eyesight", "instant cure", "reverses diabetes").
-  * NEVER claim direct biological cure/regulatory statements (e.g. do NOT write "works by regulating insulin resistance", "completely cures blood sugar spikes").
-  * NEVER suggest bypassing standard healthcare or medications (e.g. do NOT write "without expensive medications", "avoid doctors", "alternatives to surgery").
-  * Instead, frame all description insights safely and educationally, focusing on healthy habit discussions, scientific curiosity, educational exploration, and general lifestyle awareness. Use cautious, compliant, and supportive terminology.
+- POLICY AND MONETIZATION SAFETY COMPLIANCE (CRITICAL): Do NOT use sensitive, overly dramatic medical claims, pseudo-medical claims, or unverified scientific statements that violate monetization policies.
 Return the output in the "description" key.`;
       responseSchema = {
         type: Type.OBJECT,
@@ -1712,7 +1699,7 @@ Return the output in the "description" key.`;
         required: ["description"]
       };
     } else if (field === "timestamps") {
-      fieldPrompt = `Generate video timestamps outlining the video progression based on the provided Video Duration of "${videoDuration || "10:00"}" and this transcript:
+      fieldPrompt = `Generate video timestamps outlining the video progression with labels in ${langInfo.name} (${langInfo.scriptHint}) based on the provided Video Duration of "${videoDuration || "10:00"}" and this transcript:
 """
 ${transcript}
 """
@@ -1738,7 +1725,7 @@ Return the output in the "timestamps" array.`;
         required: ["timestamps"]
       };
     } else if (field === "hashtags") {
-      fieldPrompt = `Generate exactly 15 high-ranking YouTube hashtags with the '#' symbol based on this transcript:
+      fieldPrompt = `Generate exactly 15 high-ranking YouTube hashtags in or relevant to ${langInfo.name} with the '#' symbol based on this transcript:
 """
 ${transcript}
 """
@@ -1754,7 +1741,7 @@ Return the output in the "hashtags" array.`;
         required: ["hashtags"]
       };
     } else if (field === "tags") {
-      fieldPrompt = `Generate exactly 15 highly-optimized SEO tags as a list of keyword strings based on this transcript:
+      fieldPrompt = `Generate exactly 15 highly-optimized SEO tags in or relevant to ${langInfo.name} as a list of keyword strings based on this transcript:
 """
 ${transcript}
 """
