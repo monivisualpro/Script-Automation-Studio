@@ -75,125 +75,7 @@ const CATEGORIES = [
   "Software Engineering",
   "Technology",
   "Travel",
-  "Visual effects VFX",
-  "3D Modeling, Printing & CAD Design",
-  "Agriculture & Modern Farming",
-  "Ancient Civilizations & Archaeology",
-  "Anime, Manga & Pop Culture",
-  "Aviation & Aerospace Engineering",
-  "Astronomy & Astrophysics",
-  "Biology, Genetics & Biotechnology",
-  "Blockchain, Crypto & Web3",
-  "Book Reviews & Literary Analysis",
-  "Carpentry, Woodworking & Crafting",
-  "Chemistry & Material Science",
-  "Cybersecurity & Ethical Hacking",
-  "Data Science & Machine Learning",
-  "Digital Marketing, SEO & Ads",
-  "DIY, Crafting & Home Repair",
-  "E-Commerce, Dropshipping & Retail",
-  "Economics & Macro Analysis",
-  "Entrepreneurship, Startups & Venture Capital",
-  "Environment, Climate & Ecology",
-  "Fashion, Beauty & Personal Styling",
-  "Filmmaking, Editing & Directing",
-  "Financial Literacy, Stocks & Crypto",
-  "Gardening, Houseplants & Landscaping",
-  "Geopolitics, World Affairs & Defense",
-  "Hospitality, Tourism & Hotel Vlogging",
-  "Human Psychology & Mental Health",
-  "Interior Design & Architecture",
-  "Investigative Journalism & Crime Stories",
-  "Law, Legal Explanations & Crime",
-  "Martial Arts, Self-Defense & Combat Sports",
-  "Mathematics, Logic & Statistics",
-  "Mindfulness, Meditation & Wellness",
-  "Music Production, Beatmaking & Theory",
-  "Mythology, Folklore & Urban Legends",
-  "Parenting, Childcare & Family Life",
-  "Pets, Animal Care & Veterinary Science",
-  "Philosophy, Ethics & Deep Thought",
-  "Photography, Camera Gear & Lighting",
-  "Physics & Quantum Mechanics",
-  "Productivity, Time Management & Habits",
-  "Robotics, Automation & Mechatronics",
-  "Self-Improvement, Discipline & Growth",
-  "Space Exploration & Rocketry",
-  "Sports Analytics, Football & Cricket",
-  "Supercars, Electric Vehicles & Racing",
-  "Survival Skills, Camping & Bushcraft",
-  "Tabletop RPGs, Board Games & Esports",
-  "Unexplained Mysteries & Paranormal",
-  "Urban Planning, Infrastructure & Megaprojects",
-  "Web Development & Frontend Engineering"
-];
-
-const TUTORIAL_TONES = [
-  "Warm Friendly Conversational",
-  "Islamic / Religious Tone",
-  "Engaging Food Blogger Vibe",
-  "Fast Paced Explainer (YouTube FB)",
-  "Informative Health Explainer",
-  "Exciting Tech Enthusiast",
-  "Passionate Story Teller",
-  "Poetic Relatable (Shayari Vibe)",
-  "Funny and Entertaining",
-  "Professional Clear Speaker",
-  "Science-Based Tutorial (Easy Explanation)",
-  "Professional & Technical",
-  "Casual & Conversational",
-  "Dramatic Narrative (Hyped)",
-  "Deep Informative (Analytical)",
-  "Inspiring & Motivational Masterclass",
-  "Cinematic & Epical Storyteller",
-  "Curious & Thought-Provoking",
-  "Empathetic & Supportive Guide",
-  "Humorous & Sarcastic Commentary",
-  "Direct & Actionable Step-by-Step",
-  "Authoritative & Academic Expert",
-  "Energetic & High-Octane Hype",
-  "Calm & Meditative Mindfulness",
-  "Philosophical & Reflective",
-  "Suspenseful & Thrilling Mystery",
-  "Sincere & Heartfelt Message",
-  "Witty & Playful Banter",
-  "Luxury & Sophisticated Elegance",
-  "Raw & Unfiltered Honest Review",
-  "Minimalist & Direct-to-the-Point",
-  "Investigative & Tabloid Style",
-  "Friendly Mentor & Big Brother/Sister",
-  "Bold & Controversial Stance",
-  "Nostalgic & Retro Flashback",
-  "Educational & Kid-Friendly",
-  "Skeptical & Myth-Busting",
-  "Relatable Everyday Pakistani/South Asian Vibe",
-  "Corporate & Boardroom Executive",
-  "Soothing Bedtime Story Style",
-  "High-Energy Fitness Coach",
-  "Geeky & In-Depth Deep-Dive",
-  "Provocative & Mind-Bending",
-  "Chill & Relaxed Lofi Vibe",
-  "Tactical & Strategic Advisor",
-  "Optimistic & Future-Focused",
-  "Cautionary & Warning Tale",
-  "Humorous Stand-up Style",
-  "Authentic Personal Journal",
-  "Persuasive Sales & Pitch",
-  "Spiritual & Philosophical Wisdom",
-  "Rebellious & Anti-Establishment",
-  "Warm Family-Friendly Story",
-  "Charming & Captivating Orator",
-  "Fast & Punchy TikTok/Reels Style",
-  "Historical Narrative & Reenactment",
-  "Friendly Local Tour Guide",
-  "Gourmet Culinary Expert",
-  "Scientific Curiosity & Wonders",
-  "Sharp Political & Economic Analyst",
-  "Gentle & Nurturing Teacher",
-  "Action-Packed Thriller Narrative",
-  "Candid Vlog & Behind-The-Scenes",
-  "High-Stakes Legal / Investigative",
-  "Futuristic Speculative Sci-Fi"
+  "Visual effects VFX"
 ];
 
 const ALL_COUNTRIES = [
@@ -346,10 +228,6 @@ export default function App() {
   const [languageSearchQuery, setLanguageSearchQuery] = useState("");
   const [isLangDropdownOpen, setIsLangDropdownOpen] = useState(false);
   const [isCountryDropdownOpen, setIsCountryDropdownOpen] = useState(false);
-  const [isDomainDropdownOpen, setIsDomainDropdownOpen] = useState(false);
-  const [domainSearchQuery, setDomainSearchQuery] = useState("");
-  const [isToneDropdownOpen, setIsToneDropdownOpen] = useState(false);
-  const [toneSearchQuery, setToneSearchQuery] = useState("");
   const [targetAudience, setTargetAudience] = useState("adults");
   const [wordCount, setWordCount] = useState<number>(300);
   const [scriptLengthType, setScriptLengthType] = useState<"word_count" | "video_duration">("word_count");
@@ -1542,218 +1420,54 @@ export default function App() {
 
             {/* TOPIC DOMAIN / NICHE */}
             <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-3 transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.cardBorderCode, boxShadow: panelShadow }}>
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-mono uppercase tracking-widest flex items-center gap-1.5 font-extrabold" style={{ color: theme.accentColor }}>
-                  <TrendingUp className="h-3.5 w-3.5" style={{ color: theme.accentColor }} />
-                  Domain
-                </label>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full font-extrabold shadow-sm shrink-0" style={{ backgroundColor: `${theme.accentColor}25`, color: theme.accentColor }}>
-                  {topicNiche || "Select Domain"}
-                </span>
-              </div>
-
-              {/* Dropdown Box Trigger */}
-              <button
-                type="button"
+              <label className="text-xs font-mono uppercase tracking-widest flex items-center gap-1.5 font-extrabold" style={{ color: theme.accentColor }}>
+                <TrendingUp className="h-3.5 w-3.5" style={{ color: theme.accentColor }} />
+                Domain
+              </label>
+              <select
                 id="select-niche"
-                onClick={() => setIsDomainDropdownOpen(!isDomainDropdownOpen)}
-                className="glass-input w-full rounded-xl py-2.5 px-4 text-xs font-mono cursor-pointer transition-all duration-300 flex items-center justify-between focus:outline-none border hover:border-white/40"
-                style={{
-                  backgroundColor: theme.inputBg,
-                  borderColor: isDomainDropdownOpen ? theme.accentColor : (theme.isLight ? "#E5E5E5" : "transparent"),
-                  color: theme.textColor
+                value={topicNiche}
+                onChange={(e) => {
+                  setTopicNiche(e.target.value);
+                  setContentCategory(e.target.value);
                 }}
+                className="glass-input w-full rounded-xl py-2.5 px-4 text-xs font-mono cursor-pointer transition-all duration-300 focus:outline-none"
+                style={{ backgroundColor: theme.inputBg, borderColor: theme.isLight ? "#E5E5E5" : "transparent", color: theme.textColor }}
               >
-                <span className="truncate pr-2 font-bold">
-                  {topicNiche || "Select Domain / Niche..."}
-                </span>
-                {isDomainDropdownOpen ? (
-                  <ChevronUp className="h-4 w-4 shrink-0" style={{ color: theme.accentColor }} />
-                ) : (
-                  <ChevronDown className="h-4 w-4 shrink-0 opacity-70" style={{ color: theme.textColor }} />
-                )}
-              </button>
-
-              {/* Expandable Tab / Dropdown with Search */}
-              {isDomainDropdownOpen && (
-                <div className="space-y-2.5 pt-2 border-t animate-fade-in" style={{ borderColor: `${theme.accentColor}25` }}>
-                  {/* Search Box */}
-                  <div className="relative">
-                    <Search className="absolute left-3 top-2.5 h-3.5 w-3.5" style={{ color: theme.accentColor }} />
-                    <input
-                      type="text"
-                      placeholder="Search domain (e.g. AI, Medical, Finance, Gaming)..."
-                      value={domainSearchQuery}
-                      onChange={(e) => setDomainSearchQuery(e.target.value)}
-                      className="glass-input w-full rounded-xl py-2 pl-9 pr-8 text-xs font-mono transition-all duration-300 focus:outline-none"
-                      style={{ backgroundColor: theme.inputBg, borderColor: theme.isLight ? "#E5E5E5" : "transparent", color: theme.textColor }}
-                    />
-                    {domainSearchQuery && (
-                      <button
-                        type="button"
-                        onClick={() => setDomainSearchQuery("")}
-                        className="absolute right-3 top-2.5 text-[10px] cursor-pointer font-bold"
-                        style={{ color: theme.accentColor }}
-                      >
-                        Clear
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Filtered Scrollable List */}
-                  <div className="rounded-xl max-h-[170px] overflow-y-auto p-1.5 space-y-1 scrollbar-thin border glass-card" style={{ backgroundColor: theme.inputBg, borderColor: theme.accentColor }}>
-                    {CATEGORIES.filter(cat =>
-                      cat.toLowerCase().includes(domainSearchQuery.toLowerCase())
-                    ).map((cat) => {
-                      const isSelected = topicNiche === cat;
-                      return (
-                        <button
-                          key={cat}
-                          type="button"
-                          onClick={() => {
-                            setTopicNiche(cat);
-                            setContentCategory(cat);
-                            setIsDomainDropdownOpen(false);
-                          }}
-                          className={`glass-button w-full text-left px-2.5 py-1.5 rounded-xl text-xs font-mono transition-all flex items-center justify-between cursor-pointer border ${
-                            isSelected
-                              ? "font-extrabold shadow-md scale-[1.01]"
-                              : "border-transparent opacity-80 hover:opacity-100"
-                          }`}
-                          style={isSelected ? {
-                            backgroundColor: `${theme.accentColor}25`,
-                            borderColor: theme.accentColor,
-                            color: theme.accentColor
-                          } : { color: theme.textColor }}
-                        >
-                          <span className="truncate pr-2">{cat}</span>
-                          {isSelected ? (
-                            <span className="text-[9px] px-2 py-0.5 rounded-full font-bold shadow-sm shrink-0" style={{ backgroundColor: theme.accentColor, color: "#ffffff" }}>
-                              ✓ Active
-                            </span>
-                          ) : (
-                            <span className="text-[9px] opacity-60 shrink-0">Select</span>
-                          )}
-                        </button>
-                      );
-                    })}
-                    {CATEGORIES.filter(cat =>
-                      cat.toLowerCase().includes(domainSearchQuery.toLowerCase())
-                    ).length === 0 && (
-                      <div className="text-[10px] text-gray-400 font-mono text-center py-4">
-                        No domains match "{domainSearchQuery}"
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
+                {CATEGORIES.map((cat) => (
+                  <option key={cat} value={cat} style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>{cat}</option>
+                ))}
+              </select>
             </div>
 
             {/* TUTORIAL & LITERATURE TONES */}
             <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-3 transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.cardBorderCode, boxShadow: panelShadow }}>
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-mono uppercase tracking-widest block font-extrabold" style={{ color: theme.accentColor }}>
-                  Tutorial & Literature Tool
-                </label>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full font-extrabold shadow-sm shrink-0" style={{ backgroundColor: `${theme.accentColor}25`, color: theme.accentColor }}>
-                  Tone Active
-                </span>
-              </div>
-
-              {/* Dropdown Box Trigger */}
-              <button
-                type="button"
+              <label className="text-xs font-mono uppercase tracking-widest block font-extrabold" style={{ color: theme.accentColor }}>
+                Tutorial & Literature Tool
+              </label>
+              <select
                 id="select-tone"
-                onClick={() => setIsToneDropdownOpen(!isToneDropdownOpen)}
-                className="glass-input w-full rounded-xl py-2.5 px-4 text-xs font-mono cursor-pointer transition-all duration-300 flex items-center justify-between focus:outline-none border hover:border-white/40"
-                style={{
-                  backgroundColor: theme.inputBg,
-                  borderColor: isToneDropdownOpen ? theme.accentColor : (theme.isLight ? "#E5E5E5" : "transparent"),
-                  color: theme.textColor
-                }}
+                value={tutorialTone}
+                onChange={(e) => setTutorialTone(e.target.value)}
+                className="glass-input w-full rounded-xl py-2.5 px-4 text-xs font-mono cursor-pointer transition-all duration-300 focus:outline-none"
+                style={{ backgroundColor: theme.inputBg, borderColor: theme.isLight ? "#E5E5E5" : "transparent", color: theme.textColor }}
               >
-                <span className="truncate pr-2 font-bold">
-                  {tutorialTone || "Select Tone / Style..."}
-                </span>
-                {isToneDropdownOpen ? (
-                  <ChevronUp className="h-4 w-4 shrink-0" style={{ color: theme.accentColor }} />
-                ) : (
-                  <ChevronDown className="h-4 w-4 shrink-0 opacity-70" style={{ color: theme.textColor }} />
-                )}
-              </button>
-
-              {/* Expandable Tab / Dropdown with Search */}
-              {isToneDropdownOpen && (
-                <div className="space-y-2.5 pt-2 border-t animate-fade-in" style={{ borderColor: `${theme.accentColor}25` }}>
-                  {/* Search Box */}
-                  <div className="relative">
-                    <Search className="absolute left-3 top-2.5 h-3.5 w-3.5" style={{ color: theme.accentColor }} />
-                    <input
-                      type="text"
-                      placeholder="Search tone (e.g. Conversational, Storyteller, Cinematic, Dramatic)..."
-                      value={toneSearchQuery}
-                      onChange={(e) => setToneSearchQuery(e.target.value)}
-                      className="glass-input w-full rounded-xl py-2 pl-9 pr-8 text-xs font-mono transition-all duration-300 focus:outline-none"
-                      style={{ backgroundColor: theme.inputBg, borderColor: theme.isLight ? "#E5E5E5" : "transparent", color: theme.textColor }}
-                    />
-                    {toneSearchQuery && (
-                      <button
-                        type="button"
-                        onClick={() => setToneSearchQuery("")}
-                        className="absolute right-3 top-2.5 text-[10px] cursor-pointer font-bold"
-                        style={{ color: theme.accentColor }}
-                      >
-                        Clear
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Filtered Scrollable List */}
-                  <div className="rounded-xl max-h-[170px] overflow-y-auto p-1.5 space-y-1 scrollbar-thin border glass-card" style={{ backgroundColor: theme.inputBg, borderColor: theme.accentColor }}>
-                    {TUTORIAL_TONES.filter(tone =>
-                      tone.toLowerCase().includes(toneSearchQuery.toLowerCase())
-                    ).map((tone) => {
-                      const isSelected = tutorialTone === tone;
-                      return (
-                        <button
-                          key={tone}
-                          type="button"
-                          onClick={() => {
-                            setTutorialTone(tone);
-                            setIsToneDropdownOpen(false);
-                          }}
-                          className={`glass-button w-full text-left px-2.5 py-1.5 rounded-xl text-xs font-mono transition-all flex items-center justify-between cursor-pointer border ${
-                            isSelected
-                              ? "font-extrabold shadow-md scale-[1.01]"
-                              : "border-transparent opacity-80 hover:opacity-100"
-                          }`}
-                          style={isSelected ? {
-                            backgroundColor: `${theme.accentColor}25`,
-                            borderColor: theme.accentColor,
-                            color: theme.accentColor
-                          } : { color: theme.textColor }}
-                        >
-                          <span className="truncate pr-2">{tone}</span>
-                          {isSelected ? (
-                            <span className="text-[9px] px-2 py-0.5 rounded-full font-bold shadow-sm shrink-0" style={{ backgroundColor: theme.accentColor, color: "#ffffff" }}>
-                              ✓ Active
-                            </span>
-                          ) : (
-                            <span className="text-[9px] opacity-60 shrink-0">Select</span>
-                          )}
-                        </button>
-                      );
-                    })}
-                    {TUTORIAL_TONES.filter(tone =>
-                      tone.toLowerCase().includes(toneSearchQuery.toLowerCase())
-                    ).length === 0 && (
-                      <div className="text-[10px] text-gray-400 font-mono text-center py-4">
-                        No tones match "{toneSearchQuery}"
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
+                <option value="Warm Friendly Conversational" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Warm Friendly Conversational</option>
+                <option value="Islamic / Religious Tone" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Islamic / Religious Tone</option>
+                <option value="Engaging Food Blogger Vibe" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Engaging Food Blogger Vibe</option>
+                <option value="Fast Paced Explainer (YouTube FB)" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Fast Paced Explainer (YouTube FB)</option>
+                <option value="Informative Health Explainer" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Informative Health Explainer</option>
+                <option value="Exciting Tech Enthusiast" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Exciting Tech Enthusiast</option>
+                <option value="Passionate Story Teller" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Passionate Story Teller</option>
+                <option value="Poetic Relatable (Shayari Vibe)" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Poetic Relatable (Shayari Vibe)</option>
+                <option value="Funny and Entertaining" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Funny and Entertaining</option>
+                <option value="Professional Clear Speaker" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Professional Clear Speaker</option>
+                <option value="Science-Based Tutorial (Easy Explanation)" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Science-Based Tutorial (Easy Explanation)</option>
+                <option value="Professional & Technical" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Professional & Technical</option>
+                <option value="Casual & Conversational" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Casual & Conversational</option>
+                <option value="Dramatic Narrative (Hyped)" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Dramatic Narrative (Hyped)</option>
+                <option value="Deep Informative (Analytical)" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Deep Informative (Analytical)</option>
+              </select>
             </div>
 
             {/* TRANSFORMATION OPTIONS & MULTI-LANGUAGE ENGINE */}
