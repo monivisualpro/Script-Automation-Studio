@@ -47,36 +47,110 @@ import {
 } from "lucide-react";
 
 const CATEGORIES = [
+  "3D Modeling & CAD Design",
   "Animation & Motion Graphics",
-  "Artificial Intelligence",
-  "Automotive",
-  "CGI",
+  "Architecture & Interior Design",
+  "Artificial Intelligence (AI)",
+  "Astronomy & Astrophysics",
+  "Automotive & Mobility",
+  "CGI & VFX Production",
   "Civil Engineering",
+  "Cloud Computing & DevOps",
   "Computer Science",
-  "Documentary",
-  "Education",
+  "Cybersecurity & Ethical Hacking",
+  "Data Science & Big Data",
+  "Digital Marketing & SEO",
+  "Documentary Filmmaking",
+  "Drone Technology & Aviation",
+  "E-Commerce & Dropshipping",
+  "Education & E-Learning",
   "Electrical Engineering",
-  "Finance & Business",
-  "Fitness",
-  "Food & Cooking",
-  "Food Vlogging",
-  "Gaming",
-  "General",
-  "Graphic design",
-  "History",
+  "Environmental Science & Green Tech",
+  "Fashion & Luxury Lifestyle",
+  "Film & Cinema Studies",
+  "Finance, Crypto & Investing",
+  "Fitness, Bodybuilding & Wellness",
+  "Food & Culinary Arts",
+  "Food Vlogging & Street Food",
+  "Gaming & Esports",
+  "General Knowledge & Trivia",
+  "Geopolitics & World History",
+  "Graphic Design & Branding",
+  "History & Archaeology",
   "Information Technology (IT)",
-  "Islamic",
-  "Lifestyle",
-  "Mechanical Engineering",
-  "Medical & Health",
-  "Motivation",
-  "Nature",
-  "Real Estate",
-  "Science",
-  "Software Engineering",
-  "Technology",
-  "Travel",
-  "Visual effects VFX"
+  "Islamic Studies & Spiritual Reminders",
+  "Life Coaching & Personal Growth",
+  "Mechanical & Robotics Engineering",
+  "Medical, Health & Biotech",
+  "Motivation & High Performance",
+  "Music Production & Audio Engineering",
+  "Natural World & Wildlife",
+  "Neuroscience & Psychology",
+  "Nuclear Energy & Physics",
+  "Quantum Physics & Computing",
+  "Real Estate & Property Investment",
+  "Renewable Energy & Sustainability",
+  "Robotics & Automation",
+  "Science & Space Exploration",
+  "Software Engineering & Coding",
+  "Technology & Gadget Reviews",
+  "Travel, Adventure & Culture",
+  "UI/UX Design & Product Strategy",
+  "Visual Effects & Compositing",
+  "Web Development & SaaS"
+];
+
+const TUTORIAL_TONES = [
+  "Academic & Research Expert",
+  "Authoritative News Anchor",
+  "Bedtime Storyteller (Calm & Soothing)",
+  "Business Executive & Pitch Tone",
+  "Casual & Conversational",
+  "Cinematic Trailer Style",
+  "Coding Bootcamp Mentor",
+  "Comedy & Sarcastic Commentary",
+  "Direct & Punchy Short-Form",
+  "Dramatic Narrative (Hyped)",
+  "Deep Informative (Analytical)",
+  "Debate & Persuasive Orator",
+  "Educational Kids & Teen Friendly",
+  "Empathetic Counseling & Support",
+  "Energetic Fitness Trainer",
+  "Engaging Food Blogger Vibe",
+  "Epic Legendary Tone",
+  "Exciting Tech Enthusiast",
+  "Fast Paced Explainer (YouTube FB)",
+  "Financial Analyst & Market Expert",
+  "Friendly Neighborhood Tutor",
+  "Funny and Entertaining",
+  "Futuristic Sci-Fi Guide",
+  "Gaming Shoutcaster & Streamer",
+  "Hard Hitting Investigative Journalist",
+  "High Conversion Sales Copywriter",
+  "High Energy Motivational Masterclass",
+  "Historical Chronological Narrator",
+  "Informative Health Explainer",
+  "Islamic / Religious Tone",
+  "Luxury & Premium Elegance",
+  "Mystery & Suspense Unraveler",
+  "Nostalgic & Retro Storyteller",
+  "Passionate Story Teller",
+  "Philosophical & Thought Provoking",
+  "Poetic Relatable (Shayari Vibe)",
+  "Professional Clear Speaker",
+  "Professional & Technical",
+  "Quick Tips & Hacks Specialist",
+  "Real Estate & Luxury Agent",
+  "Science-Based Tutorial (Easy Explanation)",
+  "Scientific Skeptic & Mythbuster",
+  "Self-Improvement & Mindfulness",
+  "Soft Whisper / ASMR Relaxation",
+  "Spiritual Peace & Meditation",
+  "Tech Reviewer & Hands-on Critic",
+  "Travel Guide & Local Culture Explorer",
+  "True Crime Suspense Narrator",
+  "Urban Streetwise & Trendy",
+  "Warm Friendly Conversational"
 ];
 
 const ALL_COUNTRIES = [
@@ -229,6 +303,10 @@ export default function App() {
   const [languageSearchQuery, setLanguageSearchQuery] = useState("");
   const [isLangDropdownOpen, setIsLangDropdownOpen] = useState(false);
   const [isCountryDropdownOpen, setIsCountryDropdownOpen] = useState(false);
+  const [isNicheDropdownOpen, setIsNicheDropdownOpen] = useState(false);
+  const [nicheSearchQuery, setNicheSearchQuery] = useState("");
+  const [isToneDropdownOpen, setIsToneDropdownOpen] = useState(false);
+  const [toneSearchQuery, setToneSearchQuery] = useState("");
   const [targetAudience, setTargetAudience] = useState("adults");
   const [wordCount, setWordCount] = useState<number>(300);
   const [scriptLengthType, setScriptLengthType] = useState<"word_count" | "video_duration">("word_count");
@@ -247,6 +325,7 @@ export default function App() {
   // Scene Prompt Generator States
   const [transcriptInput, setTranscriptInput] = useState("");
   const [numScenes, setNumScenes] = useState<number>(10);
+  const [promptLineCount, setPromptLineCount] = useState<number>(15);
   const [contentCategory, setContentCategory] = useState("Medical & Health");
   const [storyboardFormat, setStoryboardFormat] = useState<"16:9" | "9:16" | "1:1" | "none">("16:9");
   
@@ -1118,6 +1197,7 @@ export default function App() {
           numScenes,
           category: contentCategory,
           format: storyboardFormat,
+          promptLineCount,
         }),
       });
       if (!res.ok) throw new Error("Failed to generate scenes.");
@@ -1223,6 +1303,7 @@ export default function App() {
           category: contentCategory,
           previousPrompt: previous,
           format: storyboardFormat,
+          promptLineCount,
         }),
       });
       if (!res.ok) throw new Error("Failed to regenerate single scene.");
@@ -1420,56 +1501,211 @@ export default function App() {
               </div>
             </div>
 
-            {/* TOPIC DOMAIN / NICHE */}
+            {/* TOPIC DOMAIN / NICHE SEARCHABLE DROPDOWN */}
             <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-3 transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.cardBorderCode, boxShadow: panelShadow }}>
-              <label className="text-xs font-mono uppercase tracking-widest flex items-center gap-1.5 font-extrabold" style={{ color: theme.accentColor }}>
-                <TrendingUp className="h-3.5 w-3.5" style={{ color: theme.accentColor }} />
-                Domain
-              </label>
-              <select
-                id="select-niche"
-                value={topicNiche}
-                onChange={(e) => {
-                  setTopicNiche(e.target.value);
-                  setContentCategory(e.target.value);
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-mono uppercase tracking-widest flex items-center gap-1.5 font-extrabold" style={{ color: theme.accentColor }}>
+                  <TrendingUp className="h-3.5 w-3.5" style={{ color: theme.accentColor }} />
+                  Domain (50+ SEO Niches)
+                </label>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full font-extrabold shadow-sm shrink-0" style={{ backgroundColor: `${theme.accentColor}25`, color: theme.accentColor }}>
+                  {topicNiche || "Select Domain"}
+                </span>
+              </div>
+
+              {/* Trigger Button */}
+              <button
+                type="button"
+                onClick={() => setIsNicheDropdownOpen(!isNicheDropdownOpen)}
+                className="glass-input w-full rounded-xl py-2.5 px-4 text-xs font-mono cursor-pointer transition-all duration-300 flex items-center justify-between focus:outline-none border hover:border-white/40"
+                style={{
+                  backgroundColor: theme.inputBg,
+                  borderColor: isNicheDropdownOpen ? theme.accentColor : (theme.isLight ? "#E5E5E5" : "transparent"),
+                  color: theme.textColor
                 }}
-                className="glass-input w-full rounded-xl py-2.5 px-4 text-xs font-mono cursor-pointer transition-all duration-300 focus:outline-none"
-                style={{ backgroundColor: theme.inputBg, borderColor: theme.isLight ? "#E5E5E5" : "transparent", color: theme.textColor }}
               >
-                {CATEGORIES.map((cat) => (
-                  <option key={cat} value={cat} style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>{cat}</option>
-                ))}
-              </select>
+                <span className="truncate pr-2 font-bold">{topicNiche || "Select Domain / SEO Niche..."}</span>
+                {isNicheDropdownOpen ? (
+                  <ChevronUp className="h-4 w-4 shrink-0" style={{ color: theme.accentColor }} />
+                ) : (
+                  <ChevronDown className="h-4 w-4 shrink-0 opacity-70" style={{ color: theme.textColor }} />
+                )}
+              </button>
+
+              {/* Expandable Dropdown with Real-Time Search */}
+              {isNicheDropdownOpen && (
+                <div className="space-y-2.5 pt-2 border-t animate-fade-in" style={{ borderColor: `${theme.accentColor}25` }}>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-2.5 h-3.5 w-3.5" style={{ color: theme.accentColor }} />
+                    <input
+                      type="text"
+                      placeholder="Search domain (e.g. AI, Cyber, Finance, CAD, History)..."
+                      value={nicheSearchQuery}
+                      onChange={(e) => setNicheSearchQuery(e.target.value)}
+                      className="glass-input w-full rounded-xl py-2 pl-9 pr-8 text-xs font-mono transition-all duration-300 focus:outline-none"
+                      style={{ backgroundColor: theme.inputBg, borderColor: theme.isLight ? "#E5E5E5" : "transparent", color: theme.textColor }}
+                    />
+                    {nicheSearchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setNicheSearchQuery("")}
+                        className="absolute right-3 top-2.5 text-[10px] cursor-pointer font-bold"
+                        style={{ color: theme.accentColor }}
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="rounded-xl max-h-[180px] overflow-y-auto p-1.5 space-y-1 scrollbar-thin border glass-card" style={{ backgroundColor: theme.inputBg, borderColor: theme.accentColor }}>
+                    {CATEGORIES.filter(cat =>
+                      cat.toLowerCase().includes(nicheSearchQuery.toLowerCase())
+                    ).map((cat) => {
+                      const isSelected = topicNiche === cat;
+                      return (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => {
+                            setTopicNiche(cat);
+                            setContentCategory(cat);
+                            setIsNicheDropdownOpen(false);
+                          }}
+                          className={`glass-button w-full text-left px-2.5 py-1.5 rounded-xl text-xs font-mono transition-all flex items-center justify-between cursor-pointer border ${
+                            isSelected
+                              ? "font-extrabold shadow-md scale-[1.01]"
+                              : "border-transparent opacity-80 hover:opacity-100"
+                          }`}
+                          style={isSelected ? {
+                            backgroundColor: `${theme.accentColor}25`,
+                            borderColor: theme.accentColor,
+                            color: theme.accentColor
+                          } : { color: theme.textColor }}
+                        >
+                          <span className="truncate pr-2">{cat}</span>
+                          {isSelected ? (
+                            <span className="text-[9px] px-2 py-0.5 rounded-full font-bold shadow-sm shrink-0" style={{ backgroundColor: theme.accentColor, color: "#ffffff" }}>
+                              ✓ Active
+                            </span>
+                          ) : (
+                            <span className="text-[9px] opacity-60 shrink-0">Select</span>
+                          )}
+                        </button>
+                      );
+                    })}
+                    {CATEGORIES.filter(cat =>
+                      cat.toLowerCase().includes(nicheSearchQuery.toLowerCase())
+                    ).length === 0 && (
+                      <div className="text-[10px] text-gray-400 font-mono text-center py-4">
+                        No domains match "{nicheSearchQuery}"
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* TUTORIAL & LITERATURE TONES */}
+            {/* TUTORIAL & LITERATURE TONES SEARCHABLE DROPDOWN */}
             <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-3 transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.cardBorderCode, boxShadow: panelShadow }}>
-              <label className="text-xs font-mono uppercase tracking-widest block font-extrabold" style={{ color: theme.accentColor }}>
-                Tutorial & Literature Tool
-              </label>
-              <select
-                id="select-tone"
-                value={tutorialTone}
-                onChange={(e) => setTutorialTone(e.target.value)}
-                className="glass-input w-full rounded-xl py-2.5 px-4 text-xs font-mono cursor-pointer transition-all duration-300 focus:outline-none"
-                style={{ backgroundColor: theme.inputBg, borderColor: theme.isLight ? "#E5E5E5" : "transparent", color: theme.textColor }}
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-mono uppercase tracking-widest flex items-center gap-1.5 font-extrabold" style={{ color: theme.accentColor }}>
+                  <Sparkles className="h-3.5 w-3.5" style={{ color: theme.accentColor }} />
+                  Tutorial & Literature Tool (50+ Tones)
+                </label>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full font-extrabold shadow-sm shrink-0 truncate max-w-[150px]" style={{ backgroundColor: `${theme.accentColor}25`, color: theme.accentColor }}>
+                  {tutorialTone || "Select Tone"}
+                </span>
+              </div>
+
+              {/* Trigger Button */}
+              <button
+                type="button"
+                onClick={() => setIsToneDropdownOpen(!isToneDropdownOpen)}
+                className="glass-input w-full rounded-xl py-2.5 px-4 text-xs font-mono cursor-pointer transition-all duration-300 flex items-center justify-between focus:outline-none border hover:border-white/40"
+                style={{
+                  backgroundColor: theme.inputBg,
+                  borderColor: isToneDropdownOpen ? theme.accentColor : (theme.isLight ? "#E5E5E5" : "transparent"),
+                  color: theme.textColor
+                }}
               >
-                <option value="Warm Friendly Conversational" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Warm Friendly Conversational</option>
-                <option value="Islamic / Religious Tone" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Islamic / Religious Tone</option>
-                <option value="Engaging Food Blogger Vibe" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Engaging Food Blogger Vibe</option>
-                <option value="Fast Paced Explainer (YouTube FB)" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Fast Paced Explainer (YouTube FB)</option>
-                <option value="Informative Health Explainer" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Informative Health Explainer</option>
-                <option value="Exciting Tech Enthusiast" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Exciting Tech Enthusiast</option>
-                <option value="Passionate Story Teller" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Passionate Story Teller</option>
-                <option value="Poetic Relatable (Shayari Vibe)" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Poetic Relatable (Shayari Vibe)</option>
-                <option value="Funny and Entertaining" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Funny and Entertaining</option>
-                <option value="Professional Clear Speaker" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Professional Clear Speaker</option>
-                <option value="Science-Based Tutorial (Easy Explanation)" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Science-Based Tutorial (Easy Explanation)</option>
-                <option value="Professional & Technical" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Professional & Technical</option>
-                <option value="Casual & Conversational" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Casual & Conversational</option>
-                <option value="Dramatic Narrative (Hyped)" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Dramatic Narrative (Hyped)</option>
-                <option value="Deep Informative (Analytical)" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Deep Informative (Analytical)</option>
-              </select>
+                <span className="truncate pr-2 font-bold">{tutorialTone || "Select Tone / Vibe..."}</span>
+                {isToneDropdownOpen ? (
+                  <ChevronUp className="h-4 w-4 shrink-0" style={{ color: theme.accentColor }} />
+                ) : (
+                  <ChevronDown className="h-4 w-4 shrink-0 opacity-70" style={{ color: theme.textColor }} />
+                )}
+              </button>
+
+              {/* Expandable Dropdown with Real-Time Search */}
+              {isToneDropdownOpen && (
+                <div className="space-y-2.5 pt-2 border-t animate-fade-in" style={{ borderColor: `${theme.accentColor}25` }}>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-2.5 h-3.5 w-3.5" style={{ color: theme.accentColor }} />
+                    <input
+                      type="text"
+                      placeholder="Search tone (e.g. Conversational, Storyteller, Hype, Poetic)..."
+                      value={toneSearchQuery}
+                      onChange={(e) => setToneSearchQuery(e.target.value)}
+                      className="glass-input w-full rounded-xl py-2 pl-9 pr-8 text-xs font-mono transition-all duration-300 focus:outline-none"
+                      style={{ backgroundColor: theme.inputBg, borderColor: theme.isLight ? "#E5E5E5" : "transparent", color: theme.textColor }}
+                    />
+                    {toneSearchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setToneSearchQuery("")}
+                        className="absolute right-3 top-2.5 text-[10px] cursor-pointer font-bold"
+                        style={{ color: theme.accentColor }}
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="rounded-xl max-h-[180px] overflow-y-auto p-1.5 space-y-1 scrollbar-thin border glass-card" style={{ backgroundColor: theme.inputBg, borderColor: theme.accentColor }}>
+                    {TUTORIAL_TONES.filter(t =>
+                      t.toLowerCase().includes(toneSearchQuery.toLowerCase())
+                    ).map((toneItem) => {
+                      const isSelected = tutorialTone === toneItem;
+                      return (
+                        <button
+                          key={toneItem}
+                          type="button"
+                          onClick={() => {
+                            setTutorialTone(toneItem);
+                            setIsToneDropdownOpen(false);
+                          }}
+                          className={`glass-button w-full text-left px-2.5 py-1.5 rounded-xl text-xs font-mono transition-all flex items-center justify-between cursor-pointer border ${
+                            isSelected
+                              ? "font-extrabold shadow-md scale-[1.01]"
+                              : "border-transparent opacity-80 hover:opacity-100"
+                          }`}
+                          style={isSelected ? {
+                            backgroundColor: `${theme.accentColor}25`,
+                            borderColor: theme.accentColor,
+                            color: theme.accentColor
+                          } : { color: theme.textColor }}
+                        >
+                          <span className="truncate pr-2">{toneItem}</span>
+                          {isSelected ? (
+                            <span className="text-[9px] px-2 py-0.5 rounded-full font-bold shadow-sm shrink-0" style={{ backgroundColor: theme.accentColor, color: "#ffffff" }}>
+                              ✓ Active
+                            </span>
+                          ) : (
+                            <span className="text-[9px] opacity-60 shrink-0">Select</span>
+                          )}
+                        </button>
+                      );
+                    })}
+                    {TUTORIAL_TONES.filter(t =>
+                      t.toLowerCase().includes(toneSearchQuery.toLowerCase())
+                    ).length === 0 && (
+                      <div className="text-[10px] text-gray-400 font-mono text-center py-4">
+                        No tones match "{toneSearchQuery}"
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* TRANSFORMATION OPTIONS & MULTI-LANGUAGE ENGINE */}
@@ -3208,129 +3444,140 @@ export default function App() {
             </div>
 
             {/* CINEMATIC STORYBOARD & SCENE PROMPT CREATOR SECTION */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-5">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
               
               {/* SECTION 1: TRANSCRIPT INPUT */}
-              <div className="glass-card flex flex-col h-[480px] rounded-2xl overflow-hidden transition-all duration-300 border hover:border-white/30 backdrop-blur-xl" style={{ backgroundColor: theme.cardBg, borderColor: theme.cardBorderCode, boxShadow: panelShadow }}>
-                <div className="px-5 py-3 border-b flex flex-col xl:flex-row xl:items-start justify-between gap-3 glass-card" style={{ borderColor: `${theme.accentColor}30`, backgroundColor: `${theme.accentColor}08` }}>
-                  <div className="flex flex-col gap-1">
-                    <span className="text-xs font-mono font-extrabold tracking-wider flex items-center gap-2" style={{ color: theme.accentColor }}>
-                      <Sliders className="h-4 w-4" />
-                      TRANSCRIPT INPUT <Plus className="h-4 w-4 animate-bounce" style={{ color: theme.accentColor }} />
+              <div className="glass-card flex flex-col min-h-[520px] lg:h-[560px] rounded-2xl overflow-hidden transition-all duration-300 border hover:border-white/30 backdrop-blur-xl" style={{ backgroundColor: theme.cardBg, borderColor: theme.cardBorderCode, boxShadow: panelShadow }}>
+                {/* Header Title & Action Buttons */}
+                <div className="px-4 py-3 border-b flex flex-wrap items-center justify-between gap-2.5 glass-card" style={{ borderColor: `${theme.accentColor}30`, backgroundColor: `${theme.accentColor}08` }}>
+                  <div className="flex flex-col gap-0.5 min-w-[140px]">
+                    <span className="text-xs font-mono font-extrabold tracking-wider flex items-center gap-1.5" style={{ color: theme.accentColor }}>
+                      <Sliders className="h-4 w-4 shrink-0" />
+                      TRANSCRIPT INPUT <Plus className="h-3.5 w-3.5 animate-bounce shrink-0" style={{ color: theme.accentColor }} />
                     </span>
                     <span className="text-[9px] text-gray-400 font-mono">Configure script parameters & aspect ratios</span>
                   </div>
                   
-                  {/* Controllers organized in sequential rows */}
-                  <div className="flex flex-col gap-2.5 w-full xl:w-auto items-start xl:items-end">
-                    
-                    {/* Row 1: Domain Category and Scenes (with integrated Shots Calculator) */}
-                    <div className="flex items-center gap-2 flex-wrap w-full xl:w-auto justify-start xl:justify-end">
-                      
-                      {/* Domain Category - First */}
-                      <div className="glass-card flex items-center gap-1.5 px-2 py-1 rounded-xl border" style={{ backgroundColor: `${theme.accentColor}08`, borderColor: `${theme.accentColor}30` }}>
-                        <span className="text-[9px] text-gray-400 font-mono">CATEGORY:</span>
-                        <select
-                          value={contentCategory}
-                          onChange={(e) => {
-                            setContentCategory(e.target.value);
-                            setTopicNiche(e.target.value);
-                          }}
-                          className="bg-transparent text-[10px] font-mono focus:outline-none font-bold cursor-pointer"
-                          style={{ colorScheme: "dark", color: theme.accentColor }}
-                        >
-                          {CATEGORIES.map((cat) => (
-                            <option key={cat} value={cat} style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>{cat}</option>
-                          ))}
-                        </select>
-                      </div>
+                  {/* Top Right Quick Actions: INSERT & IMPORT FILE */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (polishedScript) {
+                          setTranscriptInput(polishedScript);
+                        }
+                      }}
+                      disabled={!polishedScript}
+                      className="glass-button py-1 px-2.5 rounded-xl font-mono text-[9px] font-extrabold tracking-wider uppercase transition-all duration-300 flex items-center gap-1 border cursor-pointer"
+                      style={polishedScript ? {
+                        backgroundColor: theme.accentColor,
+                        color: "#ffffff",
+                        borderColor: theme.accentColor
+                      } : {
+                        color: "rgb(107, 114, 128)",
+                        borderColor: "transparent",
+                        opacity: 0.4
+                      }}
+                      title="Insert the polished voice over script"
+                    >
+                      <Plus className="h-3 w-3" /> INSERT
+                    </button>
 
-                      {/* Scenes with Shots Calculator toggle */}
-                      <div className="glass-card flex items-center gap-1 px-2 py-1 rounded-xl border" style={{ backgroundColor: `${theme.accentColor}08`, borderColor: `${theme.accentColor}30` }}>
-                        <span className="text-[9px] text-gray-400 font-mono">SCENES:</span>
-                        <input
-                          type="number"
-                          min="1"
-                          max="100"
-                          value={numScenes}
-                          onChange={(e) => setNumScenes(Math.min(100, Math.max(1, parseInt(e.target.value) || 1)))}
-                          className="bg-transparent w-8 text-[10px] font-mono focus:outline-none font-bold"
-                          style={{ color: theme.accentColor }}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowShotsCalculator(!showShotsCalculator)}
-                          className="glass-button p-1 rounded hover:opacity-85 text-xs transition-all flex items-center justify-center cursor-pointer"
-                          style={{
-                            color: showShotsCalculator ? "#ffffff" : theme.textColor,
-                            backgroundColor: showShotsCalculator ? theme.accentColor : "transparent"
-                          }}
-                          title="Open Shots Calculator (duration-based)"
-                        >
-                          <Calculator className="h-3 w-3" />
-                        </button>
-                      </div>
+                    <label
+                      className="glass-button py-1 px-2.5 rounded-xl font-mono text-[9px] font-extrabold tracking-wider uppercase transition-all duration-300 flex items-center gap-1 border cursor-pointer active:scale-95"
+                      style={{
+                        backgroundColor: `${theme.accentColor}15`,
+                        borderColor: theme.accentColor,
+                        color: theme.accentColor
+                      }}
+                    >
+                      <Plus className="h-3 w-3" /> IMPORT FILE
+                      <input
+                        type="file"
+                        accept=".txt,.pdf"
+                        onChange={handleTranscriptInputFileUpload}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                </div>
 
-                    </div>
+                {/* Sub-Header Parameter Strip (Single clean row for Category, Scenes, Format) */}
+                <div className="px-4 py-2 border-b flex flex-wrap items-center justify-between gap-2 text-xs font-mono" style={{ borderColor: `${theme.accentColor}20`, backgroundColor: `${theme.cardBg}80` }}>
+                  {/* 1. Category */}
+                  <div className="glass-card flex items-center gap-1.5 px-2 py-1 rounded-xl border shrink-0" style={{ backgroundColor: `${theme.accentColor}08`, borderColor: `${theme.accentColor}30` }}>
+                    <span className="text-[9px] text-gray-400 font-mono font-bold uppercase">CATEGORY:</span>
+                    <select
+                      value={contentCategory}
+                      onChange={(e) => {
+                        setContentCategory(e.target.value);
+                        setTopicNiche(e.target.value);
+                      }}
+                      className="bg-transparent text-[10px] font-mono focus:outline-none font-bold cursor-pointer max-w-[120px] sm:max-w-[160px] truncate"
+                      style={{ colorScheme: "dark", color: theme.accentColor }}
+                    >
+                      {CATEGORIES.map((cat) => (
+                        <option key={cat} value={cat} style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>{cat}</option>
+                      ))}
+                    </select>
+                  </div>
 
-                    {/* Row 2: Insert and Import File in ONE line */}
-                    <div className="flex items-center gap-2 w-full xl:w-auto justify-start xl:justify-end">
-                      <button
-                        onClick={() => {
-                          if (polishedScript) {
-                            setTranscriptInput(polishedScript);
-                          }
-                        }}
-                        disabled={!polishedScript}
-                        className="glass-button py-1 px-3 rounded-xl font-mono text-[9px] font-extrabold tracking-wider uppercase transition-all duration-300 flex items-center gap-1 border cursor-pointer"
-                        style={polishedScript ? {
-                          backgroundColor: theme.accentColor,
-                          color: "#ffffff",
-                          borderColor: theme.accentColor
-                        } : {
-                          color: "rgb(107, 114, 128)",
-                          borderColor: "transparent",
-                          opacity: 0.4
-                        }}
-                        title="Insert the polished voice over script"
-                      >
-                        <Plus className="h-3 w-3" /> INSERT
-                      </button>
+                  {/* 2. Scenes & Calculator Toggle */}
+                  <div className="glass-card flex items-center gap-1 px-2 py-1 rounded-xl border shrink-0" style={{ backgroundColor: `${theme.accentColor}08`, borderColor: `${theme.accentColor}30` }}>
+                    <span className="text-[9px] text-gray-400 font-mono font-bold uppercase">SCENES:</span>
+                    <input
+                      type="number"
+                      min="1"
+                      max="100"
+                      value={numScenes}
+                      onChange={(e) => setNumScenes(Math.min(100, Math.max(1, parseInt(e.target.value) || 1)))}
+                      className="bg-transparent w-8 text-[10px] font-mono focus:outline-none font-bold text-center"
+                      style={{ color: theme.accentColor }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowShotsCalculator(!showShotsCalculator)}
+                      className="glass-button p-1 rounded hover:opacity-85 text-xs transition-all flex items-center justify-center cursor-pointer"
+                      style={{
+                        color: showShotsCalculator ? "#ffffff" : theme.textColor,
+                        backgroundColor: showShotsCalculator ? theme.accentColor : "transparent"
+                      }}
+                      title="Open Shots Calculator (duration-based)"
+                    >
+                      <Calculator className="h-3 w-3" />
+                    </button>
+                  </div>
 
-                      <label
-                        className="glass-button py-1 px-3 rounded-xl font-mono text-[9px] font-extrabold tracking-wider uppercase transition-all duration-300 flex items-center gap-1 border cursor-pointer active:scale-95"
-                        style={{
-                          backgroundColor: `${theme.accentColor}15`,
-                          borderColor: theme.accentColor,
-                          color: theme.accentColor
-                        }}
-                      >
-                        <Plus className="h-3 w-3" /> IMPORT FILE
-                        <input
-                          type="file"
-                          accept=".txt,.pdf"
-                          onChange={handleTranscriptInputFileUpload}
-                          className="hidden"
-                        />
-                      </label>
-                    </div>
+                  {/* 3. Storyboard Format */}
+                  <div className="glass-card flex items-center gap-1.5 px-2 py-1 rounded-xl border shrink-0" style={{ backgroundColor: `${theme.accentColor}08`, borderColor: `${theme.accentColor}30` }}>
+                    <span className="text-[9px] text-gray-400 font-mono font-bold uppercase">FORMAT:</span>
+                    <select
+                      value={storyboardFormat}
+                      onChange={(e) => setStoryboardFormat(e.target.value as any)}
+                      className="bg-transparent text-[10px] font-mono focus:outline-none font-bold cursor-pointer outline-none"
+                      style={{ colorScheme: "dark", color: theme.accentColor }}
+                    >
+                      <option value="16:9" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>16:9 (Horizontal)</option>
+                      <option value="9:16" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>9:16 (Vertical)</option>
+                      <option value="1:1" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>1:1 (Square)</option>
+                      <option value="none" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>None</option>
+                    </select>
+                  </div>
 
-                    {/* Row 3: Format Dropdown below them */}
-                    <div className="glass-card flex items-center gap-1.5 px-2.5 py-1 rounded-xl border transition-all duration-300 w-fit" style={{ backgroundColor: `${theme.accentColor}08`, borderColor: `${theme.accentColor}30` }}>
-                      <span className="text-[9px] text-gray-400 font-mono">FORMAT:</span>
-                      <select
-                        value={storyboardFormat}
-                        onChange={(e) => setStoryboardFormat(e.target.value as any)}
-                        className="bg-transparent text-[10px] font-mono focus:outline-none font-bold cursor-pointer outline-none"
-                        style={{ colorScheme: "dark", color: theme.accentColor }}
-                      >
-                        <option value="16:9" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Horizontal (16:9)</option>
-                        <option value="9:16" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Vertical (9:16)</option>
-                        <option value="1:1" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>Square (1:1)</option>
-                        <option value="none" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>None (No Format)</option>
-                      </select>
-                    </div>
-
+                  {/* 4. Prompt Lines Depth Typebox */}
+                  <div className="glass-card flex items-center gap-1.5 px-2 py-1 rounded-xl border shrink-0" style={{ backgroundColor: `${theme.accentColor}08`, borderColor: `${theme.accentColor}30` }}>
+                    <span className="text-[9px] text-gray-400 font-mono font-bold uppercase" title="Target lines count / explanation depth per scene prompt (e.g. 15+ lines)">PROMPT LINES:</span>
+                    <input
+                      type="number"
+                      min="3"
+                      max="50"
+                      value={promptLineCount}
+                      onChange={(e) => setPromptLineCount(Math.min(50, Math.max(3, parseInt(e.target.value) || 15)))}
+                      className="bg-transparent w-8 text-[10px] font-mono focus:outline-none font-bold text-center"
+                      style={{ color: theme.accentColor }}
+                      title="Set specific line count / explanation depth for generated prompts (default 15 lines)"
+                    />
+                    <span className="text-[9px] font-mono font-bold" style={{ color: theme.accentColor }}>Lines</span>
                   </div>
                 </div>
 
@@ -3520,10 +3767,10 @@ export default function App() {
               </div>
 
               {/* SECTION 2: GENERATED SCENE PROMPTS */}
-              <div className="glass-card flex flex-col h-[480px] rounded-2xl overflow-hidden relative transition-all duration-300 border hover:border-white/30 backdrop-blur-xl" style={{ backgroundColor: theme.cardBg, borderColor: theme.cardBorderCode, boxShadow: panelShadow }}>
-                <div className="px-5 py-3 border-b flex flex-col xl:flex-row xl:items-center justify-between gap-3 glass-card" style={{ borderColor: `${theme.accentColor}30`, backgroundColor: `${theme.accentColor}08` }}>
+              <div className="glass-card flex flex-col min-h-[520px] lg:h-[560px] rounded-2xl overflow-hidden relative transition-all duration-300 border hover:border-white/30 backdrop-blur-xl" style={{ backgroundColor: theme.cardBg, borderColor: theme.cardBorderCode, boxShadow: panelShadow }}>
+                <div className="px-4 py-3 border-b flex flex-wrap items-center justify-between gap-2.5 glass-card" style={{ borderColor: `${theme.accentColor}30`, backgroundColor: `${theme.accentColor}08` }}>
                   <span className="text-xs font-mono font-extrabold tracking-wider flex items-center gap-1.5" style={{ color: theme.accentColor }}>
-                    <Sparkles className="h-4 w-4" style={{ color: theme.accentColor }} />
+                    <Sparkles className="h-4 w-4 shrink-0" style={{ color: theme.accentColor }} />
                     GENERATED SCENE PROMPTS
                   </span>
                   
