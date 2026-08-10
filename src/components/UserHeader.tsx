@@ -15,7 +15,9 @@ import {
   LogIn,
   Wand2,
   Sun,
-  Moon
+  Moon,
+  BookOpen,
+  Download
 } from "lucide-react";
 
 export const UserHeader: React.FC = () => {
@@ -27,6 +29,7 @@ export const UserHeader: React.FC = () => {
     setIsSettingsModalOpen, 
     setIsAdminModalOpen,
     setIsImageStudioOpen,
+    setIsTutorialModalOpen,
     currentTheme,
     setCurrentTheme,
     currentBrand,
@@ -132,6 +135,20 @@ export const UserHeader: React.FC = () => {
               <span className="text-xs font-mono font-bold hidden sm:inline text-white">Night 🌙</span>
             </>
           )}
+        </button>
+
+        {/* Tutorials & Downloads Button */}
+        <button
+          onClick={() => setIsTutorialModalOpen(true)}
+          className={`p-2 sm:px-3 py-2 rounded-2xl border transition-all cursor-pointer flex items-center gap-1.5 shadow-sm ${
+            theme.isLight 
+              ? "bg-[#FFFFFF] text-[#000000] border-[#E5E5E5]" 
+              : "bg-[#1A1A1A] text-white border-[#2A2A2A]"
+          }`}
+          title="Open Tutorials, Controls Dictionary & Downloadable Guides"
+        >
+          <BookOpen className="h-4 w-4" style={{ color: theme.accentColor }} />
+          <span className="text-xs font-mono font-bold hidden sm:inline">Tutorials & Guides</span>
         </button>
 
         {/* Image Studio Modal Trigger Button */}

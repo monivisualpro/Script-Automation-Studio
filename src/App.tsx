@@ -8,6 +8,7 @@ import { ApiKeyModal } from "./components/ApiKeyModal";
 import { SettingsModal } from "./components/SettingsModal";
 import { AdminModal } from "./components/AdminModal";
 import { ImageStudioModal } from "./components/ImageStudioModal";
+import { TutorialGuideModal } from "./components/TutorialGuideModal";
 import {
   Volume2,
   VolumeX,
@@ -1269,6 +1270,7 @@ export default function App() {
         onClose={() => setIsImageStudioOpen(false)}
         initialPrompt={initialImagePrompt}
       />
+      <TutorialGuideModal />
 
       {/* Unauthenticated / Missing API Key Alert Banners */}
       {!user && (

@@ -1,0 +1,172 @@
+================================================================================
+          SCRIPT AUTOMATION STUDIO - COMPLETE USER GUIDE & TUTORIAL
+================================================================================
+Welcome to Script Automation Studio! This comprehensive manual provides an in-depth 
+walkthrough of every control, button, input box, setting, and feature inside the 
+platform, alongside expert prompting strategies and best selection combinations.
+
+--------------------------------------------------------------------------------
+TABLE OF CONTENTS
+--------------------------------------------------------------------------------
+1. Platform Overview & Architecture
+2. Core Control Panel: Inputs, Buttons & Box Dictionary
+3. Output Formats & Transformation Engine
+4. Prompting & Command Guide (How to write inputs for best AI results)
+5. Best Selection Matrix by Platform (YouTube, Reels, TikTok, Podcasts)
+6. Troubleshooting & Power Features
+
+================================================================================
+1. PLATFORM OVERVIEW & ARCHITECTURE
+================================================================================
+Script Automation Studio is designed for professional scriptwriters, digital creators, 
+marketers, educators, and video editors. It transforms raw ideas, rough outlines, 
+voice transcriptions, or existing articles into polished, engaging video scripts 
+optimized for audience retention, algorithm performance, and production efficiency.
+
+================================================================================
+2. CORE CONTROL PANEL: INPUTS, BUTTONS & BOX DICTIONARY
+================================================================================
+
+[ BOX 1: RAW SCRIPT / IDEA / OUTLINE INPUT ]
+• Location: Left main input area.
+• Purpose: Paste your initial text, bullet points, article draft, YouTube transcript, 
+  or rough thoughts here.
+• Best Usage: You do NOT need clean formatting. Even fragmented thoughts or raw 
+  bullet points will be expanded and restructured into professional script formats.
+
+[ BUTTON: CLEAR / RESET INPUT ]
+• Location: Top-right of Raw Script Box.
+• Purpose: Instantly clears the raw input text area so you can start a fresh project.
+
+[ BUTTON: PASTE FROM CLIPBOARD ]
+• Location: Top-right of Raw Script Box.
+• Purpose: One-click paste from your system clipboard directly into the script editor.
+
+[ BUTTON: SAMPLE SCRIPT / PRESET LOAD ]
+• Location: Header near input area.
+• Purpose: Loads a high-performing example script template into the editor so you can 
+  test the AI pipeline without typing manually.
+
+--------------------------------------------------------------------------------
+TRANSFORMATION & CONFIGURATION CONTROLS
+--------------------------------------------------------------------------------
+
+[ CONTROL: SCRIPT TRANSFORMATION SELECTOR ]
+• Purpose: Defines the core output style and language format.
+• Available Options:
+  1. English Script Polisher: Fixes grammar, enhances vocabulary, improves flow.
+  2. Urdu Script Generator: Converts content into formal/poetic Urdu script.
+  3. Roman Urdu / Hindi Creator: Converts content into conversational Roman Urdu/Hindi.
+  4. Dual Language (Bilingual): Side-by-side English + Roman Urdu output.
+  5. Viral Hook Generator: Generates 5 high-converting opening hooks.
+  6. Shorts / Reels Script (60s): Micro-script formatted for fast vertical videos.
+  7. Documentary Style: Immersive, story-driven, authoritative narrative layout.
+  8. Explainer Video (2-3 Min): Structured educational script with visual prompts.
+
+[ CONTROL: VOICE PERSONA ]
+• Purpose: Tailors the tone and personality of the voiceover speaker.
+• Options & Best Use Cases:
+  - Professional Male/Female: Corporate, educational, news, and official tutorials.
+  - Energetic Hype Creator: Tech reviews, gaming, reaction videos, fast Reels.
+  - Deep Documentary Narrator: Crime stories, history, geopolitics, space.
+  - Warm Storyteller: Personal vlogs, life lessons, Islamic reminders, motivational.
+
+[ CONTROL: DOMAIN / TOPIC NICHE DROPDOWN ]
+• Purpose: Sets domain-specific terminology, background context, and industry jargon.
+• Options (50+ Domains): Artificial Intelligence, Finance, Health & Fitness, Gaming,
+  CGI, History, Civil Engineering, Automotive, Islamic, Lifestyle, General, etc.
+
+[ CONTROL: TUTORIAL & LITERATURE TOOL TONE ]
+• Purpose: Defines emotional frequency, rhythm, and literary style.
+• Popular Tones:
+  - Warm Friendly Conversational
+  - Islamic / Religious Tone
+  - Engaging Food Blogger Vibe
+  - Fast Paced Explainer
+  - Informative Health Explainer
+  - Exciting Tech Enthusiast
+  - Poetic Relatable (Shayari Vibe)
+  - Dramatic Narrative
+  - Science-Based Tutorial
+
+[ CONTROL: SCRIPT LENGTH & WORD COUNT TARGET ]
+• Purpose: Sets target duration or exact word count (e.g., 100 words = ~45s, 
+  300 words = ~2 min, 600 words = ~4 min).
+
+[ CONTROL: GREETINGS PREFIX ]
+• Options: Assalamualaikum, Hello Guys, Welcome Back, Hey Everyone, Custom.
+• Purpose: Automatically inserts your branded opening line at the start of the script.
+
+[ CONTROL: HOOKS, BODY & CONCLUSION TOGGLE ]
+• Purpose: When enabled, enforces strict tripartite narrative structuring:
+  - Hook (First 0-5s): Grips attention.
+  - Body: Core educational / entertaining content.
+  - Conclusion + CTA: Calls user to Like, Subscribe, or Comment.
+
+[ CONTROL: FAST LITE MODE TOGGLE ]
+• Purpose: Accelerates AI generation speed by bypassing deep visual cues when you 
+  only need rapid voiceover audio text.
+
+[ CONTROL: TARGET COUNTRY / REGIONAL AUDIENCE SELECTOR ]
+• Purpose: Adapts cultural references, slang, currency, and local relevance for 
+  specific target countries (e.g. Pakistan, India, USA, UK, UAE, Saudi Arabia).
+
+--------------------------------------------------------------------------------
+ACTION BUTTONS & GENERATION
+--------------------------------------------------------------------------------
+
+[ BUTTON: GENERATE POLISHED SCRIPT ]
+• Location: Bottom center / Primary CTA button.
+• Action: Sends prompt configuration to Google Gemini AI and streams back the 
+  finished, production-ready script with visual/audio directions.
+
+[ BUTTON: SHOTS CALCULATOR (SCENE SPLITTER) ]
+• Location: Tool section.
+• Action: Automatically calculates video duration in minutes/seconds, total camera 
+  shots needed, and splits the polished script into timestamped B-roll scenes!
+
+[ BUTTON: CHECK PLAGIARISM & ORIGINALITY ]
+• Action: Scans script uniqueness score and verifies originality.
+
+================================================================================
+3. PROMPTING & COMMAND GUIDE (HOW TO WRITE INPUTS FOR BEST AI RESULTS)
+================================================================================
+To get 10/10 script outputs from Script Automation Studio, follow these 3 golden rules:
+
+RULE 1: Provide Context in Raw Script Input
+Instead of entering: "Make a video about AI."
+Enter: "Explain how AI is changing graphic design in 2026. Mention tools like Midjourney 
+and Canva AI. Target audience is beginner graphic designers who fear losing their jobs. 
+End with a reassuring message."
+
+RULE 2: Combine Complementary Settings
+- For Tech Shorts: Select "Shorts / Reels", "Energetic Hype", "Technology", "Fast Paced".
+- For History / Documentaries: Select "Documentary Style", "Deep Documentary Narrator", 
+  "History", "Dramatic Narrative".
+- For Islamic / Spiritual: Select "English / Roman Urdu", "Warm Storyteller", "Islamic", 
+  "Islamic / Religious Tone", Greetings Prefix "Assalamualaikum".
+
+================================================================================
+4. BEST SELECTION MATRIX BY PLATFORM
+================================================================================
+1. YOUTUBE SHORTS / INSTAGRAM REELS (15-60 Seconds)
+   - Transformation: Shorts / Reels Script (60s)
+   - Word Count: 120-160 words
+   - Tone: Fast Paced Explainer
+   - Hooks/Body/CTA: Enabled
+
+2. LONG-FORM YOUTUBE EXPLAINER (5-10 Minutes)
+   - Transformation: Explainer Video (2-3 Min) or English Script Polisher
+   - Word Count: 600 - 1200 words
+   - Tone: Science-Based / Professional Clear Speaker
+   - Fast Lite Mode: Disabled (Keep visual B-Roll notes)
+
+3. CULTURAL / LOCAL VLOGS (Urdu / Hindi)
+   - Transformation: Roman Urdu / Hindi Creator
+   - Tone: Warm Friendly Conversational or Engaging Food Blogger Vibe
+   - Greetings: Assalamualaikum / Hey Everyone
+
+================================================================================
+Download and keep this guide handy for your content production workflow!
+Generated by Script Automation Studio.
+================================================================================

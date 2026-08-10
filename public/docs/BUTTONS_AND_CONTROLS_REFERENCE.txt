@@ -1,0 +1,57 @@
+================================================================================
+          BUTTONS & UI CONTROLS COMPLETE REFERENCE DICTIONARY
+================================================================================
+
+This document lists every button, modal trigger, input field, toggle, and dropdown 
+in Script Automation Studio, detailing its exact purpose and optimal settings.
+
+--------------------------------------------------------------------------------
+1. TOP NAVIGATION HEADER CONTROLS
+--------------------------------------------------------------------------------
+• BRAND SWITCHER (🟠 Orange / 🔵 Blue):
+  Changes the primary accent color scheme across the entire studio interface.
+
+• DAY / NIGHT THEME TOGGLE (☀️ Day / 🌙 Night):
+  Switches between high-contrast light mode and dark mode for eye safety.
+
+• IMAGE STUDIO BUTTON (Wand Icon):
+  Opens AI Image Generation Studio to generate thumbnails, scenes, or B-roll visuals.
+
+• SETTINGS BUTTON (Gear Icon):
+  Opens AI Model selector (Gemini 2.5 Flash, Gemini Pro), temperature, & safety settings.
+
+• API KEY SETTINGS (Key / Badge):
+  Allows you to input or view your personal Google AI Studio API Key.
+
+• ADMIN CONSOLE (Crown Icon - Admin only):
+  Opens user management, usage statistics, credit allocation, and system logs.
+
+--------------------------------------------------------------------------------
+2. MAIN SCRIPT GENERATOR CONTROLS
+--------------------------------------------------------------------------------
+• RAW SCRIPT TEXTAREA: Place for pasting raw thoughts, bullet points, or rough text.
+• CLEAR INPUT BUTTON: Flushes the raw text box clean.
+• PASTE BUTTON: Inserts text straight from system clipboard.
+• LOAD SAMPLE PRESET: Populates example script for testing.
+• DOMAIN DROPDOWN: Selects subject area (AI, Finance, History, Health, etc.).
+• TUTORIAL & LITERATURE TOOL TONE: Sets emotional resonance (Conversational, Poetic, Hype).
+• TRANSFORMATION OPTIONS: Converts language and script format (English, Urdu, Roman Urdu, Dual).
+• VOICE PERSONA DROPDOWN: Selects voiceover voice personality.
+• WORD COUNT SLIDER/INPUT: Controls generated script length (100 to 1500+ words).
+• HOOKS/BODY/CONCLUSION TOGGLE: Ensures opening hook, body, and closing CTA exist.
+• FAST LITE MODE TOGGLE: Fast generation without visual cue markup.
+• TARGET COUNTRY SELECTOR: Customizes regional slang & cultural context.
+• GENERATE POLISHED SCRIPT BUTTON: Main trigger that initiates AI processing.
+
+--------------------------------------------------------------------------------
+3. OUTPUT & POST-PROCESSING TOOLS
+--------------------------------------------------------------------------------
+• COPY TO CLIPBOARD BUTTON: Copies formatted generated script to your clipboard.
+• DOWNLOAD SCRIPT (.TXT / .MD): Saves script directly to your local computer.
+• SHOTS CALCULATOR (SCENE SPLITTER): Divides script into timestamped camera scenes.
+• CHECK PLAGIARISM BUTTON: Verifies originality score.
+• AUDIO VOICE SIMULATOR (TTS): Converts text to speech audio preview inside studio.
+
+================================================================================
+Keep this reference guide handy for quick studio navigation!
+================================================================================

@@ -41,6 +41,8 @@ interface AuthContextType {
   setIsAdminModalOpen: (open: boolean) => void;
   isImageStudioOpen: boolean;
   setIsImageStudioOpen: (open: boolean) => void;
+  isTutorialModalOpen: boolean;
+  setIsTutorialModalOpen: (open: boolean) => void;
   initialImagePrompt: string;
   openImageStudioWithPrompt: (prompt?: string) => void;
   modelSettings: FeatureModelConfig;
@@ -71,6 +73,8 @@ const AuthContext = createContext<AuthContextType>({
   setIsAdminModalOpen: () => {},
   isImageStudioOpen: false,
   setIsImageStudioOpen: () => {},
+  isTutorialModalOpen: false,
+  setIsTutorialModalOpen: () => {},
   initialImagePrompt: "",
   openImageStudioWithPrompt: () => {},
   modelSettings: DEFAULT_FEATURE_MODELS,
@@ -93,6 +97,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState<boolean>(false);
   const [isAdminModalOpen, setIsAdminModalOpen] = useState<boolean>(false);
   const [isImageStudioOpen, setIsImageStudioOpen] = useState<boolean>(false);
+  const [isTutorialModalOpen, setIsTutorialModalOpen] = useState<boolean>(false);
   const [initialImagePrompt, setInitialImagePrompt] = useState<string>("");
   const [currentTheme, setCurrentThemeState] = useState<string>(() => {
     try {
@@ -335,6 +340,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsAdminModalOpen,
         isImageStudioOpen,
         setIsImageStudioOpen,
+        isTutorialModalOpen,
+        setIsTutorialModalOpen,
         initialImagePrompt,
         openImageStudioWithPrompt,
         modelSettings,
