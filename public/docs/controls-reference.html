@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>Buttons & Controls Reference Dictionary | Script Automation Studio</title>
+    <meta name="description" content="Complete itemized reference dictionary of all UI controls, toggles, parameters, and action triggers in Script Automation Studio." />
+    <meta name="author" content="Muhammad Tehseen Irshad" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+      body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #0d0e12; color: #f3f4f6; }
+      .glass-card { background: rgba(22, 24, 33, 0.75); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.08); }
+      [data-theme="day"] { background-color: #f8fafc; color: #0f172a; }
+      [data-theme="day"] .glass-card { background: rgba(255, 255, 255, 0.95); border: 1px solid #e2e8f0; }
+      [data-brand="blue"] { --accent: #2774fc; --secondary-accent: #ff073a; }
+      [data-brand="red"] { --accent: #ff073a; --secondary-accent: #2774fc; }
+      .theme-accent-bg { background-color: var(--accent); }
+      .theme-accent-text { color: var(--accent); }
+    </style>
+  </head>
+  <body class="min-h-screen" data-brand="red" data-theme="night">
+    <header class="sticky top-0 z-50 backdrop-blur-xl border-b border-white/10 bg-[#0d0e12]/80">
+      <div class="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+        <a href="/" class="flex items-center gap-3">
+          <div class="h-9 w-9 rounded-xl flex items-center justify-center font-bold text-white shadow-lg theme-accent-bg">🎛️</div>
+          <div>
+            <div class="text-xs font-mono font-extrabold uppercase tracking-wider text-white">Script Automation Studio</div>
+            <div class="text-[10px] text-gray-400 font-mono">Controls &amp; Buttons Dictionary</div>
+          </div>
+        </a>
+        <div class="flex items-center gap-2 text-xs font-mono">
+          <a href="/docs/complete-user-guide.html" class="px-3 py-1.5 rounded-xl border border-white/10 text-gray-300 hover:text-white">Full Guide</a>
+          <a href="/" class="px-3.5 py-1.5 rounded-xl font-bold text-white theme-accent-bg">Open Studio</a>
+        </div>
+      </div>
+    </header>
+
+    <main class="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-12 space-y-8">
+      <div class="glass-card rounded-3xl p-6 sm:p-10 relative overflow-hidden">
+        <div class="space-y-4 max-w-2xl">
+          <span class="px-3 py-1 rounded-full text-xs font-mono font-bold border border-white/10 bg-white/5 theme-accent-text">
+            UI Reference Manual
+          </span>
+          <h1 class="text-2xl sm:text-4xl font-extrabold">
+            Buttons &amp; UI Controls <br/><span class="theme-accent-text">Complete Dictionary</span>
+          </h1>
+          <p class="text-sm text-gray-300 leading-relaxed">
+            Detailed purpose, location, and optimal settings for every single control, input field, and trigger inside the platform.
+          </p>
+          <div class="flex items-center gap-3 pt-2">
+            <a href="/docs/BUTTONS_AND_CONTROLS_REFERENCE.txt" download class="px-4 py-2 rounded-xl text-xs font-mono font-bold text-white theme-accent-bg flex items-center gap-2">
+              <span>Download .TXT</span>
+            </a>
+            <a href="/docs/BUTTONS_AND_CONTROLS_REFERENCE.txt" target="_blank" class="px-4 py-2 rounded-xl text-xs font-mono text-gray-300 border border-white/10 hover:bg-white/5">
+              <span>View Plain Text</span>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <section class="space-y-4">
+        <!-- Group 1 -->
+        <h2 class="text-sm font-mono font-extrabold uppercase tracking-widest theme-accent-text">1. Header &amp; Top Navigation Controls</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div class="glass-card p-5 rounded-2xl space-y-2">
+            <div class="flex items-center justify-between font-mono">
+              <span class="text-xs font-bold text-white">Brand Switcher (🔴 Red / 🔵 Blue)</span>
+              <span class="text-[10px] theme-accent-text">Header</span>
+            </div>
+            <p class="text-xs text-gray-300 leading-relaxed">Dynamically alters primary and secondary accent colors (#FF073A / #2774FC) across all buttons, borders, highlights, and icons.</p>
+          </div>
+          <div class="glass-card p-5 rounded-2xl space-y-2">
+            <div class="flex items-center justify-between font-mono">
+              <span class="text-xs font-bold text-white">Day / Night Theme Toggle</span>
+              <span class="text-[10px] theme-accent-text">Header</span>
+            </div>
+            <p class="text-xs text-gray-300 leading-relaxed">Switches between high-contrast dark room mode (#0D0E12) and bright daylight studio mode (#FAFAFA) to protect eye health.</p>
+          </div>
+          <div class="glass-card p-5 rounded-2xl space-y-2">
+            <div class="flex items-center justify-between font-mono">
+              <span class="text-xs font-bold text-white">Image Studio Modal (Wand Icon)</span>
+              <span class="text-[10px] theme-accent-text">Header</span>
+            </div>
+            <p class="text-xs text-gray-300 leading-relaxed">Opens the AI visual suite with aspect ratio options (16:9 YouTube, 9:16 Shorts, 1:1 Square) to generate thumbnails or B-roll shots.</p>
+          </div>
+          <div class="glass-card p-5 rounded-2xl space-y-2">
+            <div class="flex items-center justify-between font-mono">
+              <span class="text-xs font-bold text-white">Settings &amp; Model Selection</span>
+              <span class="text-[10px] theme-accent-text">Header</span>
+            </div>
+            <p class="text-xs text-gray-300 leading-relaxed">Adjusts Gemini engine parameters (Gemini 2.5 Flash, Gemini Pro), generation temperature, and safety filtering thresholds.</p>
+          </div>
+        </div>
+
+        <!-- Group 2 -->
+        <h2 class="text-sm font-mono font-extrabold uppercase tracking-widest theme-accent-text pt-4">2. Scriptmaking &amp; Configuration Controls</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div class="glass-card p-5 rounded-2xl space-y-2">
+            <div class="flex items-center justify-between font-mono">
+              <span class="text-xs font-bold text-white">Voice Persona Dropdown</span>
+              <span class="text-[10px] theme-accent-text">Sidebar</span>
+            </div>
+            <p class="text-xs text-gray-300 leading-relaxed">Specifies voiceover delivery style: Energetic Hype Creator, Deep Documentary Narrator, Warm Storyteller, or Corporate Professional.</p>
+          </div>
+          <div class="glass-card p-5 rounded-2xl space-y-2">
+            <div class="flex items-center justify-between font-mono">
+              <span class="text-xs font-bold text-white">Shots Calculator (Scene Splitter)</span>
+              <span class="text-[10px] theme-accent-text">Post-Tool</span>
+            </div>
+            <p class="text-xs text-gray-300 leading-relaxed">Calculates speech timing and divides output scripts into timestamped video scenes with B-roll visual and audio sound effect cues.</p>
+          </div>
+          <div class="glass-card p-5 rounded-2xl space-y-2">
+            <div class="flex items-center justify-between font-mono">
+              <span class="text-xs font-bold text-white">Check Plagiarism &amp; Originality</span>
+              <span class="text-[10px] theme-accent-text">Post-Tool</span>
+            </div>
+            <p class="text-xs text-gray-300 leading-relaxed">Performs an originality calculation on the script body to confirm zero-risk copyright safety and avoid demonetization.</p>
+          </div>
+          <div class="glass-card p-5 rounded-2xl space-y-2">
+            <div class="flex items-center justify-between font-mono">
+              <span class="text-xs font-bold text-white">Transformation Option (Language)</span>
+              <span class="text-[10px] theme-accent-text">Thumbnail &amp; Script</span>
+            </div>
+            <p class="text-xs text-gray-300 leading-relaxed">Controls target linguistic script: Urdu Nastaliq, Roman Urdu, Hindi, Arabic, English, Spanish, French, Japanese, Russian, etc.</p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="border-t border-white/10 py-8 text-center text-xs font-mono text-gray-500">
+      Script Automation Studio &bull; Created by Muhammad Tehseen Irshad
+    </footer>
+  </body>
+</html>

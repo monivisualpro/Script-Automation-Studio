@@ -1,0 +1,420 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>Complete User Guide & Tutorial | Script Automation Studio</title>
+    <meta name="description" content="Official User Manual and Complete Tutorial for Script Automation Studio. Comprehensive guide to every button, setting, prompt structure, and selection matrix." />
+    <meta name="author" content="Muhammad Tehseen Irshad" />
+    <link rel="canonical" href="https://script-automation-studio.ai.studio/docs/complete-user-guide.html" />
+    <!-- Tailwind CSS CDN for Standalone View -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Noto+Nastaliq+Urdu:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+      body {
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        background-color: #0d0e12;
+        color: #f3f4f6;
+        transition: background-color 0.2s, color 0.2s;
+      }
+      .font-mono-code {
+        font-family: 'Fira Code', monospace;
+      }
+      .glass-card {
+        background: rgba(22, 24, 33, 0.75);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      /* Theme attributes */
+      [data-theme="day"] {
+        background-color: #f8fafc;
+        color: #0f172a;
+      }
+      [data-theme="day"] .glass-card {
+        background: rgba(255, 255, 255, 0.95);
+        border: 1px solid #e2e8f0;
+      }
+      [data-brand="blue"] {
+        --accent: #2774fc;
+        --secondary-accent: #ff073a;
+      }
+      [data-brand="red"] {
+        --accent: #ff073a;
+        --secondary-accent: #2774fc;
+      }
+      .theme-accent-bg { background-color: var(--accent); }
+      .theme-accent-text { color: var(--accent); }
+      .theme-accent-border { border-color: var(--accent); }
+    </style>
+  </head>
+  <body class="min-h-screen selection:bg-red-500 selection:text-white" data-brand="red" data-theme="night">
+    <!-- Top Fixed Navigation Bar -->
+    <header class="sticky top-0 z-50 backdrop-blur-xl border-b border-white/10 bg-[#0d0e12]/80 transition-colors">
+      <div class="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+        <a href="/" class="flex items-center gap-3 group">
+          <div class="h-9 w-9 rounded-xl flex items-center justify-center font-bold text-white shadow-lg theme-accent-bg">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+          </div>
+          <div>
+            <div class="text-xs font-mono font-extrabold uppercase tracking-wider flex items-center gap-2">
+              <span class="text-white group-hover:text-red-400 transition-colors">Script Automation Studio</span>
+              <span class="text-[9px] px-2 py-0.5 rounded-full font-bold uppercase theme-accent-bg text-white">Docs</span>
+            </div>
+            <div class="text-[10px] text-gray-400 font-mono">By Muhammad Tehseen Irshad</div>
+          </div>
+        </a>
+
+        <!-- Controls: Brand & Theme Toggle & Raw link -->
+        <div class="flex items-center gap-2 sm:gap-3 text-xs font-mono">
+          <!-- Brand switcher -->
+          <div class="flex items-center p-1 rounded-xl border border-white/10 bg-black/30">
+            <button id="btnBrandRed" onclick="setBrand('red')" class="px-2 py-1 rounded-lg font-bold text-[10px] flex items-center gap-1 text-white bg-red-600 transition-all">
+              <span>🔴 Red</span>
+            </button>
+            <button id="btnBrandBlue" onclick="setBrand('blue')" class="px-2 py-1 rounded-lg font-bold text-[10px] flex items-center gap-1 text-gray-400 hover:text-white transition-all">
+              <span>🔵 Blue</span>
+            </button>
+          </div>
+
+          <!-- Day/Night Toggle -->
+          <button id="btnThemeToggle" onclick="toggleTheme()" class="px-2.5 py-1.5 rounded-xl border border-white/10 bg-black/30 hover:border-white/30 text-gray-300 hover:text-white transition-all flex items-center gap-1.5 text-xs">
+            <span id="themeIcon">☀️</span>
+            <span id="themeLabel" class="hidden sm:inline">Day</span>
+          </button>
+
+          <!-- Back to App button -->
+          <a href="/" class="px-3 py-1.5 rounded-xl font-bold text-white shadow-md theme-accent-bg hover:opacity-90 transition-all flex items-center gap-1.5">
+            <span>Open Studio</span>
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12 space-y-10">
+      <!-- Hero Header -->
+      <div class="glass-card rounded-3xl p-6 sm:p-10 relative overflow-hidden">
+        <div class="absolute -right-20 -bottom-20 w-80 h-80 rounded-full blur-3xl opacity-15 pointer-events-none theme-accent-bg"></div>
+        <div class="space-y-4 max-w-3xl relative z-10">
+          <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-mono font-bold border border-white/10 bg-white/5">
+            <span class="h-2 w-2 rounded-full theme-accent-bg animate-pulse"></span>
+            <span>Official User Manual &amp; Tutorial Center</span>
+          </div>
+          <h1 class="text-2xl sm:text-4xl font-extrabold tracking-tight">
+            Script Automation Studio <br/>
+            <span class="theme-accent-text">Complete User Guide &amp; Master Tutorial</span>
+          </h1>
+          <p class="text-sm sm:text-base text-gray-300 leading-relaxed font-sans">
+            Comprehensive manual explaining every button, input box, configuration dropdown, tone setting, prompting command, and selection matrix inside the studio.
+          </p>
+
+          <!-- Action bar -->
+          <div class="pt-4 flex flex-wrap items-center gap-3">
+            <a href="/docs/COMPLETE_USER_GUIDE_TUTORIAL.txt" download="COMPLETE_USER_GUIDE_TUTORIAL.txt" class="px-4 py-2 rounded-xl text-xs font-mono font-bold text-white theme-accent-bg shadow-lg flex items-center gap-2 hover:opacity-90 transition-all">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+              <span>Download Raw .TXT File</span>
+            </a>
+            <a href="/docs/COMPLETE_USER_GUIDE_TUTORIAL.txt" target="_blank" class="px-4 py-2 rounded-xl text-xs font-mono font-bold text-gray-300 bg-white/5 border border-white/10 hover:bg-white/10 transition-all flex items-center gap-1.5">
+              <span>View Plain Text</span>
+              <svg class="w-3.5 h-3.5 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+            </a>
+            <button onclick="window.print()" class="px-3.5 py-2 rounded-xl text-xs font-mono font-bold text-gray-400 bg-white/5 border border-white/10 hover:text-white transition-all flex items-center gap-1.5">
+              <span>🖨️ Print / Save PDF</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Jump Table of Contents -->
+      <nav class="glass-card rounded-2xl p-5 border border-white/10">
+        <h3 class="text-xs font-mono font-extrabold uppercase tracking-widest text-gray-400 mb-3 flex items-center gap-2">
+          <svg class="w-4 h-4 theme-accent-text" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"/></svg>
+          <span>Table of Contents</span>
+        </h3>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-xs font-mono">
+          <a href="#overview" class="p-2 rounded-lg hover:bg-white/5 transition-colors flex items-center gap-2 text-gray-300 hover:text-white">
+            <span class="theme-accent-text font-bold">01.</span> Platform Overview &amp; Architecture
+          </a>
+          <a href="#controls" class="p-2 rounded-lg hover:bg-white/5 transition-colors flex items-center gap-2 text-gray-300 hover:text-white">
+            <span class="theme-accent-text font-bold">02.</span> Core Controls &amp; Input Box Dictionary
+          </a>
+          <a href="#transformations" class="p-2 rounded-lg hover:bg-white/5 transition-colors flex items-center gap-2 text-gray-300 hover:text-white">
+            <span class="theme-accent-text font-bold">03.</span> Transformation Modes &amp; Engines
+          </a>
+          <a href="#tones" class="p-2 rounded-lg hover:bg-white/5 transition-colors flex items-center gap-2 text-gray-300 hover:text-white">
+            <span class="theme-accent-text font-bold">04.</span> 50+ Tones &amp; Literature Styles
+          </a>
+          <a href="#prompting" class="p-2 rounded-lg hover:bg-white/5 transition-colors flex items-center gap-2 text-gray-300 hover:text-white">
+            <span class="theme-accent-text font-bold">05.</span> Prompting &amp; Command Guide
+          </a>
+          <a href="#matrix" class="p-2 rounded-lg hover:bg-white/5 transition-colors flex items-center gap-2 text-gray-300 hover:text-white">
+            <span class="theme-accent-text font-bold">06.</span> Best Selection Matrix by Platform
+          </a>
+        </div>
+      </nav>
+
+      <!-- Section 1: Overview -->
+      <section id="overview" class="glass-card rounded-3xl p-6 sm:p-8 space-y-4">
+        <div class="flex items-center gap-3 border-b border-white/10 pb-4">
+          <span class="h-8 w-8 rounded-xl flex items-center justify-center font-mono font-bold text-xs theme-accent-bg text-white">01</span>
+          <div>
+            <h2 class="text-xl font-bold tracking-tight">Platform Overview &amp; Architecture</h2>
+            <p class="text-xs text-gray-400 font-mono">Engineered for video creators, educators, editors, and digital marketers</p>
+          </div>
+        </div>
+        <p class="text-sm leading-relaxed text-gray-300">
+          <strong>Script Automation Studio</strong> transforms raw ideas, fragmented thoughts, voice transcripts, or articles into polished, high-retention video scripts. Equipped with deep YouTube algorithm optimization, scene B-roll direction, high-CTR thumbnail director, and multilingual translation capabilities.
+        </p>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
+          <div class="p-4 rounded-2xl bg-black/20 border border-white/5 space-y-1.5">
+            <div class="text-xs font-mono font-bold theme-accent-text">⚡ Retention First</div>
+            <p class="text-xs text-gray-400">Strict opening hook triggers, pattern interrupts, and concise narrative pacing.</p>
+          </div>
+          <div class="p-4 rounded-2xl bg-black/20 border border-white/5 space-y-1.5">
+            <div class="text-xs font-mono font-bold theme-accent-text">🎬 Production Ready</div>
+            <p class="text-xs text-gray-400">Generates scene-by-scene camera instructions, B-roll visuals, and SFX notes.</p>
+          </div>
+          <div class="p-4 rounded-2xl bg-black/20 border border-white/5 space-y-1.5">
+            <div class="text-xs font-mono font-bold theme-accent-text">🌐 40+ Languages</div>
+            <p class="text-xs text-gray-400">Native Urdu Nastaliq, Roman Urdu, Hindi, Arabic, Spanish, French, German, and more.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 2: Core Controls & Dictionary -->
+      <section id="controls" class="glass-card rounded-3xl p-6 sm:p-8 space-y-6">
+        <div class="flex items-center gap-3 border-b border-white/10 pb-4">
+          <span class="h-8 w-8 rounded-xl flex items-center justify-center font-mono font-bold text-xs theme-accent-bg text-white">02</span>
+          <div>
+            <h2 class="text-xl font-bold tracking-tight">Core Controls &amp; Input Box Dictionary</h2>
+            <p class="text-xs text-gray-400 font-mono">Detailed breakdown of every input, button, and parameter</p>
+          </div>
+        </div>
+
+        <div class="space-y-4">
+          <!-- Item 1 -->
+          <div class="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-2">
+            <div class="flex items-center justify-between flex-wrap gap-2">
+              <span class="text-sm font-bold font-mono text-white flex items-center gap-2">
+                <span class="px-2 py-0.5 rounded text-[10px] theme-accent-bg text-white font-mono">BOX</span>
+                Raw Script / Idea Box
+              </span>
+              <span class="text-xs font-mono text-gray-400">Location: Left Primary Panel</span>
+            </div>
+            <p class="text-xs text-gray-300 leading-relaxed">
+              <strong>Purpose:</strong> Primary input box for pasting raw ideas, rough thoughts, article snippets, or YouTube transcripts.<br/>
+              <strong>Best Practice:</strong> You don't need clean formatting. Even broken notes, bullet points, or stream-of-consciousness ideas will be systematically restructured into viral scripts.
+            </p>
+          </div>
+
+          <!-- Item 2 -->
+          <div class="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-2">
+            <div class="flex items-center justify-between flex-wrap gap-2">
+              <span class="text-sm font-bold font-mono text-white flex items-center gap-2">
+                <span class="px-2 py-0.5 rounded text-[10px] bg-blue-600 text-white font-mono">BUTTON</span>
+                Paste / Clear / Sample Preset
+              </span>
+              <span class="text-xs font-mono text-gray-400">Header of Input Box</span>
+            </div>
+            <p class="text-xs text-gray-300 leading-relaxed">
+              <strong>Paste:</strong> Injects your device clipboard with one click.<br/>
+              <strong>Clear:</strong> Wipes the slate clean for a fresh project.<br/>
+              <strong>Sample:</strong> Loads a high-performing real-world script prompt to instantly test the engine.
+            </p>
+          </div>
+
+          <!-- Item 3 -->
+          <div class="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-2">
+            <div class="flex items-center justify-between flex-wrap gap-2">
+              <span class="text-sm font-bold font-mono text-white flex items-center gap-2">
+                <span class="px-2 py-0.5 rounded text-[10px] bg-purple-600 text-white font-mono">DROPDOWN</span>
+                Domain / Topic Niche (50+ Categories)
+              </span>
+              <span class="text-xs font-mono text-gray-400">Parameters Sidebar</span>
+            </div>
+            <p class="text-xs text-gray-300 leading-relaxed">
+              <strong>Purpose:</strong> Grounds the AI in domain-specific terminology, audience expectations, and technical context (e.g. AI, Finance, History, Gaming, Islamic, Civil Engineering, Healthcare).
+            </p>
+          </div>
+
+          <!-- Item 4 -->
+          <div class="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-2">
+            <div class="flex items-center justify-between flex-wrap gap-2">
+              <span class="text-sm font-bold font-mono text-white flex items-center gap-2">
+                <span class="px-2 py-0.5 rounded text-[10px] theme-accent-bg text-white font-mono">TOGGLE</span>
+                Hooks, Body &amp; Conclusion Enforcer
+              </span>
+              <span class="text-xs font-mono text-gray-400">Recommended: Always ON</span>
+            </div>
+            <p class="text-xs text-gray-300 leading-relaxed">
+              <strong>Purpose:</strong> Mandates the 3-phase viral video formula: 0-5s Hook pattern interrupt &rarr; Value Body delivery &rarr; Natural call-to-action (CTA).
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 3: Prompting & Command Guide -->
+      <section id="prompting" class="glass-card rounded-3xl p-6 sm:p-8 space-y-6">
+        <div class="flex items-center gap-3 border-b border-white/10 pb-4">
+          <span class="h-8 w-8 rounded-xl flex items-center justify-center font-mono font-bold text-xs theme-accent-bg text-white">03</span>
+          <div>
+            <h2 class="text-xl font-bold tracking-tight">Prompting &amp; Command Masterclass</h2>
+            <p class="text-xs text-gray-400 font-mono">How to write inputs that generate 10/10 viral outputs</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- Template 1 -->
+          <div class="p-5 rounded-2xl bg-black/20 border border-white/10 space-y-3">
+            <div class="text-xs font-mono font-bold uppercase tracking-wider theme-accent-text">Template A: Tech Shorts / Reels</div>
+            <div class="p-3 rounded-xl bg-black/40 border border-white/5 text-xs font-mono text-gray-300">
+              "Topic: Why Quantum Computers will make regular encryption obsolete in 2026.<br/>
+              Tone: Fast Paced Explainer<br/>
+              Target: 140 words, high curiosity hook."
+            </div>
+            <p class="text-xs text-gray-400"><strong>Expected Output:</strong> High-energy opening, simple qubit metaphor, visual B-roll cues, subscribe CTA.</p>
+          </div>
+
+          <!-- Template 2 -->
+          <div class="p-5 rounded-2xl bg-black/20 border border-white/10 space-y-3">
+            <div class="text-xs font-mono font-bold uppercase tracking-wider text-blue-400">Template B: Mystery / Documentary</div>
+            <div class="p-3 rounded-xl bg-black/40 border border-white/5 text-xs font-mono text-gray-300">
+              "Topic: The mystery of flight MH370 radar anomaly.<br/>
+              Tone: Dramatic Narrative<br/>
+              Voice Persona: Deep Documentary Narrator<br/>
+              Length: 800 words."
+            </div>
+            <p class="text-xs text-gray-400"><strong>Expected Output:</strong> Atmospheric pacing, suspense pauses, radar timestamps, cinematic visual directions.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 4: Selection Matrix -->
+      <section id="matrix" class="glass-card rounded-3xl p-6 sm:p-8 space-y-6">
+        <div class="flex items-center gap-3 border-b border-white/10 pb-4">
+          <span class="h-8 w-8 rounded-xl flex items-center justify-center font-mono font-bold text-xs theme-accent-bg text-white">04</span>
+          <div>
+            <h2 class="text-xl font-bold tracking-tight">Best Selection Matrix by Platform</h2>
+            <p class="text-xs text-gray-400 font-mono">Recommended settings for maximum CTR &amp; audience retention</p>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs font-mono border-collapse">
+            <thead>
+              <tr class="border-b border-white/10 text-gray-400">
+                <th class="py-3 px-3">Platform / Goal</th>
+                <th class="py-3 px-3">Transformation</th>
+                <th class="py-3 px-3">Tone Setting</th>
+                <th class="py-3 px-3">Word Count</th>
+                <th class="py-3 px-3">Voice Persona</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-white/5 text-gray-300">
+              <tr class="hover:bg-white/5">
+                <td class="py-3 px-3 font-bold text-white">YouTube Shorts / Reels</td>
+                <td class="py-3 px-3">Shorts (60s)</td>
+                <td class="py-3 px-3">Fast Paced Explainer</td>
+                <td class="py-3 px-3">120 - 150 words</td>
+                <td class="py-3 px-3">Energetic Hype</td>
+              </tr>
+              <tr class="hover:bg-white/5">
+                <td class="py-3 px-3 font-bold text-white">YouTube Long Explainer</td>
+                <td class="py-3 px-3">Explainer (2-3 Min)</td>
+                <td class="py-3 px-3">Science-Based / Clear</td>
+                <td class="py-3 px-3">600 - 1200 words</td>
+                <td class="py-3 px-3">Professional Male/Female</td>
+              </tr>
+              <tr class="hover:bg-white/5">
+                <td class="py-3 px-3 font-bold text-white">Documentary / Story</td>
+                <td class="py-3 px-3">Documentary Style</td>
+                <td class="py-3 px-3">Dramatic Narrative</td>
+                <td class="py-3 px-3">800 - 1500 words</td>
+                <td class="py-3 px-3">Deep Narrator</td>
+              </tr>
+              <tr class="hover:bg-white/5">
+                <td class="py-3 px-3 font-bold text-white">Urdu / Hindi Vlogs</td>
+                <td class="py-3 px-3">Roman Urdu / Hindi</td>
+                <td class="py-3 px-3">Warm Friendly / Vlogger</td>
+                <td class="py-3 px-3">300 - 700 words</td>
+                <td class="py-3 px-3">Warm Storyteller</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Additional Manuals Links -->
+      <section class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <a href="/docs/PROMPT_ENGINEERING_MASTERCLASS.txt" target="_blank" class="p-5 rounded-2xl glass-card border border-white/10 hover:border-white/30 transition-all space-y-2 block">
+          <div class="text-xs font-mono font-bold theme-accent-text flex items-center justify-between">
+            <span>PROMPTING MASTERCLASS</span>
+            <span>&rarr;</span>
+          </div>
+          <p class="text-xs text-gray-400">View prompt engineering guide, viral hooks, and fill-in-the-blank prompt blueprints.</p>
+        </a>
+        <a href="/docs/BUTTONS_AND_CONTROLS_REFERENCE.txt" target="_blank" class="p-5 rounded-2xl glass-card border border-white/10 hover:border-white/30 transition-all space-y-2 block">
+          <div class="text-xs font-mono font-bold theme-accent-text flex items-center justify-between">
+            <span>BUTTONS DICTIONARY</span>
+            <span>&rarr;</span>
+          </div>
+          <p class="text-xs text-gray-400">Itemized dictionary of all 40+ controls, buttons, toggles, and shortcut keys.</p>
+        </a>
+        <a href="/docs/COMPLETE_USER_GUIDE.md" target="_blank" class="p-5 rounded-2xl glass-card border border-white/10 hover:border-white/30 transition-all space-y-2 block">
+          <div class="text-xs font-mono font-bold theme-accent-text flex items-center justify-between">
+            <span>MARKDOWN (.MD) MANUAL</span>
+            <span>&rarr;</span>
+          </div>
+          <p class="text-xs text-gray-400">Full markdown version with headings, checklists, and code formatting.</p>
+        </a>
+      </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-white/10 py-8 text-center text-xs font-mono text-gray-500 space-y-2">
+      <p>Script Automation Studio &bull; Created by Muhammad Tehseen Irshad</p>
+      <p class="text-[10px]">High-performance AI scriptwriting, viral metadata, and thumbnail directing engine.</p>
+    </footer>
+
+    <!-- Theme & Brand script -->
+    <script>
+      function setBrand(brand) {
+        document.body.setAttribute('data-brand', brand);
+        const btnRed = document.getElementById('btnBrandRed');
+        const btnBlue = document.getElementById('btnBrandBlue');
+        if (brand === 'red') {
+          btnRed.className = 'px-2 py-1 rounded-lg font-bold text-[10px] flex items-center gap-1 text-white bg-red-600 transition-all';
+          btnBlue.className = 'px-2 py-1 rounded-lg font-bold text-[10px] flex items-center gap-1 text-gray-400 hover:text-white transition-all';
+        } else {
+          btnBlue.className = 'px-2 py-1 rounded-lg font-bold text-[10px] flex items-center gap-1 text-white bg-blue-600 transition-all';
+          btnRed.className = 'px-2 py-1 rounded-lg font-bold text-[10px] flex items-center gap-1 text-gray-400 hover:text-white transition-all';
+        }
+        localStorage.setItem('doc_brand', brand);
+      }
+
+      function toggleTheme() {
+        const current = document.body.getAttribute('data-theme') || 'night';
+        const next = current === 'night' ? 'day' : 'night';
+        document.body.setAttribute('data-theme', next);
+        document.getElementById('themeIcon').textContent = next === 'day' ? '🌙' : '☀️';
+        document.getElementById('themeLabel').textContent = next === 'day' ? 'Night' : 'Day';
+        localStorage.setItem('doc_theme', next);
+      }
+
+      // Restore preferences
+      try {
+        const savedBrand = localStorage.getItem('doc_brand');
+        if (savedBrand) setBrand(savedBrand);
+        const savedTheme = localStorage.getItem('doc_theme');
+        if (savedTheme === 'day') toggleTheme();
+      } catch (e) {}
+    </script>
+  </body>
+</html>

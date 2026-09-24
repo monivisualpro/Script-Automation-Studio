@@ -12,8 +12,8 @@ export interface ThemeConfig {
   secondaryBgCode: string;
   cardBorder: string;
   cardBorderCode: string;
-  accentColor: string; // Primary accent: #FF3E00 (Orange) or #0B9EFE (Blue)
-  secondaryAccentColor: string; // Secondary accent: #0B9EFE (Orange) or #FF3E00 (Blue)
+  accentColor: string; // Primary accent: #FF073A (Red) or #2774FC (Blue)
+  secondaryAccentColor: string; // Secondary accent: #2774FC (Blue) or #FF073A (Red)
   accentText: string;
   accentBg: string;
   inputBg: string;
@@ -26,12 +26,12 @@ export interface ThemeConfig {
   iconColor: string;
 }
 
-export const getThemeConfig = (themeName?: string, brandName: string = "orange"): ThemeConfig => {
+export const getThemeConfig = (themeName?: string, brandName: string = "red"): ThemeConfig => {
   const isLight = themeName === "Day" || themeName === "Day Mode";
   const isBlue = brandName === "blue";
 
-  const primaryColor = isBlue ? "#0B9EFE" : "#FF3E00";
-  const secondaryColor = isBlue ? "#FF3E00" : "#0B9EFE";
+  const primaryColor = isBlue ? "#2774FC" : "#FF073A";
+  const secondaryColor = isBlue ? "#FF073A" : "#2774FC";
 
   if (isLight) {
     return {
@@ -92,8 +92,8 @@ export const getThemeConfig = (themeName?: string, brandName: string = "orange")
   };
 };
 
-export const NIGHT_THEME = getThemeConfig("Night", "orange");
-export const DAY_THEME = getThemeConfig("Day", "orange");
+export const NIGHT_THEME = getThemeConfig("Night", "red");
+export const DAY_THEME = getThemeConfig("Day", "red");
 
 export const THEMES: Record<string, ThemeConfig> = {
   "Night": NIGHT_THEME,

@@ -369,6 +369,9 @@ export default function App() {
   const [thumbBgColor, setThumbBgColor] = useState("Dark Green & Black");
   const [thumbHeadline, setThumbHeadline] = useState("");
   const [thumbSmallTagline, setThumbSmallTagline] = useState("");
+  const [thumbTransformation, setThumbTransformation] = useState("urdu-writing");
+  const [isThumbLangDropdownOpen, setIsThumbLangDropdownOpen] = useState(false);
+  const [thumbLangSearchQuery, setThumbLangSearchQuery] = useState("");
   const [thumbTextColor, setThumbTextColor] = useState("Neon Green (#00FF01) & White");
   const [thumbnailFormat, setThumbnailFormat] = useState<"16:9" | "9:16" | "1:1" | "none">("16:9");
   const [thumbnailEngine, setThumbnailEngine] = useState<"nano_banana" | "flux1">("nano_banana");
@@ -737,8 +740,8 @@ export default function App() {
         body: JSON.stringify({
           model: modelSettings.promptGeneration,
           transcript: thumbnailTranscriptInput,
-          language: transformation,
-          transformation: transformation,
+          language: thumbTransformation,
+          transformation: thumbTransformation,
           bgColor: getActiveBgColor(),
           headline: thumbHeadline,
           smallTagline: thumbSmallTagline,
@@ -805,13 +808,15 @@ export default function App() {
 
   const formatThumbnailOutputText = (data: any) => {
     if (!data) return "";
+    const activeLangObj = TRANSFORMATION_LANGUAGES.find((l) => l.id === thumbTransformation) || { name: "Text" };
+    const langLabel = activeLangObj.name.toUpperCase();
     let txt = "";
     if (data.engine === "flux1") {
-      txt += "=== 1️⃣ Scene Prompt (Positive Box) — English, NO Urdu ===\n";
+      txt += `=== 1️⃣ Scene Prompt (Positive Box) — English Visual Prompt ===\n`;
       txt += (data.fluxScenePrompt || data.thumbnailPrompt) + "\n\n";
       txt += "=== 2️⃣ Negative Prompt (Anti-Text) ===\n";
       txt += (data.fluxNegativePrompt || "low quality, blurry, bad anatomy, deformed, extra fingers, text, letters, words, watermark, gibberish script, distorted") + "\n\n";
-      txt += "=== 3️⃣ Urdu Poster Text Overlay Fields ===\n";
+      txt += `=== 3️⃣ ${langLabel} Poster Text Overlay Fields ===\n`;
       if (data.overlayFields) {
         txt += `heading_text: ${data.overlayFields.heading_text}\n`;
         txt += `tagline_text: ${data.overlayFields.tagline_text}\n`;
@@ -829,9 +834,9 @@ export default function App() {
     } else {
       txt += "=== CINEMATIC THUMBNAIL PROMPT ===\n";
       txt += data.thumbnailPrompt + "\n\n";
-      txt += "=== MAIN URDU HEADLINE ===\n";
+      txt += `=== MAIN ${langLabel} HEADLINE ===\n`;
       txt += data.headlineUrdu + "\n\n";
-      txt += "=== SMALL TAGLINE ===\n";
+      txt += `=== SMALL ${langLabel} TAGLINE ===\n`;
       txt += data.smallTaglineUrdu + "\n";
     }
     return txt.trim();
@@ -2432,6 +2437,117 @@ export default function App() {
                 <span className="text-xs font-mono uppercase tracking-wider block font-extrabold" style={{ color: theme.accentColor }}>
                   thumbnail director & Tagline
                 </span>
+              </div>
+
+              {/* Transformation Option Language Searchable Dropdown */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-mono uppercase tracking-widest flex items-center gap-1.5 font-extrabold" style={{ color: theme.accentColor }}>
+                    <Globe className="h-3.5 w-3.5" style={{ color: theme.accentColor }} />
+                    Transformation Option
+                  </label>
+                  <span className="text-[9px] font-mono px-2 py-0.5 rounded-full font-extrabold shadow-sm shrink-0 truncate max-w-[130px]" style={{ backgroundColor: `${theme.accentColor}25`, color: theme.accentColor }}>
+                    {TRANSFORMATION_LANGUAGES.find(l => l.id === thumbTransformation)?.name || "Language"}
+                  </span>
+                </div>
+
+                {/* Dropdown Trigger Button */}
+                <button
+                  type="button"
+                  onClick={() => setIsThumbLangDropdownOpen(!isThumbLangDropdownOpen)}
+                  className="glass-input w-full rounded-xl py-2 px-3 text-xs font-mono cursor-pointer transition-all duration-300 flex items-center justify-between focus:outline-none border hover:border-white/40"
+                  style={{
+                    backgroundColor: theme.inputBg,
+                    borderColor: isThumbLangDropdownOpen ? theme.accentColor : `${theme.accentColor}40`,
+                    color: theme.textColor
+                  }}
+                >
+                  <span className="truncate pr-2 font-bold text-left">
+                    {TRANSFORMATION_LANGUAGES.find(l => l.id === thumbTransformation)?.label || "Select Language..."}
+                  </span>
+                  {isThumbLangDropdownOpen ? (
+                    <ChevronUp className="h-4 w-4 shrink-0" style={{ color: theme.accentColor }} />
+                  ) : (
+                    <ChevronDown className="h-4 w-4 shrink-0 opacity-70" style={{ color: theme.textColor }} />
+                  )}
+                </button>
+
+                {/* Expandable Searchable Dropdown Menu */}
+                {isThumbLangDropdownOpen && (
+                  <div className="space-y-2 pt-2 border-t animate-fade-in" style={{ borderColor: `${theme.accentColor}25` }}>
+                    {/* Search Input */}
+                    <div className="relative">
+                      <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5" style={{ color: theme.accentColor }} />
+                      <input
+                        type="text"
+                        placeholder="Search language (e.g. English, Urdu, Hindi, Arabic)..."
+                        value={thumbLangSearchQuery}
+                        onChange={(e) => setThumbLangSearchQuery(e.target.value)}
+                        className="glass-input w-full rounded-xl py-1.5 pl-8 pr-7 text-xs font-mono transition-all duration-300 focus:outline-none"
+                        style={{ backgroundColor: theme.inputBg, borderColor: `${theme.accentColor}30`, color: theme.textColor }}
+                      />
+                      {thumbLangSearchQuery && (
+                        <button
+                          type="button"
+                          onClick={() => setThumbLangSearchQuery("")}
+                          className="absolute right-2.5 top-2 text-[10px] cursor-pointer font-bold"
+                          style={{ color: theme.accentColor }}
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Scrollable Language List */}
+                    <div className="rounded-xl max-h-[160px] overflow-y-auto p-1.5 space-y-1 scrollbar-thin border glass-card" style={{ backgroundColor: theme.inputBg, borderColor: `${theme.accentColor}40` }}>
+                      {TRANSFORMATION_LANGUAGES.filter(lang =>
+                        lang.label.toLowerCase().includes(thumbLangSearchQuery.toLowerCase()) ||
+                        lang.name.toLowerCase().includes(thumbLangSearchQuery.toLowerCase()) ||
+                        lang.id.toLowerCase().includes(thumbLangSearchQuery.toLowerCase())
+                      ).map((lang) => {
+                        const isSelected = thumbTransformation === lang.id;
+                        return (
+                          <button
+                            key={lang.id}
+                            type="button"
+                            onClick={() => {
+                              setThumbTransformation(lang.id);
+                              setIsThumbLangDropdownOpen(false);
+                            }}
+                            className={`glass-button w-full text-left px-2 py-1.5 rounded-xl text-xs font-mono transition-all flex items-center justify-between cursor-pointer border ${
+                              isSelected
+                                ? "font-extrabold shadow-md scale-[1.01]"
+                                : "border-transparent opacity-80 hover:opacity-100"
+                            }`}
+                            style={isSelected ? {
+                              backgroundColor: `${theme.accentColor}25`,
+                              borderColor: theme.accentColor,
+                              color: theme.accentColor
+                            } : { color: theme.textColor }}
+                          >
+                            <span className="truncate pr-2">{lang.label}</span>
+                            {isSelected ? (
+                              <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold shadow-sm shrink-0" style={{ backgroundColor: theme.accentColor, color: "#ffffff" }}>
+                                ✓ Active
+                              </span>
+                            ) : (
+                              <span className="text-[9px] opacity-60 shrink-0">Select</span>
+                            )}
+                          </button>
+                        );
+                      })}
+                      {TRANSFORMATION_LANGUAGES.filter(lang =>
+                        lang.label.toLowerCase().includes(thumbLangSearchQuery.toLowerCase()) ||
+                        lang.name.toLowerCase().includes(thumbLangSearchQuery.toLowerCase()) ||
+                        lang.id.toLowerCase().includes(thumbLangSearchQuery.toLowerCase())
+                      ).length === 0 && (
+                        <div className="text-[10px] text-gray-400 font-mono text-center py-3">
+                          No languages match "{thumbLangSearchQuery}"
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Niche dropdown synced with Domain */}
@@ -4647,10 +4763,12 @@ export default function App() {
                                 </p>
                               </div>
 
-                              {/* FLUX 1 URDU POSTER TEXT OVERLAY NODE FIELDS */}
+                              {/* FLUX 1 POSTER TEXT OVERLAY NODE FIELDS */}
                               <div className="glass-card p-3 rounded-xl border space-y-2" style={{ backgroundColor: `${theme.accentColor}05`, borderColor: `${theme.accentColor}25` }}>
                                 <div className="flex justify-between items-center border-b pb-1.5" style={{ borderColor: `${theme.accentColor}20` }}>
-                                  <span className="font-mono font-bold" style={{ color: theme.accentColor }}>3️⃣ Urdu Poster Text Overlay Fields</span>
+                                  <span className="font-mono font-bold" style={{ color: theme.accentColor }}>
+                                    3️⃣ {(TRANSFORMATION_LANGUAGES.find((l) => l.id === thumbTransformation)?.name || "Language")} Poster Text Overlay Fields
+                                  </span>
                                   <button
                                     onClick={() => {
                                       const fieldsStr = thumbnailOutput.overlayFields
@@ -4671,11 +4789,11 @@ export default function App() {
                                     <>
                                       <div className="flex justify-between py-0.5 border-b" style={{ borderColor: `${theme.accentColor}12` }}>
                                         <span className="text-gray-400">heading_text</span>
-                                        <span className="font-urdu font-bold" dir="rtl" style={{ color: theme.accentColor }}>{thumbnailOutput.overlayFields.heading_text}</span>
+                                        <span className={["urdu-writing", "urdu-roman", "arabic", "farsi", "pashto", "sindhi", "hebrew"].includes(thumbTransformation) ? "font-urdu font-bold" : "font-bold"} dir={["urdu-writing", "arabic", "farsi", "pashto", "sindhi", "hebrew"].includes(thumbTransformation) ? "rtl" : "ltr"} style={{ color: theme.accentColor }}>{thumbnailOutput.overlayFields.heading_text}</span>
                                       </div>
                                       <div className="flex justify-between py-0.5 border-b" style={{ borderColor: `${theme.accentColor}12` }}>
                                         <span className="text-gray-400">tagline_text</span>
-                                        <span className="font-urdu" dir="rtl" style={{ color: theme.accentColor }}>{thumbnailOutput.overlayFields.tagline_text}</span>
+                                        <span className={["urdu-writing", "urdu-roman", "arabic", "farsi", "pashto", "sindhi", "hebrew"].includes(thumbTransformation) ? "font-urdu" : ""} dir={["urdu-writing", "arabic", "farsi", "pashto", "sindhi", "hebrew"].includes(thumbTransformation) ? "rtl" : "ltr"} style={{ color: theme.accentColor }}>{thumbnailOutput.overlayFields.tagline_text}</span>
                                       </div>
                                       <div className="flex justify-between py-0.5 border-b" style={{ borderColor: `${theme.accentColor}12` }}>
                                         <span className="text-gray-400">text_color</span>
@@ -4738,36 +4856,48 @@ export default function App() {
                                 <p className="font-sans leading-relaxed text-xs" style={{ color: theme.textColor }}>{thumbnailOutput.thumbnailPrompt}</p>
                               </div>
 
-                              {/* URDU HEADLINE */}
+                              {/* HEADLINE */}
                               <div className="glass-card p-3 rounded-xl border space-y-2" style={{ backgroundColor: `${theme.accentColor}05`, borderColor: `${theme.accentColor}25` }}>
                                 <div className="flex justify-between items-center border-b pb-1.5" style={{ borderColor: `${theme.accentColor}20` }}>
-                                  <span className="font-mono font-bold" style={{ color: theme.accentColor }}>🇵🇰 URDU OVERLAY HEADLINE</span>
+                                  <span className="font-mono font-bold" style={{ color: theme.accentColor }}>
+                                    ✨ {(TRANSFORMATION_LANGUAGES.find((l) => l.id === thumbTransformation)?.name || "Language")} OVERLAY HEADLINE
+                                  </span>
                                   <button
-                                    onClick={() => handleCopyText(thumbnailOutput.headlineUrdu, "Urdu Headline")}
+                                    onClick={() => handleCopyText(thumbnailOutput.headlineUrdu, "Headline")}
                                     className="p-1 text-[9px] bg-black/40 hover:opacity-85 rounded border cursor-pointer"
                                     style={{ color: theme.textColor, borderColor: `${theme.accentColor}30` }}
                                   >
                                     Copy text
                                   </button>
                                 </div>
-                                <p className="font-urdu text-right text-lg font-bold tracking-wide py-2 leading-relaxed" style={{ color: theme.textColor }} dir="rtl">
+                                <p
+                                  className={`${["urdu-writing", "urdu-roman", "arabic", "farsi", "pashto", "sindhi", "hebrew"].includes(thumbTransformation) ? "font-urdu text-right" : "text-left"} text-lg font-bold tracking-wide py-2 leading-relaxed`}
+                                  style={{ color: theme.textColor }}
+                                  dir={["urdu-writing", "arabic", "farsi", "pashto", "sindhi", "hebrew"].includes(thumbTransformation) ? "rtl" : "ltr"}
+                                >
                                   {thumbnailOutput.headlineUrdu}
                                 </p>
                               </div>
 
-                              {/* URDU TAGLINE */}
+                              {/* TAGLINE */}
                               <div className="glass-card p-3 rounded-xl border space-y-2" style={{ backgroundColor: `${theme.accentColor}05`, borderColor: `${theme.accentColor}25` }}>
                                 <div className="flex justify-between items-center border-b pb-1.5" style={{ borderColor: `${theme.accentColor}20` }}>
-                                  <span className="font-mono font-bold" style={{ color: theme.accentColor }}>🇵🇰 URDU OVERLAY TAGLINE</span>
+                                  <span className="font-mono font-bold" style={{ color: theme.accentColor }}>
+                                    📌 {(TRANSFORMATION_LANGUAGES.find((l) => l.id === thumbTransformation)?.name || "Language")} OVERLAY TAGLINE
+                                  </span>
                                   <button
-                                    onClick={() => handleCopyText(thumbnailOutput.smallTaglineUrdu, "Urdu Tagline")}
+                                    onClick={() => handleCopyText(thumbnailOutput.smallTaglineUrdu, "Tagline")}
                                     className="p-1 text-[9px] bg-black/40 hover:opacity-85 rounded border cursor-pointer"
                                     style={{ color: theme.textColor, borderColor: `${theme.accentColor}30` }}
                                   >
                                     Copy text
                                   </button>
                                 </div>
-                                <p className="font-urdu text-right text-base py-1 leading-relaxed" style={{ color: theme.textColor }} dir="rtl">
+                                <p
+                                  className={`${["urdu-writing", "urdu-roman", "arabic", "farsi", "pashto", "sindhi", "hebrew"].includes(thumbTransformation) ? "font-urdu text-right" : "text-left"} text-base py-1 leading-relaxed`}
+                                  style={{ color: theme.textColor }}
+                                  dir={["urdu-writing", "arabic", "farsi", "pashto", "sindhi", "hebrew"].includes(thumbTransformation) ? "rtl" : "ltr"}
+                                >
                                   {thumbnailOutput.smallTaglineUrdu}
                                 </p>
                               </div>
@@ -4860,20 +4990,23 @@ export default function App() {
 
         {/* BOTTOM ARCHITECT FOOTER */}
         <footer className="pt-6 border-t flex flex-col md:flex-row items-center justify-between text-[11px] font-mono text-gray-500 gap-3" style={{ borderColor: `${theme.accentColor}15` }}>
-          <p>© 2026 Script Automation Studio. Built for unique social media VO rephrasings.</p>
-          <p
-            className="glass-panel tracking-widest font-semibold px-4 py-1.5 rounded-2xl border"
-            style={{
-              color: theme.textColor,
-              backgroundColor: `${theme.accentColor}12`,
-              borderColor: `${theme.accentColor}35`,
-              boxShadow: theme.isLight
-                ? "0 6px 16px -3px rgba(0,0,0,0.06)"
-                : "0 8px 20px -3px rgba(0,0,0,0.4)"
-            }}
-          >
-            REGION: PAKISTAN
-          </p>
+          <p>© 2026 Script Automation Studio by <span className="font-semibold" style={{ color: theme.accentColor }}>Muhammad Tehseen Irshad</span>. Built for viral YouTube & social media video rephrasing.</p>
+          <div className="flex items-center gap-3">
+            <span className="text-[10px] text-gray-500 font-mono">v3.4 Production Release</span>
+            <p
+              className="glass-panel tracking-widest font-semibold px-4 py-1.5 rounded-2xl border"
+              style={{
+                color: theme.textColor,
+                backgroundColor: `${theme.accentColor}12`,
+                borderColor: `${theme.accentColor}35`,
+                boxShadow: theme.isLight
+                  ? "0 6px 16px -3px rgba(0,0,0,0.06)"
+                  : "0 8px 20px -3px rgba(0,0,0,0.4)"
+              }}
+            >
+              REGION: GLOBAL
+            </p>
+          </div>
         </footer>
 
       </div>

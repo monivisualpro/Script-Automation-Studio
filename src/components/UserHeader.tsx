@@ -82,7 +82,7 @@ export const UserHeader: React.FC = () => {
 
       {/* Right User Navigation & Controls */}
       <div className="flex items-center gap-2 sm:gap-3 relative">
-        {/* Brand Color Switcher (Orange / Blue) */}
+        {/* Brand Color Switcher (Red / Blue) */}
         <div className={`flex items-center p-0.5 rounded-2xl border ${
           theme.isLight ? "bg-[#FFFFFF] border-[#E5E5E5]" : "bg-[#1A1A1A] border-[#2A2A2A]"
         }`}>
@@ -90,24 +90,24 @@ export const UserHeader: React.FC = () => {
             type="button"
             onClick={() => setCurrentBrand("orange")}
             className={`px-2.5 py-1.5 rounded-xl font-mono text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
-              currentBrand === "orange"
-                ? "bg-[#FF3E00] text-white shadow-sm"
+              currentBrand === "orange" || currentBrand === "red"
+                ? "bg-[#FF073A] text-white shadow-sm"
                 : (theme.isLight ? "text-[#444444] hover:text-[#000000]" : "text-[#BDBDBD] hover:text-white")
             }`}
-            title="Orange Brand (#FF3E00 Primary, #0B9EFE Secondary)"
+            title="Red Brand (#FF073A Primary, #2774FC Secondary)"
           >
-            <span>🟠</span>
-            <span className="hidden md:inline">Orange</span>
+            <span>🔴</span>
+            <span className="hidden md:inline">Red</span>
           </button>
           <button
             type="button"
             onClick={() => setCurrentBrand("blue")}
             className={`px-2.5 py-1.5 rounded-xl font-mono text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
               currentBrand === "blue"
-                ? "bg-[#0B9EFE] text-white shadow-sm"
+                ? "bg-[#2774FC] text-white shadow-sm"
                 : (theme.isLight ? "text-[#444444] hover:text-[#000000]" : "text-[#BDBDBD] hover:text-white")
             }`}
-            title="Blue Brand (#0B9EFE Primary, #FF3E00 Secondary)"
+            title="Blue Brand (#2774FC Primary, #FF073A Secondary)"
           >
             <span>🔵</span>
             <span className="hidden md:inline">Blue</span>

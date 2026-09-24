@@ -136,11 +136,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     document.documentElement.setAttribute("data-brand", currentBrand);
     if (currentBrand === "blue") {
-      document.documentElement.style.setProperty("--color-primary", "#0B9EFE");
-      document.documentElement.style.setProperty("--color-secondary", "#FF3E00");
+      document.documentElement.style.setProperty("--color-primary", "#2774FC");
+      document.documentElement.style.setProperty("--color-secondary", "#FF073A");
     } else {
-      document.documentElement.style.setProperty("--color-primary", "#FF3E00");
-      document.documentElement.style.setProperty("--color-secondary", "#0B9EFE");
+      document.documentElement.style.setProperty("--color-primary", "#FF073A");
+      document.documentElement.style.setProperty("--color-secondary", "#2774FC");
     }
   }, [currentBrand]);
 

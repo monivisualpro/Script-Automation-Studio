@@ -82,12 +82,13 @@ interface AuthenticatedRequest extends express.Request {
   userApiKey?: string;
 }
 
-// Helper to create a GoogleGenAI client supporting both standard API keys (AIzaSy...) and OAuth access tokens (AQ..., ya29...)
+// Helper to create a GoogleGenAI client supporting both standard API keys (AQ..., AIzaSy...) and OAuth access tokens (ya29...)
 function createGoogleGenAIClient(apiKey: string): GoogleGenAI {
   const trimmed = apiKey.trim();
-  if (trimmed.startsWith("AQ.") || trimmed.startsWith("ya29.")) {
+  // ya29. is Google OAuth2 access token
+  if (trimmed.startsWith("ya29.")) {
     return new GoogleGenAI({
-      apiKey: trimmed,
+      apiKey: "",
       httpOptions: {
         headers: {
           "Authorization": `Bearer ${trimmed}`,
@@ -96,6 +97,7 @@ function createGoogleGenAIClient(apiKey: string): GoogleGenAI {
       },
     });
   }
+  // AQ... (Google AI Studio new Auth Key format) and AIzaSy... (legacy format) are standard API keys
   return new GoogleGenAI({
     apiKey: trimmed,
     httpOptions: {
@@ -167,6 +169,43 @@ async function verifyUserAuth(req: AuthenticatedRequest, res: express.Response, 
   }
 }
 
+// Helper to format Gemini API errors into clean, human-friendly messages
+function formatGeminiErrorMessage(err: any): string {
+  if (!err) return "Unknown Gemini API error";
+  const errStr = typeof err === "string" ? err : (err.message || JSON.stringify(err));
+  
+  if (errStr.includes("API_KEY_SERVICE_BLOCKED")) {
+    return "API Key Restriction Blocked: Your API key is restricted in Google Cloud Console and does not allow the 'Generative Language API', or has HTTP-referrer/IP restrictions blocking server requests. Please generate a new key from Google AI Studio (https://aistudio.google.com/app/apikey) or update your key's API restrictions in Google Cloud Console.";
+  }
+  
+  if (errStr.includes("API keys are not supported by this API")) {
+    return "API Key Configuration Error: The API key cannot access Generative Language API. Please ensure the Generative Language API is enabled in your Google Cloud project or create a key in Google AI Studio.";
+  }
+  
+  if (errStr.includes("API_KEY_INVALID") || errStr.includes("API key not valid")) {
+    return "Invalid API Key: The provided API key is invalid or has been revoked. Please check your Google AI Studio API key.";
+  }
+
+  if (errStr.includes("RESOURCE_EXHAUSTED") || errStr.includes("429")) {
+    return "Rate Limit / Quota Exceeded (429): You have exceeded your Gemini API quota or rate limit. Please try again shortly or check your Google AI Studio quota.";
+  }
+
+  try {
+    const jsonMatch = errStr.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      if (parsed.error?.message) {
+        if (parsed.error.details?.[0]?.reason === "API_KEY_SERVICE_BLOCKED") {
+          return "API Key Restriction Blocked: Your Google API key is restricted and does not allow the Generative Language API. Please create a key in Google AI Studio or allow Generative Language API in Google Cloud Console.";
+        }
+        return parsed.error.message;
+      }
+    }
+  } catch (_e) {}
+
+  return err.message || errStr;
+}
+
 // Wrapper to call Gemini API with automatic retry and exponential backoff using user's AI client
 async function generateContentWithRetry(ai: GoogleGenAI, params: any, maxRetries = 3, delayMs = 1500) {
   let attempt = 0;
@@ -177,16 +216,27 @@ async function generateContentWithRetry(ai: GoogleGenAI, params: any, maxRetries
       attempt++;
       logSafeError(`Gemini API call failed (attempt ${attempt}/${maxRetries}):`, error);
 
+      const errStr = String(error?.message || error);
+      // Fail fast on fatal auth / permission / restriction errors
+      if (
+        errStr.includes("API_KEY_SERVICE_BLOCKED") ||
+        errStr.includes("API_KEY_INVALID") ||
+        errStr.includes("UNAUTHENTICATED") ||
+        errStr.includes("PERMISSION_DENIED")
+      ) {
+        throw new Error(formatGeminiErrorMessage(error));
+      }
+
       // Check if the error is due to model availability (e.g. model not found or unsupported)
-      const errStr = String(error).toLowerCase();
+      const errLower = errStr.toLowerCase();
       const isAvailabilityError = 
-        errStr.includes("not found") || 
-        errStr.includes("not_found") || 
-        errStr.includes("not supported") || 
-        errStr.includes("unsupported") || 
-        errStr.includes("404") ||
-        errStr.includes("invalid model") ||
-        errStr.includes("model is deprecated");
+        errLower.includes("not found") || 
+        errLower.includes("not_found") || 
+        errLower.includes("not supported") || 
+        errLower.includes("unsupported") || 
+        errLower.includes("404") ||
+        errLower.includes("invalid model") ||
+        errLower.includes("model is deprecated");
 
       if (isAvailabilityError) {
         if (params.model === "gemini-3.1-flash-lite") {
@@ -199,7 +249,7 @@ async function generateContentWithRetry(ai: GoogleGenAI, params: any, maxRetries
       }
 
       if (attempt >= maxRetries) {
-        throw error;
+        throw new Error(formatGeminiErrorMessage(error));
       }
 
       const backoff = delayMs * Math.pow(2.2, attempt - 1);
@@ -305,8 +355,11 @@ app.post("/api/user/save-key", async (req, res) => {
 
     if (!pingSuccess) {
       logSafeError("API Key Validation Ping Failed:", lastError);
+      const formattedErr = lastError ? formatGeminiErrorMessage(lastError) : null;
       return res.status(400).json({
-        error: "API Key validation failed. Please check that your key is valid, has the correct permissions, and is active in Google AI Studio.",
+        error: formattedErr
+          ? `API Key validation failed: ${formattedErr}`
+          : "API Key validation failed. Please check that your key is valid, has the correct permissions, and is active in Google AI Studio.",
       });
     }
 
@@ -843,7 +896,7 @@ Ensure the output is 100% plagiarism-free, customized for a ${voicePersona} spea
           return { key: opt, text };
         } catch (err: any) {
           logSafeError(`Error generating transformation "${opt}":`, err);
-          return { key: opt, text: `Error generating transform: ${err.message || err}` };
+          return { key: opt, text: `Error generating transform: ${formatGeminiErrorMessage(err)}` };
         }
       })
     );
@@ -1309,6 +1362,8 @@ app.post("/api/generate-thumbnail-prompt", verifyUserAuth as express.RequestHand
   try {
     const {
       transcript,
+      language,
+      transformation,
       bgColor,
       headline,
       smallTagline,
@@ -1325,6 +1380,63 @@ app.post("/api/generate-thumbnail-prompt", verifyUserAuth as express.RequestHand
     }
 
     const ai = req.userAiClient!;
+
+    const selectedTransformation = transformation || language || "urdu-writing";
+
+    const langNameMap: { [key: string]: { name: string; script: string; isRTL: boolean } } = {
+      "urdu-writing": { name: "Urdu (Nastaliq)", script: "Urdu Nastaliq script", isRTL: true },
+      "urdu-roman": { name: "Urdu Roman", script: "Urdu written in Latin / Roman English alphabet (e.g. 'Aapki Sehat Ka Raaz')", isRTL: false },
+      "english": { name: "English", script: "English Latin script (Clean, viral YouTube headline)", isRTL: false },
+      "hindi": { name: "Hindi", script: "Hindi Devanagari script", isRTL: false },
+      "spanish": { name: "Spanish", script: "Spanish script (Español)", isRTL: false },
+      "french": { name: "French", script: "French script (Français)", isRTL: false },
+      "german": { name: "German", script: "German script (Deutsch)", isRTL: false },
+      "arabic": { name: "Arabic", script: "Arabic script (العربية)", isRTL: true },
+      "bengali": { name: "Bengali", script: "Bengali script (বাংলা)", isRTL: false },
+      "portuguese": { name: "Portuguese", script: "Portuguese script (Português)", isRTL: false },
+      "russian": { name: "Russian", script: "Russian Cyrillic script (Русский)", isRTL: false },
+      "japanese": { name: "Japanese", script: "Japanese script (日本語)", isRTL: false },
+      "chinese-simplified": { name: "Chinese Simplified", script: "Simplified Chinese script (简体中文)", isRTL: false },
+      "chinese-traditional": { name: "Chinese Traditional", script: "Traditional Chinese script (繁體中文)", isRTL: false },
+      "indonesian": { name: "Indonesian", script: "Indonesian script (Bahasa Indonesia)", isRTL: false },
+      "turkish": { name: "Turkish", script: "Turkish script (Türkçe)", isRTL: false },
+      "italian": { name: "Italian", script: "Italian script (Italiano)", isRTL: false },
+      "korean": { name: "Korean", script: "Korean Hangul script (한국어)", isRTL: false },
+      "farsi": { name: "Persian / Farsi", script: "Persian / Farsi script (فارسی)", isRTL: true },
+      "pashto": { name: "Pashto", script: "Pashto script (پښتو)", isRTL: true },
+      "sindhi": { name: "Sindhi", script: "Sindhi script (سنڌي)", isRTL: true },
+      "punjabi": { name: "Punjabi", script: "Punjabi script (ਪੰਜਾਬੀ / پنجابی)", isRTL: false },
+      "vietnamese": { name: "Vietnamese", script: "Vietnamese script (Tiếng Việt)", isRTL: false },
+      "thai": { name: "Thai", script: "Thai script (ไทย)", isRTL: false },
+      "tagalog": { name: "Tagalog", script: "Tagalog / Filipino script", isRTL: false },
+      "dutch": { name: "Dutch", script: "Dutch script (Nederlands)", isRTL: false },
+      "polish": { name: "Polish", script: "Polish script (Polski)", isRTL: false },
+      "swedish": { name: "Swedish", script: "Swedish script (Svenska)", isRTL: false },
+      "norwegian": { name: "Norwegian", script: "Norwegian script (Norsk)", isRTL: false },
+      "finnish": { name: "Finnish", script: "Finnish script (Suomi)", isRTL: false },
+      "danish": { name: "Danish", script: "Danish script (Dansk)", isRTL: false },
+      "greek": { name: "Greek", script: "Greek script (Ελληνικά)", isRTL: false },
+      "hebrew": { name: "Hebrew", script: "Hebrew script (עבריت)", isRTL: true },
+      "tamil": { name: "Tamil", script: "Tamil script (தமிழ்)", isRTL: false },
+      "telugu": { name: "Telugu", script: "Telugu script (తెలుగు)", isRTL: false },
+      "marathi": { name: "Marathi", script: "Marathi script (मराठी)", isRTL: false },
+      "gujarati": { name: "Gujarati", script: "Gujarati script (ગુજરાતી)", isRTL: false },
+      "malayalam": { name: "Malayalam", script: "Malayalam script (മലയാളം)", isRTL: false },
+      "kannada": { name: "Kannada", script: "Kannada script (ಕನ್ನಡ)", isRTL: false },
+      "malay": { name: "Malay", script: "Malay script (Bahasa Melayu)", isRTL: false },
+      "czech": { name: "Czech", script: "Czech script (Čeština)", isRTL: false },
+      "romanian": { name: "Romanian", script: "Romanian script (Română)", isRTL: false },
+      "hungarian": { name: "Hungarian", script: "Hungarian script (Magyar)", isRTL: false },
+      "ukrainian": { name: "Ukrainian", script: "Ukrainian Cyrillic script (Українська)", isRTL: false },
+      "afrikaans": { name: "Afrikaans", script: "Afrikaans script", isRTL: false },
+      "swahili": { name: "Swahili", script: "Swahili script (Kiswahili)", isRTL: false }
+    };
+
+    const targetLangMeta = langNameMap[selectedTransformation] || {
+      name: selectedTransformation,
+      script: `${selectedTransformation} script`,
+      isRTL: false
+    };
 
     // Prepare multimodal inline data if character image is attached
     let inlineDataPart: any = null;
@@ -1452,7 +1564,7 @@ NO CHARACTER IMAGE ATTACHED:
     if (selectedEngine === "flux1") {
       const prompt = `
 You are an expert YouTube Thumbnail Director, Visual Designer, and CTR Optimization expert specializing in highly trained "FLUX 1" visual image generation prompts.
-Create a highly engaging, viral YouTube thumbnail concept, positive prompt, negative prompt, and Urdu poster text overlay parameters based on the provided video transcript.
+Create a highly engaging, viral YouTube thumbnail concept, positive prompt, negative prompt, and ${targetLangMeta.name} poster text overlay parameters based on the provided video transcript.
 
 TRANSCRIPT:
 """
@@ -1460,6 +1572,7 @@ ${transcript}
 """
 
 Design parameters to integrate:
+- Target Language for Headline & Tagline: ${targetLangMeta.name} (${targetLangMeta.script})
 - Background Colors: ${bgColor || "Slate black, dark green gradient"}
 - Thumbnail Text Headline (Reference/Guideline): ${headline || "None specified"}
 - Small Tagline text: ${smallTagline || "None specified"}
@@ -1473,16 +1586,16 @@ ${islamicThumbnailInstruction}
 ${imageInstruction}
 
 Strict Rules for FLUX 1 Prompt Creation:
-1. The "fluxScenePrompt" MUST be in English only, with NO Urdu/Arabic/Latin text/letters/words written in the image itself. It should describe the visual layout perfectly matching the selected format guidelines. It should be a single highly-detailed paragraphs, fully descriptive, cinematic, and clear.
+1. The "fluxScenePrompt" MUST be in English only, with NO letters/words/text written directly inside the generated scene image itself. It should describe the visual layout perfectly matching the selected format guidelines. It should be a single highly-detailed paragraph, fully descriptive, cinematic, and clear.
 2. It must explicitly include empty spaces reserved for text overlays:
    - For landscape (16:9): "Empty clear space reserved on the right side (or left side) for bold headline text. No text, no letters, no watermark."
    - For vertical (9:16): "Empty clear space reserved at the very top and very bottom for title text. No text, no letters, no words."
    - For square (1:1): "Empty clear space across the upper portion for headline text. No text, no letters, no watermark."
 3. The "fluxNegativePrompt" must be a robust set of negative terms to prevent text generation inside the FLUX 1 image:
    "low quality, blurry, bad anatomy, deformed hands, extra fingers, text, letters, words, watermark, gibberish script, distorted face, cartoon"
-4. Create high-impact Urdu translations for the overlay:
-   - "headlineUrdu": A bold, high-click-through Urdu headline in Nastaliq script (3-4 words max).
-   - "smallTaglineUrdu": A matching small Urdu tagline in Nastaliq script.
+4. Create high-impact ${targetLangMeta.name} text overlays strictly in ${targetLangMeta.script}:
+   - "headlineUrdu": A bold, high-click-through headline in ${targetLangMeta.name} (${targetLangMeta.script}) (3-5 words max, viral CTR hook). If user provided a specific Prompt text Headline, translate or adapt it faithfully into ${targetLangMeta.name} (${targetLangMeta.script}).
+   - "smallTaglineUrdu": A matching small tagline in ${targetLangMeta.name} (${targetLangMeta.script}). If user provided a Prompt Small Tagline, adapt it into ${targetLangMeta.name} (${targetLangMeta.script}).
 5. Determine the appropriate overlay node coordinate percentages, stroke styling, and hex color codes based on parameters:
    - For landscape: headingYPercent = 0.08, taglineYPercent = 0.22, strokeWidth = 5.
    - For vertical: headingYPercent = 0.10, taglineYPercent = 0.92 (or 0.20), strokeWidth = 6.
@@ -1497,8 +1610,8 @@ Return your response as a valid JSON object matching this schema:
 {
   "fluxScenePrompt": "The detailed English positive scene prompt...",
   "fluxNegativePrompt": "The negative prompt terms...",
-  "headlineUrdu": "High-impact Urdu headline...",
-  "smallTaglineUrdu": "Matching small Urdu tagline...",
+  "headlineUrdu": "High-impact headline in ${targetLangMeta.name} (${targetLangMeta.script})...",
+  "smallTaglineUrdu": "Matching small tagline in ${targetLangMeta.name} (${targetLangMeta.script})...",
   "textColor": "#FFFFFF or similar hex color",
   "strokeColor": "#00FF01 or similar hex color",
   "strokeWidth": 6,
@@ -1605,7 +1718,7 @@ Return your response as a valid JSON object matching this schema:
       // Default: Nano Banana 2
       const prompt = `
 You are an expert YouTube Thumbnail Director, Visual Designer, and CTR Optimization expert specializing in highly trained "Nano Banana 2" visual image generation prompts.
-Create a highly engaging, viral YouTube thumbnail concept and Urdu text overlays based on the provided video transcript.
+Create a highly engaging, viral YouTube thumbnail concept and ${targetLangMeta.name} text overlays based on the provided video transcript.
 
 TRANSCRIPT:
 """
@@ -1613,6 +1726,7 @@ ${transcript}
 """
 
 Design parameters to integrate:
+- Target Language for Headline & Tagline: ${targetLangMeta.name} (${targetLangMeta.script})
 - Background Colors: ${bgColor || "Slate black, dark green gradient"}
 - Thumbnail Text Headline (Reference/Guideline): ${headline || "None specified"}
 - Small Tagline text: ${smallTagline || "None specified"}
@@ -1631,19 +1745,19 @@ Strict Rules for Thumbnail Prompt Creation:
    LEFT SIDE: A large close-up of the creator [specify gender/clothing/appearance based on topic, ensuring Islamic dress if applicable], with a [specify expressive emotion, e.g. surprised and concerned] expression, pointing toward [specify high-impact visual object from transcript, e.g., fresh ginger root with glowing medical effects/device].
    RIGHT SIDE: [Describe realistic visual representations of the main topic, e.g., realistic kidney illustration glowing with healthy neon green energy, or high-tech gadget glowing, or food element], and other secondary high-impact elements like [describe 2-3 supporting objects/icons].
    BACKGROUND: [Describe a premium gradient blended with relevant graphics, e.g., a premium black and dark green gradient blended together with futuristic medical graphics, or cyber patterns, or organic textures] utilizing [Background Colors]. Use only [List specific color hexes/names from parameters, e.g. neon green (#00FF01), Black (#000000), White (#FFFFFF)].
-   Large bold Urdu headline with merged [Text Color overlays] text: \"[Headline in Urdu Nastaliq]\"
-   Small Urdu tagline underneath: \"[Tagline in Urdu Nastaliq]\".
+   Large bold ${targetLangMeta.name} headline with merged [Text Color overlays] text: \"[Headline in ${targetLangMeta.name} ${targetLangMeta.script}]\"
+   Small ${targetLangMeta.name} tagline underneath: \"[Tagline in ${targetLangMeta.name} ${targetLangMeta.script}]\".
    Typography should be mobile-readable, ultra-realistic, cinematic lighting, high contrast, sharp focus, viral YouTube thumbnail style, professional [Niche Theme] design, maximum CTR optimization, clean bold composition with the creator's face as the main focal point."
 
 3. Keep the visual composition bold, simple, mobile-readable, and optimized for maximum YouTube CTR, strictly adjusting the composition according to the selected format guidelines.
-4. Create a matching, extremely high-impact main headline in Urdu script ("headlineUrdu") (max 3-4 words for high readability).
-5. Create a matching small tagline in Urdu script ("smallTaglineUrdu").
+4. Create a matching, extremely high-impact main headline strictly in ${targetLangMeta.name} (${targetLangMeta.script}) ("headlineUrdu") (max 3-5 words for high CTR impact). If the user provided a specific Prompt text Headline, translate or adapt it into ${targetLangMeta.name} (${targetLangMeta.script}).
+5. Create a matching small tagline strictly in ${targetLangMeta.name} (${targetLangMeta.script}) ("smallTaglineUrdu"). If the user provided a Prompt Small Tagline, translate or adapt it into ${targetLangMeta.name} (${targetLangMeta.script}).
 
 Return your response as a valid JSON object matching this schema:
 {
-  "thumbnailPrompt": "The detailed English Nano Banana 2 prompt following the precise layout above adapted to the selected format...",
-  "headlineUrdu": "Bold Urdu Headline...",
-  "smallTaglineUrdu": "Small Urdu Tagline..."
+  "thumbnailPrompt": "The detailed English Nano Banana 2 prompt following the precise layout above adapted to the selected format and featuring the ${targetLangMeta.name} headline & tagline...",
+  "headlineUrdu": "Bold headline in ${targetLangMeta.name} (${targetLangMeta.script})...",
+  "smallTaglineUrdu": "Small tagline in ${targetLangMeta.name} (${targetLangMeta.script})..."
 }
 `;
 
@@ -1834,6 +1948,53 @@ Return the output in the "tags" array.`;
     logSafeError("Error in /api/regenerate-ctr-field:", error);
     res.status(500).json({ error: "An error occurred regenerating the field." });
   }
+});
+
+// Explicit routes for SEO files and Google Search Console verification
+app.get("/sitemap.xml", (req, res) => {
+  const host = req.get("host") || "script-automation-studio.ai.studio";
+  const protocol = req.protocol === "https" || req.get("x-forwarded-proto") === "https" ? "https" : "http";
+  const baseUrl = `${protocol}://${host}`;
+  res.header("Content-Type", "application/xml; charset=utf-8");
+  res.send(`<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>${baseUrl}/</loc>
+    <lastmod>${new Date().toISOString().split("T")[0]}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>${baseUrl}/docs/complete-user-guide.html</loc>
+    <lastmod>${new Date().toISOString().split("T")[0]}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>${baseUrl}/docs/prompt-masterclass.html</loc>
+    <lastmod>${new Date().toISOString().split("T")[0]}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>${baseUrl}/docs/controls-reference.html</loc>
+    <lastmod>${new Date().toISOString().split("T")[0]}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+</urlset>`);
+});
+
+app.get("/robots.txt", (req, res) => {
+  const host = req.get("host") || "script-automation-studio.ai.studio";
+  const protocol = req.protocol === "https" || req.get("x-forwarded-proto") === "https" ? "https" : "http";
+  res.header("Content-Type", "text/plain; charset=utf-8");
+  res.send(`User-agent: *\nAllow: /\nSitemap: ${protocol}://${host}/sitemap.xml\n`);
+});
+
+app.get("/google8b0af31d9f56062a.html", (_req, res) => {
+  res.header("Content-Type", "text/html; charset=utf-8");
+  res.send("google-site-verification: google8b0af31d9f56062a.html\n");
 });
 
 // Serve static assets or mount Vite dev middleware
