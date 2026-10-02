@@ -152,6 +152,13 @@ export const TutorialGuideModal: React.FC = () => {
       action: "Toggle ON/OFF."
     },
     {
+      category: "Configuration Dropdowns",
+      name: "Target Audience (8-Tier Demographic Engine)",
+      purpose: "Adapts script vocabulary, sentence pacing, hooks, and cultural honorifics to the selected age bracket (All Ages, Kids up to 10, Teens up to 20, Young up to 30, Adults up to 40, Men up to 50, Senior Men up to 60, Elders up to 80).",
+      bestSetting: "Use 'All Ages' for family channels, 'Teens/Young' for high-retention Shorts, or 'Men 50–80' for dignified health & wisdom videos.",
+      action: "Click dropdown to select demographic tier."
+    },
+    {
       category: "Output & Length Settings",
       name: "Target Country Audience",
       purpose: "Adapts cultural slang, local currency, and geographic relevance.",

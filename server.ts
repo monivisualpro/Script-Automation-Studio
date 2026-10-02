@@ -961,6 +961,75 @@ app.delete("/api/image-studio/history/:imageId", verifyUserAuth as express.Reque
   }
 });
 
+// ============================================================================
+// 8-Tier Demographic Target Audience Linguistic Directive Engine
+// ============================================================================
+function getTargetAudienceDirective(targetAudience?: string): { label: string; directive: string } {
+  const key = (targetAudience || "all").toLowerCase();
+  switch (key) {
+    case "children":
+    case "children_10":
+      return {
+        label: "Children / Kids (Up to 10 Years Old)",
+        directive: `Target Audience: CHILDREN / KIDS UP TO 10 YEARS OLD.
+   - Vocabulary & Wording: Use ultra-simple, joyful, wonder-filled, and easy-to-understand words suitable for young kids under 10. Avoid complex jargon; explain every concept through fun, magical, or everyday childhood comparisons (toys, animals, games, school, nature).
+   - Rhythm & Delivery: Keep sentences short, bouncy, and enthusiastic. Address listeners warmly (e.g., "Pyare bacho", "Chote dosto", "Little explorers"). Ensure the tone is encouraging, safe, educational, and captivating from start to finish.`
+      };
+    case "teenagers_20":
+      return {
+        label: "Teenagers & Youth (Up to 20 Years Old)",
+        directive: `Target Audience: TEENAGERS & YOUTH UP TO 20 YEARS OLD.
+   - Vocabulary & Wording: Use energetic, fast-paced, curiosity-driven, and highly relatable contemporary phrasing that resonates with students, teens, and Gen-Z viewers up to age 20.
+   - Rhythm & Delivery: Start with punchy hooks, eliminate slow or repetitive academic filler, use dynamic transitions, and connect examples to student life, gaming, technology, skills, self-discovery, and future ambition.`
+      };
+    case "young_30":
+      return {
+        label: "Young Adults (Up to 30 Years Old)",
+        directive: `Target Audience: YOUNG ADULTS UP TO 30 YEARS OLD.
+   - Vocabulary & Wording: Use sharp, modern, ambitious, and action-oriented language tailored for young adults in their 20s (up to 30 years old) building their careers, mindset, health, and lifestyle.
+   - Rhythm & Delivery: Balance high-retention storytelling with practical, real-world takeaways, smart analytical insights, and motivating momentum.`
+      };
+    case "adults":
+    case "adults_40":
+      return {
+        label: "Adults & Professionals (Up to 40 Years Old)",
+        directive: `Target Audience: ADULTS & PROFESSIONALS UP TO 40 YEARS OLD.
+   - Vocabulary & Wording: Use articulate, evidence-backed, analytical, and persuasive modern phrasing tailored for established adults up to 40 years old.
+   - Rhythm & Delivery: Maintain high information density, logical cause-and-effect explanations, credible facts, and practical relevance to family, career, wellness, and smart decision-making.`
+      };
+    case "men_50":
+      return {
+        label: "Men & Mature Adults (Up to 50 Years Old)",
+        directive: `Target Audience: MEN & MATURE ADULTS UP TO 50 YEARS OLD.
+   - Vocabulary & Wording: Use seasoned, authoritative, pragmatic, and dignified language tailored for mature men and experienced listeners up to 50 years old.
+   - Rhythm & Delivery: Focus on wisdom, long-term vitality, leadership, family responsibility, financial/health longevity, and direct, no-nonsense clarity with respectful address (e.g., "Mohtaram dosto", "Ahbab" in Urdu/Hindi; confident, poised prose in English).`
+      };
+    case "men_60":
+      return {
+        label: "Senior Men & Veterans (Up to 60 Years Old)",
+        directive: `Target Audience: SENIOR MEN UP TO 60 YEARS OLD.
+   - Vocabulary & Wording: Use composed, classic, deeply respectful, and refined vocabulary tailored for senior men up to 60 years old.
+   - Rhythm & Delivery: Employ measured, thoughtful pacing and culturally respectful honorifics (e.g., in Urdu/Hindi use "Aap", "Janab", "Mohtaram", "Ahbab"; in English use dignified, courteous, and distinguished prose). Avoid rushed slang or overly casual tropes.`
+      };
+    case "seniors":
+    case "old_80":
+      return {
+        label: "Old / Elders & Seniors (Up to 80 Years Old)",
+        directive: `Target Audience: OLD / ELDERS & SENIORS UP TO 80 YEARS OLD.
+   - Vocabulary & Wording: Use extremely respectful, warm, soothing, crystal-clear, and unhurried phrasing tailored for elders up to 80 years old.
+   - Rhythm & Delivery: Always use the highest level of politeness and traditional honorifics (e.g., in Urdu/Hindi use "Buzurgo", "Mohtaram Buzurgo", "Aap", "Aadab", "Tashreef", "Shukriya"; in English use gracious, warm, comforting, and unhurried prose). Keep transitions gentle, reassuring, and easy to follow.`
+      };
+    case "all":
+    default:
+      return {
+        label: "All Ages · Universal Audience (For Everyone)",
+        directive: `Target Audience: ALL AGES / UNIVERSAL AUDIENCE (FOR EVERYONE).
+   - Vocabulary & Wording: Use universally clear, inclusive, engaging, and balanced phrasing that appeals equally to youth, adults, families, and seniors watching together.
+   - Rhythm & Delivery: Explain complex ideas simply without sounding childish, maintain warm and respectful family-friendly vocabulary across all languages, and keep the narrative engaging for every age group.`
+      };
+  }
+}
+
 // Protected AI Script Generation API Routes
 app.post("/api/generate", verifyUserAuth as express.RequestHandler, async (req: AuthenticatedRequest, res) => {
   try {
@@ -1016,11 +1085,9 @@ Strict rules for formatting and content:
    - If "urdu-roman": Translate/Rephrase entirely into Urdu written in Roman letters (e.g., "Assalamu Alaikum dosto, aaj hum baat karenge..."). Use conversational, native, and easy-to-read Roman Urdu wording.
    - If "english": Translate/Rephrase entirely into fluent, highly engaging English.
    - If "urdu-writing": Translate/Rephrase entirely into beautiful, professional Urdu script (Nastaliq/Arabic script, using proper Urdu characters) in the authentic Pakistani Urdu language. You must use rich, elegant Pakistani Urdu vocabulary and proper Urdu Nastaliq punctuation, phrasing, and sentence structures. It is strictly forbidden to use English or Hindi words where proper Urdu equivalents exist. The output script must flow beautifully and natively in proper Urdu.
-4. Adapt perfectly to the TARGET AUDIENCE:
-   - Option selected: "${targetAudience}"
-   - If "children": Target audience is Children up to 10 years old. Use very simple, exciting, energetic vocabulary. Include playful expressions and sound cue descriptors in square brackets (e.g. "[Gasp!]", "[Excited sound effect]", "[Cheerful laughter]") to guide the voice-over artist. Ensure the tone is friendly and highly educational yet fun.
-   - If "adults": Target audience is Adults up to 40 years old. Use engaging, professional, analytical, and highly persuasive modern phrasing. Bring out interesting facts and maintain high narrative density.
-   - If "seniors": Target audience is Men over 60 years old. Wording must be extremely respectful, polite, and paced. Use formal honorifics and mature vocabulary (e.g. in Hindi/Urdu, use "Aap", "Aadab", "Tashreef", "Shukriya", "Buzurgo"; in English, use clear, elegant, and classy prose with balanced, respectful phrasing).
+4. Adapt perfectly to the TARGET AUDIENCE (CRITICAL — GENERATED TEXT MUST STRICTLY MATCH THIS DEMOGRAPHIC):
+   - Selected Audience Tier: "${getTargetAudienceDirective(targetAudience).label}" (ID: "${targetAudience || "all"}")
+   - ${getTargetAudienceDirective(targetAudience).directive}
 5. Tone / Niche Theme:
    - Topic Niche: "${topicNiche}"
    - Tutorial & Literature Tone: "${tutorialTone}"
@@ -1110,7 +1177,7 @@ RAW SOURCE SCRIPT:
 ${rawScript}
 """
 
-Ensure the output is 100% plagiarism-free, customized for a ${voicePersona} speaker, written in the "${transOpt}" format, targeted at ${targetAudience}, following the "${topicNiche}" niche and "${tutorialTone}" tone, and starting with greeting "${greetingsPrefix || ""}" and hook "${customHook || ""}".
+Ensure the output is 100% plagiarism-free, customized for a ${voicePersona} speaker, written in the "${transOpt}" format, strictly tailored for the target audience "${getTargetAudienceDirective(targetAudience).label}" (${getTargetAudienceDirective(targetAudience).directive}), following the "${topicNiche}" niche and "${tutorialTone}" tone, and starting with greeting "${greetingsPrefix || ""}" and hook "${customHook || ""}".
 `;
 
       const response = await generateContentWithRetry(ai, {
@@ -1157,17 +1224,23 @@ Ensure the output is 100% plagiarism-free, customized for a ${voicePersona} spea
 // Generate a script draft based on a Topic & Word Count limit
 app.post("/api/generate-topic", verifyUserAuth as express.RequestHandler, async (req: AuthenticatedRequest, res) => {
   try {
-    const { topic, wordCount } = req.body;
+    const { topic, wordCount, targetAudience, topicNiche, tutorialTone } = req.body;
     if (!topic || !topic.trim()) {
       return res.status(400).json({ error: "Topic is required." });
     }
     const targetWords = parseInt(wordCount) || 300;
+    const audienceInfo = getTargetAudienceDirective(targetAudience);
 
     const ai = req.userAiClient!;
     const modelToUse = req.body.model || "gemini-3.1-flash-lite";
     const response = await generateContentWithRetry(ai, {
       model: modelToUse,
-      contents: `Generate a detailed, high-quality script on the topic: "${topic}". The script should be approximately ${targetWords} words. It should be highly engaging, educational, and structured, written directly as clean raw content ready for voiceover and script transformation. Return ONLY the script text itself.`,
+      contents: `Generate a detailed, high-quality script on the topic: "${topic}".
+The script should be approximately ${targetWords} words.
+Target Niche/Domain: "${topicNiche || "General"}"
+Tone/Vibe: "${tutorialTone || "Warm Friendly Conversational"}"
+${audienceInfo.directive}
+Adapt the vocabulary, sentence pacing, examples, and tone specifically for "${audienceInfo.label}". Write directly as clean raw content ready for voiceover and script transformation. Return ONLY the script text itself.`,
     });
 
     res.json({ rawScript: (response.text || "").trim(), modelUsed: modelToUse });
@@ -1462,6 +1535,7 @@ app.post("/api/generate-ctr", verifyUserAuth as express.RequestHandler, async (r
       toggleHashtags,
       toggleTags,
       videoDuration,
+      targetAudience,
     } = req.body;
 
     if (!transcript || !transcript.trim()) {
@@ -1469,6 +1543,7 @@ app.post("/api/generate-ctr", verifyUserAuth as express.RequestHandler, async (r
     }
 
     const ai = req.userAiClient!;
+    const audienceInfo = getTargetAudienceDirective(targetAudience);
     
     // Construct dynamic prompt based on toggles
     const prompt = `
@@ -1481,6 +1556,7 @@ ${transcript}
 """
 
 Video Duration: ${videoDuration || "10:00"}
+Target Audience Demographic: ${audienceInfo.label} (${audienceInfo.directive})
 
 Please generate only the requested metadata segments below (if set to true):
 - Generate Title Options (titles): ${toggleTitle ? "YES" : "NO"}

@@ -1,6 +1,6 @@
 {
-  "summary":  "Fix \"Firestore REST list failed (403)\" in /api/admin/users by adding a resilient server-side user directory registry fallback and owner-document lookup when Firestore rules enforce strict owner-only (request.auth.uid == userId) access.",
-  "updatedAt":  "2026-10-02T06:37:16.164282405Z",
+  "summary":  "Unified Nexa & Gotham geometric typography system across the entire website (cards, navbar, buttons, modals/lightboxes, and dropdowns) and an expanded 8-tier Target Audience selector card with tailored AI script generation prompts for every age demographic.",
+  "updatedAt":  "2026-10-02T07:27:56.364139739Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

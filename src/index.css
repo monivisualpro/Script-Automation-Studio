@@ -1,9 +1,12 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@400;600;700;800&family=Noto+Nastaliq+Urdu:wght@400;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+@import url('https://fonts.cdnfonts.com/css/nexa-bold');
+@import url('https://fonts.cdnfonts.com/css/gotham');
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Noto+Nastaliq+Urdu:wght@400;700&display=swap');
 @import "tailwindcss";
 
 :root {
   --color-primary: #ff073a;
   --color-secondary: #2774fc;
+  --font-studio-stack: "Nexa", "Gotham", "Nexa Bold", "Nexa Regular", "Gotham Book", "Gotham Medium", "Gotham Bold", "Montserrat", "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 [data-brand="blue"] {
@@ -12,18 +15,50 @@
 }
 
 @theme {
-  --font-sans: "Inter", "Sora", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-mono: "JetBrains Mono", "Roboto Mono", ui-monospace, SFMono-Regular, monospace;
-  --font-display: "Inter", "Sora", ui-sans-serif, system-ui, sans-serif;
-  --font-urdu: "Noto Nastaliq Urdu", "Inter", serif;
+  --font-sans: "Nexa", "Gotham", "Montserrat", "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "Nexa", "Gotham", "Montserrat", "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-display: "Nexa", "Gotham", "Montserrat", "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-urdu: "Noto Nastaliq Urdu", "Nexa", "Gotham", serif;
+}
+
+/* Unified Nexa & Gotham Font Family Across Whole Website, Cards, Navbar, Buttons, Lightboxes/Modals & Dropdowns */
+html,
+body,
+button,
+input,
+select,
+textarea,
+option,
+optgroup,
+label,
+a,
+header,
+nav,
+footer,
+main,
+section,
+article,
+aside,
+table,
+th,
+td,
+.glass-panel,
+.glass-card,
+.glass-button,
+.glass-input,
+.font-sans,
+.font-display,
+.font-mono {
+  font-family: var(--font-studio-stack);
+  font-variant-numeric: tabular-nums;
 }
 
 body {
-  font-family: var(--font-sans);
+  font-family: var(--font-studio-stack);
   background-color: #141414;
   color: #FFFFFF;
   line-height: 1.6;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.005em;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   transition: background-color 0.2s ease, color 0.2s ease;
@@ -32,7 +67,7 @@ body {
 body.day-theme {
   background-color: #FAFAFA !important;
   color: #000000 !important;
-  font-weight: 450;
+  font-weight: 500;
 }
 
 body.night-theme {
@@ -42,31 +77,31 @@ body.night-theme {
 
 /* Typography Hierarchy Utilities */
 .hero-title {
-  font-family: var(--font-display);
+  font-family: var(--font-studio-stack);
   font-size: clamp(2.5rem, 5vw, 3.5rem); /* 40px - 56px */
   font-weight: 800;
   line-height: 1.2;
-  letter-spacing: -0.025em;
-}
-
-.page-title {
-  font-family: var(--font-display);
-  font-size: clamp(2rem, 4vw, 2.5rem); /* 32px - 40px */
-  font-weight: 700;
-  line-height: 1.25;
   letter-spacing: -0.02em;
 }
 
-.section-title {
-  font-family: var(--font-display);
-  font-size: clamp(1.375rem, 2.5vw, 1.75rem); /* 22px - 28px */
-  font-weight: 600;
-  line-height: 1.3;
+.page-title {
+  font-family: var(--font-studio-stack);
+  font-size: clamp(2rem, 4vw, 2.5rem); /* 32px - 40px */
+  font-weight: 700;
+  line-height: 1.25;
   letter-spacing: -0.015em;
 }
 
+.section-title {
+  font-family: var(--font-studio-stack);
+  font-size: clamp(1.375rem, 2.5vw, 1.75rem); /* 22px - 28px */
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+
 .card-title {
-  font-family: var(--font-display);
+  font-family: var(--font-studio-stack);
   font-size: clamp(1.125rem, 2vw, 1.25rem); /* 18px - 20px */
   font-weight: 600;
   line-height: 1.35;
@@ -74,6 +109,7 @@ body.night-theme {
 }
 
 .body-text {
+  font-family: var(--font-studio-stack);
   font-size: 0.9375rem; /* 15px - 16px */
   line-height: 1.6;
   font-weight: 400;
@@ -85,6 +121,7 @@ body.day-theme .body-text {
 }
 
 .secondary-text {
+  font-family: var(--font-studio-stack);
   font-size: 0.875rem; /* 14px */
   line-height: 1.5;
   font-weight: 400;
@@ -95,6 +132,7 @@ body.day-theme .secondary-text {
 }
 
 .label-text {
+  font-family: var(--font-studio-stack);
   font-size: 0.84375rem; /* 13.5px */
   line-height: 1.4;
   font-weight: 500;
@@ -106,6 +144,7 @@ body.day-theme .label-text {
 }
 
 .button-text {
+  font-family: var(--font-studio-stack);
   font-size: 0.90625rem; /* 14.5px */
   font-weight: 600;
   line-height: 1.2;
@@ -113,6 +152,7 @@ body.day-theme .label-text {
 }
 
 .caption-text {
+  font-family: var(--font-studio-stack);
   font-size: 0.8125rem; /* 13px */
   line-height: 1.5;
   font-weight: 400;
@@ -123,6 +163,7 @@ body.day-theme .caption-text {
 }
 
 .badge-text {
+  font-family: var(--font-studio-stack);
   font-size: 0.75rem; /* 12px */
   font-weight: 500;
   line-height: 1;
@@ -165,9 +206,9 @@ body.day-theme ::-webkit-scrollbar-thumb {
   background: #D4D4D4;
 }
 
-/* Nastaliq Urdu style */
+/* Nastaliq Urdu style (preserved strictly for Urdu script output) */
 .font-nastaliq {
-  font-family: "Noto Nastaliq Urdu", "Inter", serif;
+  font-family: "Noto Nastaliq Urdu", "Nexa", "Gotham", serif !important;
 }
 
 /* Clean, crisp static UI styles - no aggressive animated glows */
@@ -175,13 +216,16 @@ button, input, select, textarea, a {
   box-shadow: none;
 }
 
-/* Ensure dropdown options have proper standard background and color states */
+/* Ensure dropdown options have proper standard background, color states, and Nexa/Gotham font */
+select,
 select option {
+  font-family: var(--font-studio-stack) !important;
   background-color: #1A1A1A;
   color: #FFFFFF;
   border: none !important;
 }
 
+body.day-theme select,
 body.day-theme select option {
   background-color: #FFFFFF !important;
   color: #000000 !important;
@@ -269,7 +313,3 @@ body.day-theme .glass-input::placeholder {
 .glow-on-hover:hover:not(:disabled) {
   opacity: 0.95 !important;
 }
-
-
-
-

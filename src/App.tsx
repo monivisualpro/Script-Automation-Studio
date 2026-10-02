@@ -240,6 +240,65 @@ const TRANSFORMATION_LANGUAGES = [
   { id: "swahili", label: "🇰🇪 Swahili (Kiswahili)", name: "Swahili" }
 ];
 
+const TARGET_AUDIENCES = [
+  {
+    id: "all",
+    label: "All Ages · Universal Audience (For Everyone)",
+    badge: "For All Ages",
+    shortTitle: "Universal Audience (For All)",
+    styleSummary: "Balanced, clear, inclusive & universally relatable phrasing for all viewers"
+  },
+  {
+    id: "children_10",
+    label: "Children / Kids (Up to 10 Years)",
+    badge: "Up to 10 Yrs",
+    shortTitle: "Children / Kids (Up to 10 Years)",
+    styleSummary: "Playful, wonder-filled, ultra-simple words & lively expressive cues"
+  },
+  {
+    id: "teenagers_20",
+    label: "Teenagers & Youth (Up to 20 Years)",
+    badge: "Up to 20 Yrs",
+    shortTitle: "Teenagers (Up to 20 Years)",
+    styleSummary: "Fast-paced, high-retention hooks, dynamic rhythm & relatable examples"
+  },
+  {
+    id: "young_30",
+    label: "Young Adults (Up to 30 Years)",
+    badge: "Up to 30 Yrs",
+    shortTitle: "Young Adults (Up to 30 Years)",
+    styleSummary: "Modern, ambitious, actionable & career/lifestyle growth perspective"
+  },
+  {
+    id: "adults_40",
+    label: "Adults & Professionals (Up to 40 Years)",
+    badge: "Up to 40 Yrs",
+    shortTitle: "Adults (Up to 40 Years)",
+    styleSummary: "Analytical, articulate, evidence-backed & practical high-value prose"
+  },
+  {
+    id: "men_50",
+    label: "Men & Mature Adults (Up to 50 Years)",
+    badge: "Up to 50 Yrs",
+    shortTitle: "Men & Mature (Up to 50 Years)",
+    styleSummary: "Seasoned, authoritative, pragmatic & leadership-focused delivery"
+  },
+  {
+    id: "men_60",
+    label: "Senior Men & Veterans (Up to 60 Years)",
+    badge: "Up to 60 Yrs",
+    shortTitle: "Senior Men (Up to 60 Years)",
+    styleSummary: "Dignified, composed, classic vocabulary & respectful honorifics"
+  },
+  {
+    id: "old_80",
+    label: "Old / Elders & Seniors (Up to 80 Years)",
+    badge: "Up to 80 Yrs",
+    shortTitle: "Old / Elders (Up to 80 Years)",
+    styleSummary: "Highly respectful, calm, soothing, unhurried & crystal-clear wording"
+  }
+];
+
 export default function App() {
   const {
     user,
@@ -307,7 +366,20 @@ export default function App() {
   const [nicheSearchQuery, setNicheSearchQuery] = useState("");
   const [isToneDropdownOpen, setIsToneDropdownOpen] = useState(false);
   const [toneSearchQuery, setToneSearchQuery] = useState("");
-  const [targetAudience, setTargetAudience] = useState("adults");
+  const [isAudienceDropdownOpen, setIsAudienceDropdownOpen] = useState(false);
+  const [targetAudience, setTargetAudience] = useState(() => {
+    try {
+      return localStorage.getItem("script_automation_target_audience") || "all";
+    } catch {
+      return "all";
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("script_automation_target_audience", targetAudience);
+    } catch {}
+  }, [targetAudience]);
   const [wordCount, setWordCount] = useState<number>(300);
   const [scriptLengthType, setScriptLengthType] = useState<"word_count" | "video_duration">("word_count");
   const [videoDuration, setVideoDuration] = useState<number>(15);
@@ -668,6 +740,7 @@ export default function App() {
           toggleHashtags,
           toggleTags,
           videoDuration: ytVideoDuration,
+          targetAudience,
         }),
       });
 
@@ -1028,6 +1101,9 @@ export default function App() {
           model: modelSettings.rewriteExpand,
           topic: topicName,
           wordCount: topicWordLimit,
+          targetAudience,
+          topicNiche,
+          tutorialTone,
         }),
       });
       if (!res.ok) throw new Error("Failed to generate script from topic.");
@@ -1423,7 +1499,7 @@ export default function App() {
             </div>
             <div>
               <h1 className="text-xl md:text-2xl font-display font-extrabold tracking-tight flex items-center gap-2" style={{ color: theme.accentColor }}>
-                <span>Script Automation Studio</span>
+                <span className="text-[28px] font-extrabold" style={{ fontSize: "28px", fontWeight: 800 }}>Script Automation Studio</span>
               </h1>
               <p className="text-xs text-gray-400 font-mono mt-0.5">
                 Elite Anti-plagiarism rephrasing · Dynamic unique output generator
@@ -1824,23 +1900,98 @@ export default function App() {
               )}
             </div>
 
-            {/* TARGET AUDIENCE */}
+            {/* TARGET AUDIENCE (8-TIER DEMOGRAPHIC ENGINE) */}
             <div className="glass-card p-4 rounded-2xl backdrop-blur-xl space-y-3 transition-all duration-300 border hover:border-white/30" style={{ backgroundColor: theme.cardBg, borderColor: theme.cardBorderCode, boxShadow: panelShadow }}>
-              <label className="text-xs font-mono uppercase tracking-widest flex items-center gap-1.5 font-extrabold" style={{ color: theme.accentColor }}>
-                <Lock className="h-3.5 w-3.5" style={{ color: theme.accentColor }} />
-                Target Audience
-              </label>
-              <select
-                id="select-audience"
-                value={targetAudience}
-                onChange={(e) => setTargetAudience(e.target.value)}
-                className="glass-input w-full rounded-xl py-2.5 px-4 text-xs font-mono cursor-pointer transition-all duration-300 focus:outline-none"
-                style={{ backgroundColor: theme.inputBg, borderColor: theme.isLight ? "#E5E5E5" : "transparent", color: theme.textColor }}
-              >
-                <option value="children" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>👶 Children up to 10 years old</option>
-                <option value="adults" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>💼 Adults up to 40 years old</option>
-                <option value="seniors" style={{ backgroundColor: theme.inputBg, color: theme.textColor }}>👴 Men over 60 years old</option>
-              </select>
+              {(() => {
+                const activeAudienceObj = TARGET_AUDIENCES.find((a) => a.id === targetAudience) || TARGET_AUDIENCES[0];
+                return (
+                  <>
+                    <div className="flex items-center justify-between gap-2">
+                      <label className="text-xs font-mono uppercase tracking-widest flex items-center gap-1.5 font-extrabold" style={{ color: theme.accentColor }}>
+                        <User className="h-3.5 w-3.5" style={{ color: theme.accentColor }} />
+                        Target Audience
+                      </label>
+                      <span
+                        className="text-[10px] font-mono px-2.5 py-0.5 rounded-full font-extrabold shadow-sm shrink-0"
+                        style={{ backgroundColor: `${theme.accentColor}25`, color: theme.accentColor }}
+                      >
+                        {activeAudienceObj.badge}
+                      </span>
+                    </div>
+
+                    {/* Custom Dropdown Trigger Button */}
+                    <button
+                      id="select-audience"
+                      type="button"
+                      onClick={() => setIsAudienceDropdownOpen(!isAudienceDropdownOpen)}
+                      className="glass-input w-full rounded-xl py-2.5 px-3.5 text-xs font-mono cursor-pointer transition-all duration-300 flex items-center justify-between focus:outline-none border hover:border-white/40"
+                      style={{
+                        backgroundColor: theme.inputBg,
+                        borderColor: isAudienceDropdownOpen ? theme.accentColor : (theme.isLight ? "#E5E5E5" : "transparent"),
+                        color: theme.textColor
+                      }}
+                    >
+                      <div className="flex flex-col items-start text-left pr-2 overflow-hidden">
+                        <span className="truncate font-bold w-full">{activeAudienceObj.shortTitle}</span>
+                        <span className="text-[10px] opacity-70 truncate w-full mt-0.5">{activeAudienceObj.styleSummary}</span>
+                      </div>
+                      {isAudienceDropdownOpen ? (
+                        <ChevronUp className="h-4 w-4 shrink-0" style={{ color: theme.accentColor }} />
+                      ) : (
+                        <ChevronDown className="h-4 w-4 shrink-0 opacity-70" style={{ color: theme.textColor }} />
+                      )}
+                    </button>
+
+                    {/* Expandable 8-Tier Audience Dropdown List */}
+                    {isAudienceDropdownOpen && (
+                      <div className="space-y-2 pt-2 border-t animate-fade-in" style={{ borderColor: `${theme.accentColor}25` }}>
+                        <div className="rounded-xl max-h-[240px] overflow-y-auto p-1.5 space-y-1.5 scrollbar-thin border glass-card" style={{ backgroundColor: theme.inputBg, borderColor: theme.accentColor }}>
+                          {TARGET_AUDIENCES.map((aud) => {
+                            const isSelected = targetAudience === aud.id;
+                            return (
+                              <button
+                                key={aud.id}
+                                type="button"
+                                onClick={() => {
+                                  setTargetAudience(aud.id);
+                                  setIsAudienceDropdownOpen(false);
+                                }}
+                                className={`glass-button w-full text-left px-3 py-2 rounded-xl text-xs font-mono transition-all flex items-start justify-between gap-2 cursor-pointer border ${
+                                  isSelected
+                                    ? "font-extrabold shadow-md scale-[1.01]"
+                                    : "border-transparent opacity-85 hover:opacity-100"
+                                }`}
+                                style={isSelected ? {
+                                  backgroundColor: `${theme.accentColor}25`,
+                                  borderColor: theme.accentColor,
+                                  color: theme.accentColor
+                                } : { color: theme.textColor }}
+                              >
+                                <div className="space-y-0.5 pr-1 min-w-0">
+                                  <div className="font-bold truncate">{aud.label}</div>
+                                  <div className="text-[10px] opacity-75 leading-snug">{aud.styleSummary}</div>
+                                </div>
+                                <span
+                                  className="text-[9px] px-2 py-0.5 rounded-full font-bold shadow-sm shrink-0 mt-0.5"
+                                  style={isSelected ? {
+                                    backgroundColor: theme.accentColor,
+                                    color: "#ffffff"
+                                  } : {
+                                    backgroundColor: `${theme.accentColor}15`,
+                                    color: theme.accentColor
+                                  }}
+                                >
+                                  {isSelected ? `✓ ${aud.badge}` : aud.badge}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </div>
 
             {/* TARGET REGIONS / COUNTRIES */}
