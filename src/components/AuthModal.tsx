@@ -1,11 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
 import { getThemeConfig } from "../lib/themeConfig";
 import { 
   signInWithPopup, 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
-  signInAnonymously,
   updateProfile 
 } from "firebase/auth";
 import { auth, googleProvider, syncUserProfile } from "../lib/firebase";
@@ -19,15 +18,27 @@ import {
   ArrowRight, 
   Eye, 
   EyeOff, 
-  ExternalLink,
-  Zap,
-  HelpCircle,
+  RefreshCw,
   X
 } from "lucide-react";
 
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
+}
+
+interface SecurityChallenge {
+  question: string;
+  answer: number;
+}
+
+function generateChallenge(): SecurityChallenge {
+  const a = Math.floor(Math.random() * 8) + 2;
+  const b = Math.floor(Math.random() * 8) + 2;
+  return {
+    question: `${a} + ${b}`,
+    answer: a + b,
+  };
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
@@ -42,9 +53,49 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   const [isNotAllowedErr, setIsNotAllowedErr] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
 
+  // Free client-side anti-bot & cooldown state
+  const [honeypot, setHoneypot] = useState<string>("");
+  const [challenge, setChallenge] = useState<SecurityChallenge>(() => generateChallenge());
+  const [challengeInput, setChallengeInput] = useState<string>("");
+  const [formOpenedAt, setFormOpenedAt] = useState<number>(() => Date.now());
+  const [cooldownUntil, setCooldownUntil] = useState<number>(0);
+  const [cooldownSeconds, setCooldownSeconds] = useState<number>(0);
+
+  const refreshChallenge = useCallback(() => {
+    setChallenge(generateChallenge());
+    setChallengeInput("");
+  }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      setFormOpenedAt(Date.now());
+      refreshChallenge();
+      setHoneypot("");
+    }
+  }, [isOpen, isSignUp, refreshChallenge]);
+
+  useEffect(() => {
+    if (cooldownUntil <= Date.now()) {
+      setCooldownSeconds(0);
+      return;
+    }
+    const updateTimer = () => {
+      const remaining = Math.ceil((cooldownUntil - Date.now()) / 1000);
+      setCooldownSeconds(remaining > 0 ? remaining : 0);
+    };
+    updateTimer();
+    const interval = setInterval(updateTimer, 500);
+    return () => clearInterval(interval);
+  }, [cooldownUntil]);
+
   if (!isOpen) return null;
 
+  const triggerFailureCooldown = (seconds = 3) => {
+    setCooldownUntil(Date.now() + seconds * 1000);
+  };
+
   const handleGoogleSignIn = async () => {
+    if (cooldownSeconds > 0) return;
     setError(null);
     setIsNotAllowedErr(false);
     setLoading(true);
@@ -56,6 +107,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
       }
     } catch (err: any) {
       console.error("Google Sign-In Error:", err);
+      triggerFailureCooldown(3);
       if (err.code === "auth/operation-not-allowed") {
         setIsNotAllowedErr(true);
         setError("Google Sign-In is disabled in your Firebase project. Please enable Google provider in Firebase Console.");
@@ -63,6 +115,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
         setError("Sign-in popup was closed before completing.");
       } else if (err.code === "auth/popup-blocked") {
         setError("Sign-in popup was blocked by browser. Please allow popups or use Email & Password.");
+      } else if (err.code === "auth/too-many-requests") {
+        triggerFailureCooldown(15);
+        setError("Too many attempts detected. Please wait a moment before trying again.");
       } else {
         setError(err.message || "Failed to sign in with Google.");
       }
@@ -71,115 +126,108 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     }
   };
 
-  const handleAnonymousSignIn = async () => {
-    setError(null);
-    setIsNotAllowedErr(false);
-    setLoading(true);
-    try {
-      const result = await signInAnonymously(auth);
-      if (result.user) {
-        await syncUserProfile(result.user, "anonymous", "Guest Creator");
-        onClose();
-      }
-    } catch (err: any) {
-      console.error("Anonymous Auth Error:", err);
-      if (err.code === "auth/operation-not-allowed") {
-        setIsNotAllowedErr(true);
-        setError("Anonymous Sign-In is not enabled in Firebase Console. Please enable Anonymous auth or Email/Password in Firebase Console.");
-      } else {
-        setError(err.message || "Failed to start quick demo session.");
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (cooldownSeconds > 0) {
+      setError(`Please wait ${cooldownSeconds}s before trying again.`);
+      return;
+    }
+
     setError(null);
     setIsNotAllowedErr(false);
 
-    if (!email || !password) {
+    // 1. Honeypot check (bots auto-fill hidden inputs)
+    if (honeypot.trim() !== "") {
+      triggerFailureCooldown(10);
+      setError("Automated submission blocked.");
+      return;
+    }
+
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail || !password) {
       setError("Please fill in all required fields.");
       return;
     }
 
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters long.");
+    if (trimmedEmail.length > 254) {
+      setError("Email address is too long.");
       return;
+    }
+
+    if (password.length < 6 || password.length > 128) {
+      setError("Password must be between 6 and 128 characters long.");
+      return;
+    }
+
+    if (isSignUp) {
+      const trimmedName = name.trim();
+      if (!trimmedName) {
+        setError("Please enter your name.");
+        return;
+      }
+      if (trimmedName.length > 120) {
+        setError("Name must be 120 characters or fewer.");
+        return;
+      }
+      // 2. Minimum form completion time check on Sign Up (1.2 seconds)
+      if (Date.now() - formOpenedAt < 1200) {
+        triggerFailureCooldown(5);
+        setError("Submission was too fast. Please verify the security challenge and try again.");
+        return;
+      }
+      // 3. Human verification challenge check
+      if (parseInt(challengeInput.trim(), 10) !== challenge.answer) {
+        refreshChallenge();
+        setError("Incorrect human verification answer. Please solve the math challenge.");
+        return;
+      }
     }
 
     setLoading(true);
     try {
       if (isSignUp) {
-        if (!name.trim()) {
-          setError("Please enter your name.");
-          setLoading(false);
-          return;
-        }
-        const userCred = await createUserWithEmailAndPassword(auth, email, password);
-        await updateProfile(userCred.user, { displayName: name });
-        await syncUserProfile(userCred.user, "password", name);
+        const cleanName = name.trim().slice(0, 120);
+        const userCred = await createUserWithEmailAndPassword(auth, trimmedEmail, password);
+        await updateProfile(userCred.user, { displayName: cleanName });
+        await syncUserProfile(userCred.user, "password", cleanName);
         onClose();
       } else {
-        try {
-          const userCred = await signInWithEmailAndPassword(auth, email, password);
-          await syncUserProfile(userCred.user, "password");
-          onClose();
-        } catch (signInErr: any) {
-          // If login failed because account doesn't exist yet, try creating it directly for seamless user onboarding
-          if (signInErr.code === "auth/user-not-found" || signInErr.code === "auth/invalid-credential") {
-            try {
-              const defaultName = email.split("@")[0] || "User";
-              const newUserCred = await createUserWithEmailAndPassword(auth, email, password);
-              await updateProfile(newUserCred.user, { displayName: defaultName });
-              await syncUserProfile(newUserCred.user, "password", defaultName);
-              onClose();
-              setLoading(false);
-              return;
-            } catch (signUpErr: any) {
-              if (signUpErr.code === "auth/email-already-in-use" || signUpErr.code === "auth/wrong-password") {
-                setError("Incorrect password for this email. Please check your password and try again.");
-              } else if (signUpErr.code === "auth/operation-not-allowed") {
-                setIsNotAllowedErr(true);
-                setError("Email/Password Authentication is not enabled in Firebase Console.");
-              } else {
-                setError(signUpErr.message || "Failed to sign in. Please verify your email and password.");
-              }
-              setLoading(false);
-              return;
-            }
-          } else {
-            throw signInErr;
-          }
-        }
+        const userCred = await signInWithEmailAndPassword(auth, trimmedEmail, password);
+        await syncUserProfile(userCred.user, "password");
+        onClose();
       }
     } catch (err: any) {
       console.error("Email Auth Error:", err);
+      triggerFailureCooldown(3);
+      if (isSignUp) {
+        refreshChallenge();
+      }
       let msg = err.message || "Authentication failed.";
-      
+
       if (err.code === "auth/operation-not-allowed") {
         setIsNotAllowedErr(true);
         msg = "Email/Password Authentication is not enabled in your Firebase Console. Please enable it in Firebase Console > Authentication > Sign-in method.";
       } else if (err.message && err.message.includes("identitytoolkit.googleapis.com")) {
         setIsNotAllowedErr(true);
         msg = "The Identity Toolkit API is disabled for the custom API key. The app configuration has been restored to the project default key.";
-      } else if (err.code === "auth/user-not-found" || err.code === "auth/wrong-password" || err.code === "auth/invalid-credential") {
-        msg = "Invalid email or password. Please check your credentials or click Sign Up to register.";
+      } else if (
+        err.code === "auth/user-not-found" ||
+        err.code === "auth/wrong-password" ||
+        err.code === "auth/invalid-credential"
+      ) {
+        msg = "Invalid email or password. If you do not have an account yet, switch to the Sign Up tab.";
       } else if (err.code === "auth/email-already-in-use") {
-        msg = "This email is already registered. Please click 'Log In' below instead.";
+        msg = "This email is already registered. Please switch to 'Log In' instead.";
+      } else if (err.code === "auth/too-many-requests") {
+        triggerFailureCooldown(15);
+        msg = "Too many failed attempts. Please wait a moment and try again.";
       }
-      
+
       setError(msg);
     } finally {
       setLoading(false);
     }
   };
-
-  const isLight = theme.isLight;
-  const modalBg = isLight ? "#FFFFFF" : "#1A1A1A";
-  const modalTextColor = isLight ? "#000000" : "#FFFFFF";
-  const btnTextColor = "#FFFFFF";
 
   return (
     <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto backdrop-blur-md ${theme.isLight ? "bg-black/30" : "bg-black/85"}`}>
@@ -222,11 +270,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
           <p className={`text-xs mt-1.5 font-mono font-medium ${
             theme.isLight ? "text-[#444444]" : "text-[#BDBDBD]"
           }`}>
-            {isSignUp ? "Create your account in seconds" : "Welcome back! Sign in to your account"}
+            {isSignUp ? "Create your free creator account" : "Welcome back! Sign in to your account"}
           </p>
         </div>
 
-        {/* Liquid Tab Switcher for Easy Toggle */}
+        {/* Tab Switcher */}
         <div className={`flex rounded-full p-1.5 border mb-6 relative z-10 ${
           theme.isLight ? "border-[#E5E5E5] bg-[#F7F7F7]" : "border-[#2A2A2A] bg-[#111111]"
         }`}>
@@ -282,21 +330,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
             }`}>
               <li>Open <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer" className="underline font-bold" style={{ color: theme.secondaryAccentColor }}>Firebase Console</a></li>
               <li>Select your project &rarr; <b>Authentication</b> &rarr; <b>Sign-in method</b></li>
-              <li>Click <b>Email/Password</b> (or Google / Anonymous) and set it to <b>Enable</b></li>
+              <li>Click <b>Email/Password</b> (or Google) and set it to <b>Enable</b></li>
             </ol>
-            <div className={`pt-2 border-t flex items-center justify-between text-[10px] ${
-              theme.isLight ? "border-[#E5E5E5]" : "border-[#2A2A2A]"
-            }`}>
-              <span className={theme.isLight ? "text-[#444444]" : "text-[#BDBDBD]"}>Or click below to try quick guest mode:</span>
-              <button
-                type="button"
-                onClick={handleAnonymousSignIn}
-                className="px-3 py-1 rounded-xl text-white font-extrabold transition-all cursor-pointer shadow-md"
-                style={{ backgroundColor: theme.secondaryAccentColor }}
-              >
-                Quick Guest Mode
-              </button>
-            </div>
           </div>
         )}
 
@@ -311,11 +346,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
           </div>
         )}
 
-        {/* Quick Social & Guest Login Options */}
+        {/* Google Login Option */}
         <div className="space-y-3 mb-5 relative z-10">
           <button
             onClick={handleGoogleSignIn}
-            disabled={loading}
+            disabled={loading || cooldownSeconds > 0}
             type="button"
             className={`w-full flex items-center justify-center gap-3 py-3 px-4 rounded-2xl font-extrabold text-sm transition-all cursor-pointer shadow-lg disabled:opacity-50 border ${
               theme.isLight 
@@ -343,19 +378,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
             </svg>
             <span>Continue with Google</span>
           </button>
-
-          <button
-            onClick={handleAnonymousSignIn}
-            disabled={loading}
-            type="button"
-            className={`w-full flex items-center justify-center gap-2 py-3 px-4 rounded-2xl font-mono text-xs font-extrabold transition-all cursor-pointer disabled:opacity-50 border shadow-sm ${
-              theme.isLight ? "bg-[#F7F7F7]" : "bg-[#111111]"
-            }`}
-            style={{ color: theme.secondaryAccentColor, borderColor: `${theme.secondaryAccentColor}66` }}
-          >
-            <Zap className="h-4 w-4 shrink-0" style={{ color: theme.secondaryAccentColor }} />
-            <span>Instant One-Click Guest Mode</span>
-          </button>
         </div>
 
         {/* Divider */}
@@ -369,6 +391,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
 
         {/* Form */}
         <form onSubmit={handleEmailAuth} className="space-y-4 relative z-10">
+          {/* Hidden Honeypot Trap for Automated Bots */}
+          <div className="hidden" aria-hidden="true">
+            <label htmlFor="studio-website-url">Website</label>
+            <input
+              id="studio-website-url"
+              type="text"
+              tabIndex={-1}
+              autoComplete="off"
+              value={honeypot}
+              onChange={(e) => setHoneypot(e.target.value)}
+            />
+          </div>
+
           {isSignUp && (
             <div>
               <label className={`block text-xs font-mono mb-1 font-semibold ${
@@ -381,6 +416,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                 <input
                   type="text"
                   required
+                  maxLength={120}
                   placeholder="John Doe"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
@@ -403,6 +439,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
               <input
                 type="email"
                 required
+                maxLength={254}
                 placeholder="creator@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -424,6 +461,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
               <input
                 type={showPassword ? "text" : "password"}
                 required
+                minLength={6}
+                maxLength={128}
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -444,17 +483,56 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
             </div>
           </div>
 
+          {/* Human Verification Challenge on Sign Up */}
+          {isSignUp && (
+            <div className={`p-3.5 rounded-2xl border ${
+              theme.isLight ? "border-[#E5E5E5] bg-[#F7F7F7]" : "border-[#2A2A2A] bg-[#111111]"
+            }`}>
+              <div className="flex items-center justify-between mb-2">
+                <label className={`text-xs font-mono font-semibold flex items-center gap-1.5 ${
+                  theme.isLight ? "text-[#444444]" : "text-[#BDBDBD]"
+                }`}>
+                  <Shield className="h-3.5 w-3.5 shrink-0" style={{ color: theme.secondaryAccentColor }} />
+                  <span>Human Check: What is <strong className={theme.isLight ? "text-[#000000]" : "text-white"}>{challenge.question}</strong>?</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={refreshChallenge}
+                  className={`p-1 rounded-lg transition-colors cursor-pointer ${
+                    theme.isLight ? "text-[#444444] hover:text-[#000000]" : "text-[#BDBDBD] hover:text-white"
+                  }`}
+                  title="New math challenge"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              <input
+                type="number"
+                required
+                inputMode="numeric"
+                placeholder="Enter sum"
+                value={challengeInput}
+                onChange={(e) => setChallengeInput(e.target.value)}
+                className={`w-full rounded-xl py-2 px-3 text-sm font-mono tabular-nums focus:outline-none border ${
+                  theme.isLight ? "border-[#E5E5E5] bg-[#FFFFFF] text-[#000000]" : "border-[#2A2A2A] bg-[#1A1A1A] text-white"
+                }`}
+              />
+            </div>
+          )}
+
           <button
             type="submit"
-            disabled={loading}
-            className="w-full py-3.5 px-4 rounded-2xl font-extrabold text-sm transition-all cursor-pointer shadow-xl flex items-center justify-center gap-2 mt-6 active:scale-[0.98] disabled:opacity-50 border text-white"
+            disabled={loading || cooldownSeconds > 0}
+            className="w-full py-3.5 px-4 rounded-2xl font-extrabold text-sm transition-all cursor-pointer shadow-xl flex items-center justify-center gap-2 mt-6 active:scale-[0.98] disabled:opacity-50 border text-white font-mono tabular-nums"
             style={{ backgroundColor: theme.accentColor, borderColor: theme.accentColor }}
           >
             {loading ? (
               <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            ) : cooldownSeconds > 0 ? (
+              <span>Retry in {cooldownSeconds}s</span>
             ) : (
               <>
-                <span>{isSignUp ? "Create Free Account" : "Log In to Studio"}</span>
+                <span className="font-sans">{isSignUp ? "Create Free Account" : "Log In to Studio"}</span>
                 <ArrowRight className="h-4 w-4" />
               </>
             )}
@@ -493,4 +571,3 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     </div>
   );
 };
-

@@ -9,15 +9,12 @@ import {
   X, 
   RefreshCw, 
   Search, 
-  UserCheck, 
-  UserX, 
   CheckCircle2, 
   AlertTriangle,
   Sparkles,
-  Server,
   Lock,
   Mail,
-  Zap
+  Calendar
 } from "lucide-react";
 
 interface AdminUser {
@@ -45,7 +42,6 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [updatingUser, setUpdatingUser] = useState<string | null>(null);
 
   const fetchUsers = async () => {
     if (!idToken) return;
@@ -77,38 +73,6 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
     }
   }, [isOpen, idToken]);
 
-  const handleToggleRole = async (targetUserId: string, currentRole: string) => {
-    if (!idToken) return;
-    const newRole = currentRole === "admin" ? "user" : "admin";
-    setUpdatingUser(targetUserId);
-    try {
-      const res = await fetch("/api/admin/toggle-role", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${idToken}`,
-        },
-        body: JSON.stringify({ targetUserId, newRole }),
-      });
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || "Failed to update role.");
-      }
-      // Update local state
-      setUsers((prev) =>
-        prev.map((u) =>
-          u.userId === targetUserId
-            ? { ...u, role: newRole as "admin" | "user", isAdmin: newRole === "admin" }
-            : u
-        )
-      );
-    } catch (err: any) {
-      alert(`Error updating user role: ${err.message}`);
-    } finally {
-      setUpdatingUser(null);
-    }
-  };
-
   if (!isOpen) return null;
 
   const filteredUsers = users.filter(
@@ -120,11 +84,23 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
 
   const totalUsers = users.length;
   const activeKeysCount = users.filter((u) => u.hasApiKey).length;
-  const adminsCount = users.filter((u) => u.isAdmin || u.role === "admin").length;
 
   const isLight = theme.isLight;
-  const modalBg = isLight ? "#FFFFFF" : "#1A1A1A";
-  const modalTextColor = isLight ? "#000000" : "#FFFFFF";
+
+  const formatJoinedDate = (iso: string | null): string => {
+    if (!iso) return "—";
+    try {
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return "—";
+      return d.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "2-digit",
+      });
+    } catch {
+      return "—";
+    }
+  };
 
   return (
     <div className={`fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 backdrop-blur-2xl animate-[fadeIn_0.15s_ease-out] ${isLight ? "bg-black/30" : "bg-black/85"}`}>
@@ -147,7 +123,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
               <Crown className="h-6 w-6" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h2 className={`text-xl font-extrabold font-sans tracking-tight ${isLight ? "text-[#000000]" : "text-white"}`}>
                   Admin Command Console
                 </h2>
@@ -156,11 +132,11 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
                   style={{ borderColor: `${theme.secondaryAccentColor}66`, backgroundColor: `${theme.secondaryAccentColor}1A`, color: theme.secondaryAccentColor }}
                 >
                   <ShieldCheck className="h-3 w-3" />
-                  Primary Admin Active
+                  Read-Only Sole Owner Mode
                 </span>
               </div>
               <p className={`text-xs font-mono mt-0.5 ${isLight ? "text-[#444444]" : "text-[#BDBDBD]"}`}>
-                Full platform control for <span className={`font-bold ${isLight ? "text-[#000000]" : "text-white"}`}>{profile?.email}</span>
+                Locked exclusively to <span className={`font-bold ${isLight ? "text-[#000000]" : "text-white"}`}>{profile?.email}</span> · Role delegation disabled for security
               </p>
             </div>
           </div>
@@ -185,7 +161,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
                 <span className="text-[11px] font-mono uppercase tracking-wider">Total Users</span>
                 <Users className="h-4 w-4" style={{ color: theme.accentColor }} />
               </div>
-              <span className={`text-2xl font-black font-mono ${isLight ? "text-[#000000]" : "text-white"}`}>{totalUsers}</span>
+              <span className={`text-2xl font-black font-mono tabular-nums ${isLight ? "text-[#000000]" : "text-white"}`}>{totalUsers}</span>
             </div>
 
             <div className={`p-4 rounded-2xl border flex flex-col ${isLight ? "border-[#E5E5E5] bg-[#F7F7F7]" : "border-[#2A2A2A] bg-[#111111]"}`}>
@@ -193,23 +169,23 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
                 <span className="text-[11px] font-mono uppercase tracking-wider">API Keys Set</span>
                 <Key className="h-4 w-4" style={{ color: theme.secondaryAccentColor }} />
               </div>
-              <span className="text-2xl font-black font-mono" style={{ color: theme.secondaryAccentColor }}>{activeKeysCount}</span>
+              <span className="text-2xl font-black font-mono tabular-nums" style={{ color: theme.secondaryAccentColor }}>{activeKeysCount}</span>
             </div>
 
             <div className={`p-4 rounded-2xl border flex flex-col ${isLight ? "border-[#E5E5E5] bg-[#F7F7F7]" : "border-[#2A2A2A] bg-[#111111]"}`}>
               <div className={`flex items-center justify-between mb-1 ${isLight ? "text-[#444444]" : "text-[#BDBDBD]"}`}>
-                <span className="text-[11px] font-mono uppercase tracking-wider">Admins</span>
+                <span className="text-[11px] font-mono uppercase tracking-wider">Admin Lock</span>
                 <Crown className="h-4 w-4" style={{ color: theme.accentColor }} />
               </div>
-              <span className="text-2xl font-black font-mono" style={{ color: theme.accentColor }}>{adminsCount}</span>
+              <span className="text-xs font-bold font-mono mt-2" style={{ color: theme.accentColor }}>1 Owner (Locked)</span>
             </div>
 
             <div className={`p-4 rounded-2xl border flex flex-col ${isLight ? "border-[#E5E5E5] bg-[#F7F7F7]" : "border-[#2A2A2A] bg-[#111111]"}`}>
               <div className={`flex items-center justify-between mb-1 ${isLight ? "text-[#444444]" : "text-[#BDBDBD]"}`}>
-                <span className="text-[11px] font-mono uppercase tracking-wider">Encryption</span>
+                <span className="text-[11px] font-mono uppercase tracking-wider">Key Security</span>
                 <Lock className="h-4 w-4" style={{ color: theme.secondaryAccentColor }} />
               </div>
-              <span className="text-xs font-bold font-mono mt-2" style={{ color: theme.secondaryAccentColor }}>AES-256-GCM</span>
+              <span className="text-xs font-bold font-mono mt-2" style={{ color: theme.secondaryAccentColor }}>AES-256 + Rate Limit</span>
             </div>
           </div>
 
@@ -260,7 +236,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
                   <th className="py-3 px-4">Auth Method</th>
                   <th className="py-3 px-4">API Key Status</th>
                   <th className="py-3 px-4">Role</th>
-                  <th className="py-3 px-4 text-right">Actions</th>
+                  <th className="py-3 px-4 text-right">Registered</th>
                 </tr>
               </thead>
               <tbody className={`divide-y text-xs font-mono ${isLight ? "divide-[#E5E5E5]" : "divide-[#2A2A2A]"}`}>
@@ -302,7 +278,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
                                     className="px-1.5 py-0.2 rounded border text-[9px] font-extrabold"
                                     style={{ borderColor: theme.accentColor, backgroundColor: `${theme.accentColor}33`, color: theme.accentColor }}
                                   >
-                                    Primary Admin
+                                    Sole Owner
                                   </span>
                                 )}
                               </div>
@@ -315,13 +291,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
                           <span className={`px-2.5 py-1 rounded-xl border text-[11px] capitalize inline-flex items-center gap-1 ${
                             isLight ? "border-[#E5E5E5] bg-[#F7F7F7] text-[#444444]" : "border-[#2A2A2A] bg-[#1A1A1A] text-[#BDBDBD]"
                           }`}>
-                            {u.provider === "google.com" ? (
-                              <Mail className="h-3 w-3" style={{ color: theme.secondaryAccentColor }} />
-                            ) : u.provider === "anonymous" ? (
-                              <Zap className="h-3 w-3" style={{ color: theme.accentColor }} />
-                            ) : (
-                              <Mail className="h-3 w-3 text-emerald-400" />
-                            )}
+                            <Mail className="h-3 w-3" style={{ color: theme.secondaryAccentColor }} />
                             <span>{u.provider}</span>
                           </span>
                         </td>
@@ -341,7 +311,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
                         </td>
 
                         <td className="py-3.5 px-4">
-                          {u.isAdmin || u.role === "admin" ? (
+                          {isPrimary ? (
                             <span 
                               className="px-2.5 py-1 rounded-xl border font-bold text-[10px] inline-flex items-center gap-1"
                               style={{ borderColor: theme.accentColor, backgroundColor: `${theme.accentColor}33`, color: theme.accentColor }}
@@ -358,33 +328,11 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
                           )}
                         </td>
 
-                        <td className="py-3.5 px-4 text-right">
-                          {isPrimary ? (
-                            <span className={`text-[10px] italic ${isLight ? "text-[#444444]" : "text-[#BDBDBD]"}`}>Owner</span>
-                          ) : (
-                            <button
-                              onClick={() => handleToggleRole(u.userId, u.role)}
-                              disabled={updatingUser === u.userId}
-                              className="px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all cursor-pointer inline-flex items-center gap-1.5 border"
-                              style={
-                                u.role === "admin"
-                                  ? { backgroundColor: `${theme.accentColor}33`, borderColor: theme.accentColor, color: theme.accentColor }
-                                  : { backgroundColor: theme.secondaryAccentColor, borderColor: theme.secondaryAccentColor, color: "#FFFFFF" }
-                              }
-                            >
-                              {u.role === "admin" ? (
-                                <>
-                                  <UserX className="h-3 w-3" />
-                                  <span>Revoke Admin</span>
-                                </>
-                              ) : (
-                                <>
-                                  <UserCheck className="h-3 w-3" />
-                                  <span>Make Admin</span>
-                                </>
-                              )}
-                            </button>
-                          )}
+                        <td className={`py-3.5 px-4 text-right tabular-nums ${isLight ? "text-[#444444]" : "text-[#BDBDBD]"}`}>
+                          <span className="inline-flex items-center gap-1.5">
+                            <Calendar className="h-3 w-3 opacity-70" />
+                            <span>{formatJoinedDate(u.createdAt)}</span>
+                          </span>
                         </td>
                       </tr>
                     );
@@ -401,7 +349,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
         }`}>
           <div className="flex items-center gap-2">
             <Sparkles className="h-4 w-4" style={{ color: theme.accentColor }} />
-            <span>Script Automation Studio Admin System</span>
+            <span>Zero-Trust Read-Only Directory · Owner-Only Writes Enforced</span>
           </div>
           <button
             onClick={onClose}

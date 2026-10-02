@@ -1,12 +1,12 @@
-{ 
-
-"projectId": "script-automation-studio",
-"appId": "1:213799464433:web:2970fd36cbd56d7460a850",
-"apiKey": "AIzaSyCf4GIuPVF53dNYzFGV59tebGzNcPpJXJQ",
-"authDomain": "script-automation-studio.firebaseapp.com", 
-"firestoreDatabaseId": "(default)", 
-"storageBucket": "script-automation-studio.firebasestorage.app", 
-"messagingSenderId": "213799464433", 
-"measurementId": "G-4WGL2LCRYB" 
-
+{
+  "projectId": "script-automation-studio",
+  "appId": "1:213799464433:web:4e2a4bb3935976ad60a850",
+  "apiKey": "AIzaSyCf4GIuPVF53dNYzFGV59tebGzNcPpJXJQ",
+  "authDomain": "script-automation-studio.firebaseapp.com",
+  "firestoreDatabaseId": "ai-studio-scriptautomation-e15f32ee-b60f-4480-a137-b06b15abddef",
+  "storageBucket": "script-automation-studio.firebasestorage.app",
+  "messagingSenderId": "213799464433",
+  "measurementId": "",
+  "oAuthClientId": "213799464433-j7dhmmomlkuac9aalj7pqosgem0haql8.apps.googleusercontent.com",
+  "recaptchaSiteKey": ""
 }

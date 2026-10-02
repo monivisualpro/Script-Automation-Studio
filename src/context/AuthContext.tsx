@@ -224,39 +224,69 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const fetchProfile = async (currentUser: User) => {
+  const syncDirectoryWithServer = async (token: string, resolvedProfile: UserProfile) => {
+    try {
+      await fetch("/api/user/sync-directory", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name: resolvedProfile.name,
+          provider: resolvedProfile.provider,
+          hasApiKey: resolvedProfile.hasApiKey,
+          apiKeyMasked: resolvedProfile.apiKeyMasked,
+          createdAt: resolvedProfile.createdAt,
+          updatedAt: resolvedProfile.updatedAt,
+        }),
+      });
+    } catch {
+      // non-blocking directory sync
+    }
+  };
+
+  const fetchProfile = async (currentUser: User, token?: string) => {
     try {
       const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+      let resolved: UserProfile;
       if (userDoc.exists()) {
         const data = userDoc.data();
         const userEmail = (currentUser.email || data.email || "").toLowerCase();
-        const isAdmin = userEmail === "tahsinirshad7370@gmail.com" || data.role === "admin";
+        const isSoleAdmin = userEmail === "tahsinirshad7370@gmail.com";
 
         if (data.modelSettings) {
           setModelSettings(prev => ({ ...prev, ...data.modelSettings }));
         }
 
-        setProfile({
+        resolved = {
           userId: currentUser.uid,
           name: data.name || currentUser.displayName || currentUser.email?.split("@")[0] || "User",
           email: data.email || currentUser.email || "",
           profilePhoto: data.profilePhoto || currentUser.photoURL || `https://api.dicebear.com/7.x/bottts/svg?seed=${currentUser.uid}`,
           provider: data.provider || "password",
-          role: isAdmin ? "admin" : "user",
-          isAdmin,
+          role: isSoleAdmin ? "admin" : "user",
+          isAdmin: isSoleAdmin,
           apiKeyMasked: data.apiKeyMasked || null,
           hasApiKey: Boolean(data.encryptedApiKey || data.apiKeyMasked),
           createdAt: data.createdAt || new Date().toISOString(),
           updatedAt: data.updatedAt || new Date().toISOString(),
-        });
+        };
+        setProfile(resolved);
       } else {
-        const synced = await syncUserProfile(currentUser);
-        setProfile(synced);
+        resolved = await syncUserProfile(currentUser);
+        setProfile(resolved);
+      }
+      if (token) {
+        void syncDirectoryWithServer(token, resolved);
       }
     } catch (err) {
       console.error("Failed to fetch user profile:", err);
       const synced = await syncUserProfile(currentUser);
       setProfile(synced);
+      if (token) {
+        void syncDirectoryWithServer(token, synced);
+      }
     }
   };
 
@@ -267,7 +297,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try {
           const token = await currentUser.getIdToken(true);
           setIdToken(token);
-          await fetchProfile(currentUser);
+          await fetchProfile(currentUser, token);
         } catch (e) {
           console.error("Error getting ID token:", e);
         }
@@ -286,7 +316,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const token = await user.getIdToken(true);
         setIdToken(token);
-        await fetchProfile(user);
+        await fetchProfile(user, token);
       } catch (e) {
         console.error("Error refreshing profile:", e);
       }

@@ -1,4 +1,5 @@
 import express from "express";
+import fs from "fs";
 import path from "path";
 import { GoogleGenAI, Type } from "@google/genai";
 import { createServer as createViteServer } from "vite";
@@ -48,8 +49,90 @@ let serverStartPromise: Promise<HttpServer> | null = null;
 
 app.use(express.json({ limit: "10mb" }));
 
+// ============================================================================
+// Free-Tier In-Memory Rate Limiting & Firestore Read Cache (Firebase Spark Safe)
+// ============================================================================
+interface RateBucket {
+  timestamps: number[];
+}
+
+const rateBuckets = new Map<string, RateBucket>();
+
+function getClientIdentifier(req: express.Request): string {
+  const forwarded = req.headers["x-forwarded-for"];
+  const ip = typeof forwarded === "string" ? forwarded.split(",")[0].trim() : req.socket.remoteAddress || "unknown-ip";
+  const authHeader = req.headers.authorization || "";
+  const tokenTail = authHeader.startsWith("Bearer ") ? authHeader.slice(-24) : "anon";
+  return `${ip}:${tokenTail}`;
+}
+
+function createRateLimiter(maxRequests: number, windowMs: number, errorMessage: string): express.RequestHandler {
+  return (req, res, next) => {
+    const now = Date.now();
+    const key = `${req.baseUrl || ""}:${maxRequests}:${getClientIdentifier(req)}`;
+    const bucket = rateBuckets.get(key) || { timestamps: [] };
+    bucket.timestamps = bucket.timestamps.filter((ts) => now - ts < windowMs);
+
+    if (bucket.timestamps.length >= maxRequests) {
+      const oldest = bucket.timestamps[0] || now;
+      const retryAfterSec = Math.max(1, Math.ceil((windowMs - (now - oldest)) / 1000));
+      res.setHeader("Retry-After", String(retryAfterSec));
+      return res.status(429).json({
+        error: `${errorMessage} Please retry in ${retryAfterSec}s.`,
+        retryAfterSeconds: retryAfterSec,
+      });
+    }
+
+    bucket.timestamps.push(now);
+    rateBuckets.set(key, bucket);
+    next();
+  };
+}
+
+// General API rate limit (60 requests / 1 minute per client)
+const apiRateLimiter = createRateLimiter(60, 60 * 1000, "Rate limit exceeded (max 60 requests/minute).");
+// Sensitive account/key write rate limit (15 requests / 15 minutes per client)
+const writeRateLimiter = createRateLimiter(15, 15 * 60 * 1000, "Too many account or key update attempts.");
+
+app.use("/api", apiRateLimiter);
+
+interface CachedUserAuthEntry {
+  uid: string;
+  email?: string;
+  name?: string;
+  emailVerified: boolean;
+  plainApiKey: string;
+  tokenHash: string;
+  expiresAt: number;
+}
+
+const USER_AUTH_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const userAuthKeyCache = new Map<string, CachedUserAuthEntry>();
+
+function invalidateUserAuthCache(uid: string): void {
+  userAuthKeyCache.delete(uid);
+}
+
+// Periodic cleanup of expired rate-limit buckets and cache entries every 5 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, bucket] of rateBuckets.entries()) {
+    const active = bucket.timestamps.filter((ts) => now - ts < 15 * 60 * 1000);
+    if (active.length === 0) {
+      rateBuckets.delete(k);
+    } else {
+      bucket.timestamps = active;
+    }
+  }
+  for (const [uid, entry] of userAuthKeyCache.entries()) {
+    if (entry.expiresAt <= now) {
+      userAuthKeyCache.delete(uid);
+    }
+  }
+}, 5 * 60 * 1000).unref();
+
 // Helper to verify Firebase Auth ID token via Google Identity Toolkit API
-async function verifyAuthToken(idToken: string): Promise<{ uid: string; email?: string; name?: string }> {
+async function verifyAuthToken(idToken: string): Promise<{ uid: string; email?: string; name?: string; emailVerified: boolean }> {
   const url = `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${firebaseConfig.apiKey}`;
   const response = await fetch(url, {
     method: "POST",
@@ -72,12 +155,13 @@ async function verifyAuthToken(idToken: string): Promise<{ uid: string; email?: 
     uid: user.localId,
     email: user.email,
     name: user.displayName,
+    emailVerified: Boolean(user.emailVerified),
   };
 }
 
 // Interface for Authenticated Requests
 interface AuthenticatedRequest extends express.Request {
-  userAuth?: { uid: string; email?: string };
+  userAuth?: { uid: string; email?: string; emailVerified?: boolean };
   userAiClient?: GoogleGenAI;
   userApiKey?: string;
 }
@@ -108,7 +192,7 @@ function createGoogleGenAIClient(apiKey: string): GoogleGenAI {
   });
 }
 
-// Authentication Middleware - Enforces user login and personal API key configuration
+// Authentication Middleware - Enforces user login, personal API key configuration, and 5-min Firestore read cache
 async function verifyUserAuth(req: AuthenticatedRequest, res: express.Response, next: express.NextFunction) {
   try {
     const authHeader = req.headers.authorization;
@@ -117,6 +201,18 @@ async function verifyUserAuth(req: AuthenticatedRequest, res: express.Response, 
     }
 
     const token = authHeader.substring(7);
+    const tokenSignatureTail = token.slice(-32);
+
+    // Check 5-minute in-memory cache first if same token is presented
+    for (const cached of userAuthKeyCache.values()) {
+      if (cached.tokenHash === tokenSignatureTail && cached.expiresAt > Date.now() && cached.plainApiKey) {
+        req.userAuth = { uid: cached.uid, email: cached.email, emailVerified: cached.emailVerified };
+        req.userApiKey = cached.plainApiKey;
+        req.userAiClient = createGoogleGenAIClient(cached.plainApiKey);
+        return next();
+      }
+    }
+
     const userInfo = await verifyAuthToken(token);
     req.userAuth = userInfo;
 
@@ -128,6 +224,15 @@ async function verifyUserAuth(req: AuthenticatedRequest, res: express.Response, 
     }
 
     const userData = userDocSnap.data;
+    upsertDirectoryUser(userInfo.uid, {
+      name: userData.name || userInfo.name || "User",
+      email: userData.email || userInfo.email || "No email",
+      provider: userData.provider || "password",
+      hasApiKey: Boolean(userData.encryptedApiKey || userData.apiKeyMasked),
+      apiKeyMasked: userData.apiKeyMasked || null,
+      createdAt: userData.createdAt || null,
+      updatedAt: userData.updatedAt || null,
+    });
     const encryptedKey = userData.encryptedApiKey;
 
     if (!encryptedKey) {
@@ -157,6 +262,17 @@ async function verifyUserAuth(req: AuthenticatedRequest, res: express.Response, 
         logSafeError("Failed to auto-upgrade legacy encrypted key:", migrateErr);
       }
     }
+
+    // Store in 5-minute cache to protect Firebase Spark daily read quota
+    userAuthKeyCache.set(userInfo.uid, {
+      uid: userInfo.uid,
+      email: userInfo.email,
+      name: userInfo.name,
+      emailVerified: userInfo.emailVerified,
+      plainApiKey: plainKey,
+      tokenHash: tokenSignatureTail,
+      expiresAt: Date.now() + USER_AUTH_CACHE_TTL_MS,
+    });
 
     // Create a new GoogleGenAI client exclusively using the logged-in user's API key
     req.userApiKey = plainKey;
@@ -260,7 +376,7 @@ async function generateContentWithRetry(ai: GoogleGenAI, params: any, maxRetries
 }
 
 // User Management Endpoints
-app.post("/api/user/save-key", async (req, res) => {
+app.post("/api/user/save-key", writeRateLimiter, async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -275,6 +391,9 @@ app.post("/api/user/save-key", async (req, res) => {
     }
 
     const trimmedKey = apiKey.trim();
+    if (trimmedKey.length < 10 || trimmedKey.length > 512) {
+      return res.status(400).json({ error: "API Key length is invalid." });
+    }
 
     // Validate the key against Gemini API with test pings supporting AIza and AQ tokens
     let pingSuccess = false;
@@ -367,11 +486,22 @@ app.post("/api/user/save-key", async (req, res) => {
     const encrypted = encryptApiKey(trimmedKey);
     const masked = maskApiKey(trimmedKey);
 
+    const nowIso = new Date().toISOString();
     await updateFirestoreDoc("users", userInfo.uid, {
       encryptedApiKey: encrypted,
       apiKeyMasked: masked,
-      updatedAt: new Date().toISOString(),
+      hasApiKey: true,
+      updatedAt: nowIso,
     }, token);
+
+    upsertDirectoryUser(userInfo.uid, {
+      name: userInfo.name,
+      email: userInfo.email,
+      hasApiKey: true,
+      apiKeyMasked: masked,
+      updatedAt: nowIso,
+    });
+    invalidateUserAuthCache(userInfo.uid);
 
     return res.json({ success: true, apiKeyMasked: masked });
   } catch (error: any) {
@@ -380,7 +510,7 @@ app.post("/api/user/save-key", async (req, res) => {
   }
 });
 
-app.post("/api/user/remove-key", async (req, res) => {
+app.post("/api/user/remove-key", writeRateLimiter, async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -389,11 +519,22 @@ app.post("/api/user/remove-key", async (req, res) => {
     const token = authHeader.substring(7);
     const userInfo = await verifyAuthToken(token);
 
+    const nowIso = new Date().toISOString();
     await updateFirestoreDoc("users", userInfo.uid, {
       encryptedApiKey: null,
       apiKeyMasked: null,
-      updatedAt: new Date().toISOString(),
+      hasApiKey: false,
+      updatedAt: nowIso,
     }, token);
+
+    upsertDirectoryUser(userInfo.uid, {
+      name: userInfo.name,
+      email: userInfo.email,
+      hasApiKey: false,
+      apiKeyMasked: null,
+      updatedAt: nowIso,
+    });
+    invalidateUserAuthCache(userInfo.uid);
 
     return res.json({ success: true });
   } catch (error: any) {
@@ -442,7 +583,7 @@ app.get("/api/user/available-models", verifyUserAuth as express.RequestHandler, 
   }
 });
 
-app.post("/api/user/model-settings", async (req, res) => {
+app.post("/api/user/model-settings", writeRateLimiter, async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -452,7 +593,7 @@ app.post("/api/user/model-settings", async (req, res) => {
     const userInfo = await verifyAuthToken(token);
 
     const { modelSettings } = req.body;
-    if (!modelSettings) {
+    if (!modelSettings || typeof modelSettings !== "object") {
       return res.status(400).json({ error: "Model settings required." });
     }
 
@@ -468,7 +609,7 @@ app.post("/api/user/model-settings", async (req, res) => {
   }
 });
 
-app.post("/api/user/delete-account", async (req, res) => {
+app.post("/api/user/delete-account", writeRateLimiter, async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -477,6 +618,8 @@ app.post("/api/user/delete-account", async (req, res) => {
     const token = authHeader.substring(7);
     const userInfo = await verifyAuthToken(token);
 
+    invalidateUserAuthCache(userInfo.uid);
+    removeDirectoryUser(userInfo.uid);
     await deleteFirestoreDoc("users", userInfo.uid, token);
 
     return res.json({ success: true });
@@ -486,8 +629,124 @@ app.post("/api/user/delete-account", async (req, res) => {
   }
 });
 
-// Admin Endpoints
+// ============================================================================
+// Admin Endpoints & Resilient Masked User Directory Registry
+// ============================================================================
 const ADMIN_PRIMARY_EMAIL = "tahsinirshad7370@gmail.com";
+const USER_DIRECTORY_FILE = path.resolve(process.cwd(), ".aistudio", "user-directory-cache.json");
+
+interface DirectoryUserEntry {
+  userId: string;
+  name: string;
+  email: string;
+  provider: string;
+  role: "admin" | "user";
+  isAdmin: boolean;
+  hasApiKey: boolean;
+  apiKeyMasked: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+const userDirectoryRegistry = new Map<string, DirectoryUserEntry>();
+
+function loadDirectoryRegistry(): void {
+  try {
+    if (fs.existsSync(USER_DIRECTORY_FILE)) {
+      const raw = fs.readFileSync(USER_DIRECTORY_FILE, "utf8");
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        for (const item of parsed) {
+          if (item && typeof item.userId === "string") {
+            userDirectoryRegistry.set(item.userId, item);
+          }
+        }
+      }
+    }
+  } catch {
+    // ignore cache read errors
+  }
+}
+
+function saveDirectoryRegistry(): void {
+  try {
+    const dir = path.dirname(USER_DIRECTORY_FILE);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    fs.writeFileSync(
+      USER_DIRECTORY_FILE,
+      JSON.stringify(Array.from(userDirectoryRegistry.values()), null, 2),
+      "utf8"
+    );
+  } catch {
+    // ignore cache write errors
+  }
+}
+
+loadDirectoryRegistry();
+
+function upsertDirectoryUser(userId: string, partial: Partial<DirectoryUserEntry>): DirectoryUserEntry {
+  const existing = userDirectoryRegistry.get(userId);
+  const email = (partial.email ?? existing?.email ?? "No email").trim();
+  const isSoleAdmin = email.toLowerCase() === ADMIN_PRIMARY_EMAIL;
+  const nowIso = new Date().toISOString();
+
+  const merged: DirectoryUserEntry = {
+    userId,
+    name: (partial.name ?? existing?.name ?? (email.split("@")[0] || "User")).slice(0, 120),
+    email: email.slice(0, 254),
+    provider: (partial.provider ?? existing?.provider ?? "password").slice(0, 64),
+    role: isSoleAdmin ? "admin" : "user",
+    isAdmin: isSoleAdmin,
+    hasApiKey: partial.hasApiKey ?? existing?.hasApiKey ?? false,
+    apiKeyMasked: partial.apiKeyMasked !== undefined ? partial.apiKeyMasked : (existing?.apiKeyMasked ?? null),
+    createdAt: partial.createdAt ?? existing?.createdAt ?? nowIso,
+    updatedAt: partial.updatedAt ?? existing?.updatedAt ?? nowIso,
+  };
+
+  userDirectoryRegistry.set(userId, merged);
+  saveDirectoryRegistry();
+  return merged;
+}
+
+function removeDirectoryUser(userId: string): void {
+  if (userDirectoryRegistry.delete(userId)) {
+    saveDirectoryRegistry();
+  }
+}
+
+// Lightweight authenticated profile sync so signed-in users appear in Admin Directory even under strict owner-only Firestore rules
+app.post("/api/user/sync-directory", async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ error: "Authentication required." });
+    }
+    const token = authHeader.substring(7);
+    const userInfo = await verifyAuthToken(token);
+
+    const { name, provider, hasApiKey, apiKeyMasked, createdAt, updatedAt } = req.body || {};
+    upsertDirectoryUser(userInfo.uid, {
+      name: typeof name === "string" ? name : userInfo.name,
+      email: userInfo.email,
+      provider: typeof provider === "string" ? provider : "password",
+      hasApiKey: typeof hasApiKey === "boolean" ? hasApiKey : undefined,
+      apiKeyMasked: typeof apiKeyMasked === "string" || apiKeyMasked === null ? apiKeyMasked : undefined,
+      createdAt: typeof createdAt === "string" ? createdAt : undefined,
+      updatedAt: typeof updatedAt === "string" ? updatedAt : undefined,
+    });
+
+    return res.json({ success: true });
+  } catch {
+    return res.status(401).json({ error: "Invalid token." });
+  }
+});
+
+function verifyCallerIsAdmin(userInfo: { uid: string; email?: string }): boolean {
+  const callerEmail = (userInfo.email || "").toLowerCase();
+  return callerEmail === ADMIN_PRIMARY_EMAIL;
+}
 
 app.get("/api/admin/users", async (req, res) => {
   try {
@@ -498,87 +757,65 @@ app.get("/api/admin/users", async (req, res) => {
     const token = authHeader.substring(7);
     const userInfo = await verifyAuthToken(token);
 
-    const callerEmail = (userInfo.email || "").toLowerCase();
-    const callerSnap = await getFirestoreDoc("users", userInfo.uid, token);
-    const isCallerAdmin = callerEmail === ADMIN_PRIMARY_EMAIL || (callerSnap.exists && callerSnap.data?.role === "admin");
-
-    if (!isCallerAdmin) {
-      return res.status(403).json({ error: "Access denied. Admin privileges required." });
+    if (!verifyCallerIsAdmin(userInfo)) {
+      return res.status(403).json({ error: "Access denied. Sole owner privileges required." });
     }
 
-    const docsList = await listFirestoreCollection("users", token);
-    const usersList: any[] = [];
-
-    docsList.forEach(({ id, data }) => {
-      const userEmail = (data.email || "").toLowerCase();
-      const isAdmin = userEmail === ADMIN_PRIMARY_EMAIL || data.role === "admin";
-
-      usersList.push({
-        userId: id,
-        name: data.name || "User",
-        email: data.email || "No email",
-        provider: data.provider || "password",
-        role: isAdmin ? "admin" : (data.role || "user"),
-        isAdmin,
-        hasApiKey: Boolean(data.encryptedApiKey || data.apiKeyMasked),
-        apiKeyMasked: data.apiKeyMasked || null,
-        createdAt: data.createdAt || null,
-        updatedAt: data.updatedAt || null,
+    // 1. Always ensure the admin's own live Firestore profile is synced into the directory
+    try {
+      const adminSnap = await getFirestoreDoc("users", userInfo.uid, token);
+      if (adminSnap.exists && adminSnap.data) {
+        const d = adminSnap.data;
+        upsertDirectoryUser(userInfo.uid, {
+          name: d.name || userInfo.name || "Primary Owner",
+          email: d.email || userInfo.email || ADMIN_PRIMARY_EMAIL,
+          provider: d.provider || "password",
+          hasApiKey: Boolean(d.encryptedApiKey || d.apiKeyMasked),
+          apiKeyMasked: d.apiKeyMasked || null,
+          createdAt: d.createdAt || null,
+          updatedAt: d.updatedAt || null,
+        });
+      } else {
+        upsertDirectoryUser(userInfo.uid, {
+          name: userInfo.name || "Primary Owner",
+          email: userInfo.email || ADMIN_PRIMARY_EMAIL,
+        });
+      }
+    } catch {
+      upsertDirectoryUser(userInfo.uid, {
+        name: userInfo.name || "Primary Owner",
+        email: userInfo.email || ADMIN_PRIMARY_EMAIL,
       });
+    }
+
+    // 2. Attempt Firestore collection list; if blocked by strict owner-only rules (403), gracefully fall back to the server directory registry
+    try {
+      const docsList = await listFirestoreCollection("users", token);
+      docsList.forEach(({ id, data }) => {
+        upsertDirectoryUser(id, {
+          name: data.name || "User",
+          email: data.email || "No email",
+          provider: data.provider || "password",
+          hasApiKey: Boolean(data.encryptedApiKey || data.apiKeyMasked),
+          apiKeyMasked: data.apiKeyMasked || null,
+          createdAt: data.createdAt || null,
+          updatedAt: data.updatedAt || null,
+        });
+      });
+    } catch {
+      // Strict owner-only Firestore rules active (403 on list): gracefully serve from synced userDirectoryRegistry
+    }
+
+    const usersList = Array.from(userDirectoryRegistry.values()).sort((a, b) => {
+      if (a.isAdmin && !b.isAdmin) return -1;
+      if (!a.isAdmin && b.isAdmin) return 1;
+      return (b.updatedAt || "").localeCompare(a.updatedAt || "");
     });
 
     return res.json({ users: usersList });
   } catch (error: any) {
     logSafeError("Admin list users error:", error);
     return res.status(500).json({ error: "Failed to fetch user list." });
-  }
-});
-
-app.post("/api/admin/toggle-role", async (req, res) => {
-  try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({ error: "Authentication required." });
-    }
-    const token = authHeader.substring(7);
-    const userInfo = await verifyAuthToken(token);
-
-    const callerEmail = (userInfo.email || "").toLowerCase();
-    const callerSnap = await getFirestoreDoc("users", userInfo.uid, token);
-    const isCallerAdmin = callerEmail === ADMIN_PRIMARY_EMAIL || (callerSnap.exists && callerSnap.data?.role === "admin");
-
-    if (!isCallerAdmin) {
-      return res.status(403).json({ error: "Access denied. Admin privileges required." });
-    }
-
-    const { targetUserId, newRole } = req.body;
-    if (!targetUserId || !["admin", "user"].includes(newRole)) {
-      return res.status(400).json({ error: "Target userId and valid role ('admin' | 'user') required." });
-    }
-
-    const targetSnap = await getFirestoreDoc("users", targetUserId, token);
-    const targetEmail = targetSnap.exists ? targetSnap.data?.email || "" : "";
-
-    await updateFirestoreDoc("users", targetUserId, {
-      role: newRole,
-      updatedAt: new Date().toISOString(),
-    }, token);
-
-    if (newRole === "admin") {
-      await updateFirestoreDoc("admins", targetUserId, {
-        userId: targetUserId,
-        email: targetEmail,
-        role: "admin",
-        updatedAt: new Date().toISOString(),
-      }, token);
-    } else {
-      await deleteFirestoreDoc("admins", targetUserId, token).catch(() => {});
-    }
-
-    return res.json({ success: true, targetUserId, newRole });
-  } catch (error: any) {
-    logSafeError("Admin toggle role error:", error);
-    return res.status(500).json({ error: "Failed to update user role." });
   }
 });
 

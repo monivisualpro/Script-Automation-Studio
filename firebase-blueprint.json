@@ -2,44 +2,46 @@
   "entities": {
     "users": {
       "title": "User Profiles",
-      "description": "User account info and encrypted API keys",
+      "description": "User account info, model settings, and encrypted API keys",
       "type": "object",
       "properties": {
-        "userId": { "type": "string" },
-        "name": { "type": "string" },
-        "email": { "type": "string" },
-        "profilePhoto": { "type": "string" },
-        "provider": { "type": "string" },
+        "userId": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 120 },
+        "email": { "type": "string", "maxLength": 254 },
+        "profilePhoto": { "type": "string", "maxLength": 1024 },
+        "provider": { "type": "string", "maxLength": 64 },
         "role": { "type": "string", "enum": ["admin", "user"] },
-        "encryptedApiKey": { "type": "string" },
-        "apiKeyMasked": { "type": "string" },
-        "createdAt": { "type": "string" },
-        "updatedAt": { "type": "string" }
+        "isAdmin": { "type": "boolean" },
+        "encryptedApiKey": { "type": "string", "maxLength": 2048 },
+        "apiKeyMasked": { "type": "string", "maxLength": 64 },
+        "hasApiKey": { "type": "boolean" },
+        "createdAt": { "type": "string", "maxLength": 64 },
+        "updatedAt": { "type": "string", "maxLength": 64 }
       },
-      "required": ["userId", "email"]
+      "required": ["userId", "email", "role"]
     },
     "admins": {
       "title": "Admin Records",
       "description": "Explicit admin privilege tracking for platform management",
       "type": "object",
       "properties": {
-        "userId": { "type": "string" },
-        "email": { "type": "string" },
-        "role": { "type": "string" },
-        "createdAt": { "type": "string" },
-        "updatedAt": { "type": "string" }
+        "userId": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 254 },
+        "role": { "type": "string", "enum": ["admin"] },
+        "createdAt": { "type": "string", "maxLength": 64 },
+        "updatedAt": { "type": "string", "maxLength": 64 }
       },
-      "required": ["userId", "email"]
+      "required": ["userId", "email", "role"]
     }
   },
   "firestore": {
     "/users/{userId}": {
       "schema": "users",
-      "description": "User profiles collection"
+      "description": "User profiles collection with owner-only isolation and role immutability"
     },
     "/admins/{userId}": {
       "schema": "admins",
-      "description": "Admin collection for system administrators"
+      "description": "Admin collection restricted strictly to verified administrators"
     }
   }
 }

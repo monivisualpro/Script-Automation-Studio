@@ -1,29 +1,83 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
     function isSignedIn() {
       return request.auth != null;
     }
 
-    function isUserEmailAdmin() {
-      return isSignedIn() && ('email' in request.auth.token) && request.auth.token.email != null && request.auth.token.email.lower() == "tahsinirshad7370@gmail.com";
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
 
+    // Sole hardcoded platform owner (no dynamic admin promotion allowed)
     function isAdmin() {
-      return isUserEmailAdmin() || (isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)));
+      return isSignedIn()
+        && ('email' in request.auth.token)
+        && request.auth.token.email != null
+        && request.auth.token.email.lower() == "tahsinirshad7370@gmail.com";
+    }
+
+    function isValidUserDoc(data, userId) {
+      return data.keys().hasOnly([
+          'userId', 'name', 'email', 'profilePhoto', 'provider',
+          'role', 'isAdmin', 'apiKeyMasked', 'hasApiKey', 'encryptedApiKey',
+          'modelSettings', 'imageHistory', 'createdAt', 'updatedAt'
+        ])
+        && (!('userId' in data) || (data.userId is string && data.userId == userId && data.userId.size() <= 128))
+        && (!('name' in data) || (data.name is string && data.name.size() <= 120))
+        && (!('email' in data) || (data.email is string && data.email.size() <= 254))
+        && (!('profilePhoto' in data) || (data.profilePhoto is string && data.profilePhoto.size() <= 1024))
+        && (!('provider' in data) || (data.provider is string && data.provider.size() <= 64))
+        && (!('role' in data) || (data.role in ['user', 'admin']))
+        && (!('isAdmin' in data) || (data.isAdmin is bool))
+        && (!('apiKeyMasked' in data) || data.apiKeyMasked == null || (data.apiKeyMasked is string && data.apiKeyMasked.size() <= 64))
+        && (!('hasApiKey' in data) || (data.hasApiKey is bool))
+        && (!('encryptedApiKey' in data) || data.encryptedApiKey == null || (data.encryptedApiKey is string && data.encryptedApiKey.size() <= 2048))
+        && (!('modelSettings' in data) || (data.modelSettings is map && data.modelSettings.keys().size() <= 20))
+        && (!('imageHistory' in data) || (data.imageHistory is list && data.imageHistory.size() <= 50))
+        && (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 64))
+        && (!('updatedAt' in data) || (data.updatedAt is string && data.updatedAt.size() <= 64));
     }
 
     match /users/{userId} {
+      // Read: Document owner can read their own profile; sole Admin can view read-only user directory
       allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-      allow write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+
+      // Writes: Strictly owner-only (request.auth.uid == userId). Even Admin cannot modify another user's document.
+      allow create: if isSignedIn()
+        && isValidId(userId)
+        && request.auth.uid == userId
+        && request.resource.data.keys().hasAll(['userId', 'email', 'role'])
+        && isValidUserDoc(request.resource.data, userId)
+        && (
+          isAdmin() || (
+            request.resource.data.role == 'user'
+            && (!('isAdmin' in request.resource.data) || request.resource.data.isAdmin == false)
+          )
+        );
+
+      allow update: if isSignedIn()
+        && isValidId(userId)
+        && request.auth.uid == userId
+        && isValidUserDoc(request.resource.data, userId)
+        && (!('createdAt' in request.resource.data) || !('createdAt' in resource.data) || request.resource.data.createdAt == resource.data.createdAt)
+        && (
+          isAdmin() || (
+            (!('role' in request.resource.data) || request.resource.data.role == 'user')
+            && (!('isAdmin' in request.resource.data) || request.resource.data.isAdmin == false)
+          )
+        );
+
+      allow delete: if isSignedIn() && isValidId(userId) && request.auth.uid == userId;
     }
 
+    // Dynamic admin promotion collection is permanently locked
     match /admins/{userId} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-    }
-
-    match /{document=**} {
       allow read, write: if false;
     }
   }

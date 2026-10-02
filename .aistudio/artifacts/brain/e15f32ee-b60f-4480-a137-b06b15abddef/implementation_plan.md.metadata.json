@@ -1,0 +1,6 @@
+{
+  "summary":  "Fix \"Firestore REST list failed (403)\" in /api/admin/users by adding a resilient server-side user directory registry fallback and owner-document lookup when Firestore rules enforce strict owner-only (request.auth.uid == userId) access.",
+  "updatedAt":  "2026-10-02T06:37:16.164282405Z",
+  "requestFeedback":  true,
+  "userFacing":  true
+}

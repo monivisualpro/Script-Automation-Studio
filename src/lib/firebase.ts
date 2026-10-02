@@ -1,4 +1,5 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
+import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 import { 
   getAuth, 
   GoogleAuthProvider, 
@@ -28,6 +29,66 @@ const auth = getAuth(app);
 const db = getFirestore(app, firebaseConfig.firestoreDatabaseId || "(default)");
 const googleProvider = new GoogleAuthProvider();
 
+// Conditionally initialize free Firebase App Check (reCAPTCHA v3) when a site key is configured
+if (typeof window !== "undefined" && firebaseConfig.recaptchaSiteKey && firebaseConfig.recaptchaSiteKey.trim() !== "") {
+  try {
+    initializeAppCheck(app, {
+      provider: new ReCaptchaV3Provider(firebaseConfig.recaptchaSiteKey.trim()),
+      isTokenAutoRefreshEnabled: true,
+    });
+  } catch (err) {
+    console.warn("Firebase App Check initialization skipped:", err);
+  }
+}
+
+export enum OperationType {
+  CREATE = "create",
+  UPDATE = "update",
+  DELETE = "delete",
+  LIST = "list",
+  GET = "get",
+  WRITE = "write",
+}
+
+export interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId?: string | null;
+    email?: string | null;
+    emailVerified?: boolean | null;
+    isAnonymous?: boolean | null;
+    tenantId?: string | null;
+    providerInfo?: {
+      providerId?: string | null;
+      email?: string | null;
+    }[];
+  };
+}
+
+export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null): never {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
+      providerInfo:
+        auth.currentUser?.providerData?.map((provider) => ({
+          providerId: provider.providerId,
+          email: provider.email,
+        })) || [],
+    },
+    operationType,
+    path,
+  };
+  console.error("Firestore Error: ", JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+}
+
 export interface UserProfile {
   userId: string;
   name: string;
@@ -42,75 +103,78 @@ export interface UserProfile {
   updatedAt: string;
 }
 
-const ADMIN_EMAILS = ["tahsinirshad7370@gmail.com"];
+const SOLE_ADMIN_EMAIL = "tahsinirshad7370@gmail.com";
+
+function sanitizeString(value: string | null | undefined, maxLength: number, fallback = ""): string {
+  const trimmed = (value || fallback).trim();
+  return trimmed.slice(0, maxLength);
+}
 
 export async function syncUserProfile(user: User, providerName: string = "password", customName?: string): Promise<UserProfile> {
+  const userPath = `users/${user.uid}`;
   const userRef = doc(db, "users", user.uid);
-  const snap = await getDoc(userRef);
+  let snap;
+  try {
+    snap = await getDoc(userRef);
+  } catch (err) {
+    handleFirestoreError(err, OperationType.GET, userPath);
+  }
 
-  const fallbackAvatar = `https://api.dicebear.com/7.x/bottts/svg?seed=${user.uid}`;
-  const userEmail = (user.email || "").toLowerCase();
-  const isAdmin = ADMIN_EMAILS.includes(userEmail);
-  const role: "admin" | "user" = isAdmin ? "admin" : "user";
+  const fallbackAvatar = `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(user.uid)}`;
+  const rawEmail = sanitizeString(user.email, 254, "");
+  const userEmail = rawEmail.toLowerCase();
+  const isSoleOwner = userEmail === SOLE_ADMIN_EMAIL;
+  const role: "admin" | "user" = isSoleOwner ? "admin" : "user";
+
+  const safeName = sanitizeString(
+    customName || user.displayName || rawEmail.split("@")[0] || "Script Author",
+    120,
+    "Script Author"
+  );
+  const safePhoto = sanitizeString(user.photoURL, 1024, fallbackAvatar);
+  const safeProvider = sanitizeString(providerName, 64, "password");
+  const nowIso = new Date().toISOString().slice(0, 64);
 
   if (!snap.exists()) {
     const newProfile: UserProfile = {
-      userId: user.uid,
-      name: customName || user.displayName || user.email?.split("@")[0] || "Script Author",
-      email: user.email || "",
-      profilePhoto: user.photoURL || fallbackAvatar,
-      provider: providerName,
+      userId: user.uid.slice(0, 128),
+      name: safeName,
+      email: rawEmail,
+      profilePhoto: safePhoto,
+      provider: safeProvider,
       role,
-      isAdmin,
+      isAdmin: isSoleOwner,
       apiKeyMasked: null,
       hasApiKey: false,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: nowIso,
+      updatedAt: nowIso,
     };
-    await setDoc(userRef, {
-      ...newProfile,
-      encryptedApiKey: null,
-    });
 
-    if (isAdmin) {
-      const adminRef = doc(db, "admins", user.uid);
-      await setDoc(adminRef, {
-        userId: user.uid,
-        email: user.email || userEmail,
-        role: "admin",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      }, { merge: true });
+    try {
+      await setDoc(userRef, {
+        ...newProfile,
+        encryptedApiKey: null,
+      });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.CREATE, userPath);
     }
 
     return newProfile;
   } else {
     const data = snap.data();
-    const storedRole = data.role || role;
-    const finalIsAdmin = isAdmin || storedRole === "admin";
     const updated: UserProfile = {
-      userId: user.uid,
-      name: customName || data.name || user.displayName || user.email?.split("@")[0] || "Script Author",
-      email: data.email || user.email || "",
-      profilePhoto: data.profilePhoto || user.photoURL || fallbackAvatar,
-      provider: data.provider || providerName,
-      role: finalIsAdmin ? "admin" : "user",
-      isAdmin: finalIsAdmin,
-      apiKeyMasked: data.apiKeyMasked || null,
+      userId: user.uid.slice(0, 128),
+      name: sanitizeString(customName || data.name || safeName, 120, "Script Author"),
+      email: sanitizeString(data.email || rawEmail, 254, ""),
+      profilePhoto: sanitizeString(data.profilePhoto || safePhoto, 1024, fallbackAvatar),
+      provider: sanitizeString(data.provider || safeProvider, 64, "password"),
+      role: isSoleOwner ? "admin" : "user",
+      isAdmin: isSoleOwner,
+      apiKeyMasked: data.apiKeyMasked ? String(data.apiKeyMasked).slice(0, 64) : null,
       hasApiKey: Boolean(data.encryptedApiKey || data.apiKeyMasked),
-      createdAt: data.createdAt || new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: data.createdAt ? String(data.createdAt).slice(0, 64) : nowIso,
+      updatedAt: data.updatedAt ? String(data.updatedAt).slice(0, 64) : nowIso,
     };
-
-    if (finalIsAdmin) {
-      const adminRef = doc(db, "admins", user.uid);
-      await setDoc(adminRef, {
-        userId: user.uid,
-        email: data.email || user.email || userEmail,
-        role: "admin",
-        updatedAt: new Date().toISOString(),
-      }, { merge: true });
-    }
 
     return updated;
   }
@@ -118,9 +182,6 @@ export async function syncUserProfile(user: User, providerName: string = "passwo
 
 export { app, auth, db, googleProvider, firebaseConfig };
 
-/**
- * Helper authentication functions
- */
 export const registerWithEmail = async (email: string, password: string) => {
   const userCredential = await createUserWithEmailAndPassword(auth, email, password);
   return userCredential.user;
@@ -143,4 +204,3 @@ export const logoutUser = async () => {
 export const watchAuthState = (callback: (user: User | null) => void) => {
   return onAuthStateChanged(auth, callback);
 };
-
