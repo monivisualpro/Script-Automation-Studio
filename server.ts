@@ -744,8 +744,8 @@ app.post("/api/user/sync-directory", async (req, res) => {
 });
 
 function verifyCallerIsAdmin(userInfo: { uid: string; email?: string }): boolean {
-  const callerEmail = (userInfo.email || "").toLowerCase();
-  return callerEmail === ADMIN_PRIMARY_EMAIL;
+  const callerEmail = (userInfo.email || "").trim().toLowerCase();
+  return callerEmail === ADMIN_PRIMARY_EMAIL.toLowerCase();
 }
 
 app.get("/api/admin/users", async (req, res) => {
@@ -788,7 +788,7 @@ app.get("/api/admin/users", async (req, res) => {
       });
     }
 
-    // 2. Attempt Firestore collection list; if blocked by strict owner-only rules (403), gracefully fall back to the server directory registry
+    // 2. Query Firestore collection list directly using admin's verified ID token
     try {
       const docsList = await listFirestoreCollection("users", token);
       docsList.forEach(({ id, data }) => {
@@ -802,8 +802,8 @@ app.get("/api/admin/users", async (req, res) => {
           updatedAt: data.updatedAt || null,
         });
       });
-    } catch {
-      // Strict owner-only Firestore rules active (403 on list): gracefully serve from synced userDirectoryRegistry
+    } catch (err: any) {
+      logSafeError("[Admin] Firestore live list note (using synced registry fallback):", err);
     }
 
     const usersList = Array.from(userDirectoryRegistry.values()).sort((a, b) => {
@@ -812,10 +812,78 @@ app.get("/api/admin/users", async (req, res) => {
       return (b.updatedAt || "").localeCompare(a.updatedAt || "");
     });
 
-    return res.json({ users: usersList });
+    return res.json({ 
+      users: usersList,
+      totalUsers: usersList.length,
+      firestoreDatabaseId: firebaseConfig.firestoreDatabaseId,
+      projectId: firebaseConfig.projectId
+    });
   } catch (error: any) {
     logSafeError("Admin list users error:", error);
     return res.status(500).json({ error: "Failed to fetch user list." });
+  }
+});
+
+// Admin endpoint to sync / import any Firebase Auth account into the live directory
+app.post("/api/admin/sync-user", async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ error: "Authentication required." });
+    }
+    const token = authHeader.substring(7);
+    const userInfo = await verifyAuthToken(token);
+
+    if (!verifyCallerIsAdmin(userInfo)) {
+      return res.status(403).json({ error: "Access denied. Sole owner privileges required." });
+    }
+
+    const { email, name, userId, provider, hasApiKey } = req.body || {};
+    if (!email || typeof email !== "string" || !email.includes("@")) {
+      return res.status(400).json({ error: "Valid user email address is required." });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const resolvedUid = (userId && typeof userId === "string" && userId.trim()) 
+      ? userId.trim().slice(0, 128)
+      : `auth_${Buffer.from(cleanEmail).toString("hex").slice(0, 24)}`;
+    const cleanName = (name && typeof name === "string" && name.trim()) 
+      ? name.trim().slice(0, 120) 
+      : cleanEmail.split("@")[0];
+    const cleanProvider = (provider && typeof provider === "string" && provider.trim()) 
+      ? provider.trim().slice(0, 64) 
+      : "google.com";
+
+    const entry = upsertDirectoryUser(resolvedUid, {
+      name: cleanName,
+      email: cleanEmail,
+      provider: cleanProvider,
+      hasApiKey: Boolean(hasApiKey),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
+    // Also attempt to initialize a live Firestore record if possible
+    try {
+      await updateFirestoreDoc("users", resolvedUid, {
+        userId: resolvedUid,
+        name: cleanName,
+        email: cleanEmail,
+        provider: cleanProvider,
+        role: "user",
+        isAdmin: false,
+        hasApiKey: Boolean(hasApiKey),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }, token);
+    } catch (fsErr) {
+      logSafeError("[Admin] Firestore sync doc write notice (saved to directory cache):", fsErr);
+    }
+
+    return res.json({ success: true, user: entry });
+  } catch (error: any) {
+    logSafeError("Admin sync user error:", error);
+    return res.status(500).json({ error: "Failed to sync user account." });
   }
 });
 
@@ -1368,12 +1436,13 @@ app.post("/api/parse-file", verifyUserAuth as express.RequestHandler, async (req
 // Divide Transcript into scenes and generate Text-to-Video prompts for each
 app.post("/api/generate-scenes", verifyUserAuth as express.RequestHandler, async (req: AuthenticatedRequest, res) => {
   try {
-    const { transcript, numScenes, category, format } = req.body;
+    const { transcript, numScenes, category, format, promptLineCount } = req.body;
     if (!transcript || !transcript.trim()) {
       return res.status(400).json({ error: "Transcript is required." });
     }
     const count = parseInt(numScenes) || 10;
     const cat = category || "General";
+    const linesCount = Math.min(50, Math.max(3, parseInt(promptLineCount) || 15));
 
     const ai = req.userAiClient!;
     
@@ -1394,20 +1463,35 @@ You are an award-winning cinematic director and AI prompt engineer specializing 
 Your task is to:
 1. Read the provided TRANSCRIPT below.
 2. Divide it logically into exactly ${count} chronological scenes.
-3. For each scene, write one highly cinematic, extremely detailed, and professional Text-to-Video generation prompt in English. Each prompt MUST be very thorough and rich (nearly 10 to 15 sentences long, exhaustively detailing every visual aspect of the scene including precise subject action, exquisite camera work, dramatic lighting, atmospheric haze/effects, textures, color grading, and environmental depth).
-4. Each prompt must:
+3. For each scene, write one highly cinematic, extremely detailed, and professional Text-to-Video generation prompt in English.
+   CRITICAL PROMPT DEPTH & LINE COUNT REQUIREMENT:
+   The user explicitly configured PROMPT LINES = ${linesCount}.
+   Therefore, the "text" for EACH scene MUST consist of EXACTLY ${linesCount} distinct descriptive lines (separated by newline line breaks \\n).
+   Each of the ${linesCount} lines must exhaustively detail a specific visual layer of the scene:
+   - Line 1: Primary subject appearance, wardrobe, posture, and core physical action.
+   - Line 2: Exact camera lens, focal length, angle, and framing (e.g. 35mm anamorphic close-up, Dutch angle, wide panoramic establishing view).
+   - Line 3: Dynamic camera movement, velocity, and trajectory (e.g. slow steady push-in, low-angle tracking orbit, crane tilt down).
+   - Line 4: Primary lighting setup (e.g. soft volumetric amber rim light, high-contrast chiaroscuro, natural golden hour backlight).
+   - Line 5: Color grading, film stock saturation, and palette (e.g. rich cinematic teal & orange, muted Kodak 5219 tones).
+   - Line 6: Atmospheric conditions, environmental haze, weather, and airborne particles (e.g. ambient dust motes, light mist, rain-slicked ground reflections).
+   - Line 7: Character micro-expressions, eye reflections, subtle gestures, and emotional intensity.
+   - Line 8: Foreground layering and occlusion elements (e.g. out-of-focus foliage, doorframe silhouette).
+   - Line 9: Midground action and interaction with surrounding props or environment.
+   - Line 10: Background architecture, horizon line, environmental scale, and secondary movement.
+   - Line 11: Real-world surface textures (e.g. weathered concrete, condensation droplets, metallic brushed finish, rough fabric).
+   - Line 12: Particle physics and movement (e.g. swirling fabric, rising steam, sparks, blowing hair in breeze).
+   - Line 13: Depth of field and bokeh character (e.g. shallow f/1.8 bokeh, crystalline focus plane).
+   - Line 14: Cinematic composition rules (e.g. rule of thirds, leading lines, golden ratio framing).
+   - Line 15 (and additional lines up to ${linesCount}): Shutter angle, motion blur simulation, and photorealistic 8K render finish.
+
+4. Each scene prompt must:
    - Be optimized for modern video generators like Veo 3 and Wan 2.2.
    - Be EXACTLY aligned with the category field: "${cat}". Do not deviate or add unrelated themes.
    - ${formatInstruction}
    - ${islamicSceneInstruction}
-   - For example:
-     * If the category is "Health and medical", describe ONLY clinical, medical, healthcare settings, doctors, anatomical details, surgical tools, or health visuals.
-     * If the category is "Industrial technology", describe ONLY industrial scenes, heavy machinery, automated assembly lines, robotic arms, factories, or mechanical components.
-     * If there are cinematic shots requested, specify high-end cinematic visuals, precise camera movements, cinematic lighting, and director composition.
-   - Ensure the visuals in each scene strictly match and visually represent the corresponding part of the transcript. Do not add anything extra from your own initiative that doesn't belong to the field.
-   - Specify precise camera angles (e.g., extreme close-up, wide tracking shot), lighting (e.g., medical white fluorescent, warm industrial low-key amber glow), subject action, and cinematic realism.
+   - Ensure the visuals in each scene strictly match and visually represent the corresponding part of the transcript.
    - Maintain perfect character, environment, and visual consistency across all scenes.
-   - FORMATTING CONSTRAINT: The "text" of each scene MUST be a single line of text containing only the cinematic video prompt itself. It MUST NOT contain any newline characters, and it MUST NOT start with "Scene X" or any custom header. The client will combine the scene number and text on a single line (e.g. "Scene X: {text}") for correct VEO3 parsing.
+   - Provide clean multi-line text separated by newlines (\\n) with exactly ${linesCount} lines of content. Do NOT include "Scene X:" label or "Line N:" numerical prefixes inside the "text" field itself.
 
 TRANSCRIPT:
 """
@@ -1419,20 +1503,14 @@ You MUST output exactly ${count} scenes. Return the output as a JSON object matc
   "scenes": [
     {
       "id": 1,
-      "text": "Detailed scene prompt..."
-    },
-    ...
+      "text": "Line 1 visual description...\\nLine 2 camera lens...\\n...\\nLine ${linesCount} finish..."
+    }
   ]
 }
 `;
 
     const response = await generateContentWithRetry(ai, {
-
-
       model: "gemini-3.1-flash-lite",
-
-
-
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -1473,8 +1551,9 @@ You MUST output exactly ${count} scenes. Return the output as a JSON object matc
 // Regenerate single scene prompt
 app.post("/api/regenerate-scene", verifyUserAuth as express.RequestHandler, async (req: AuthenticatedRequest, res) => {
   try {
-    const { transcript, sceneNumber, totalScenes, category, previousPrompt, format } = req.body;
+    const { transcript, sceneNumber, totalScenes, category, previousPrompt, format, promptLineCount } = req.body;
     const ai = req.userAiClient!;
+    const linesCount = Math.min(50, Math.max(3, parseInt(promptLineCount) || 15));
 
     const formatInstruction = (format && format !== "none") ? `Ensure this scene is strictly designed and described for a ${format === "16:9" ? "Horizontal (16:9) widescreen landscape" : format === "9:16" ? "Vertical (9:16) portrait format (for Shorts/Reels/TikTok)" : "Square (1:1) format"} aspect ratio.` : "";
 
@@ -1496,6 +1575,10 @@ ${islamicSceneInstruction}
 Ensure this scene has smooth visual and narrative continuity with preceding and succeeding scenes based on the overall transcript.
 Optimize it fully for Veo 3 and Wan 2.2 with detailed camera angles, lighting, actions, and consistent styling.
 
+CRITICAL PROMPT DEPTH & LINE COUNT REQUIREMENT:
+The user explicitly configured PROMPT LINES = ${linesCount}.
+The regenerated prompt MUST consist of EXACTLY ${linesCount} distinct descriptive lines separated by newline breaks (\\n), exhaustively detailing every cinematic aspect (subject action, lens angle, camera trajectory, lighting setup, color palette, atmospheric particles, micro-gestures, textures, depth of field, and compositional rules).
+
 Overall Transcript:
 """
 ${transcript}
@@ -1504,16 +1587,12 @@ ${transcript}
 Previous scene prompt (for reference/improvement):
 "${previousPrompt || ""}"
 
-Please provide a fresh, significantly improved, highly detailed cinematic video generation prompt for this scene.
-The prompt MUST be on a single contiguous line of text, containing ONLY the prompt description itself (no prepended "Scene X:" label or headers), with absolutely no commentary, introduction, or JSON. Just the direct prompt itself in English.
+Please provide a fresh, significantly improved cinematic video generation prompt with exactly ${linesCount} lines separated by newlines (\\n).
+Output ONLY the ${linesCount} lines of descriptive text itself with NO "Scene X:" label, NO "Line N:" prefixes, and NO introductory or concluding commentary. Just the direct prompt in English.
 `;
 
     const response = await generateContentWithRetry(ai, {
-
-
       model: "gemini-3.1-flash-lite",
-
-
       contents: prompt,
     });
 

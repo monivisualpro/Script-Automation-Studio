@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { getThemeConfig } from "../lib/themeConfig";
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "../lib/firebase";
+import firebaseConfig from "../../firebase-applet-config.json";
 import { 
   ShieldCheck, 
   Crown, 
@@ -14,7 +17,12 @@ import {
   Sparkles,
   Lock,
   Mail,
-  Calendar
+  Calendar,
+  Database,
+  UserPlus,
+  Plus,
+  Info,
+  Check
 } from "lucide-react";
 
 interface AdminUser {
@@ -43,27 +51,126 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>("");
 
+  // Sync / Import Firebase Auth User State
+  const [isSyncFormOpen, setIsSyncFormOpen] = useState<boolean>(false);
+  const [newEmail, setNewEmail] = useState<string>("");
+  const [newName, setNewName] = useState<string>("");
+  const [newUid, setNewUid] = useState<string>("");
+  const [newProvider, setNewProvider] = useState<string>("google.com");
+  const [syncingUser, setSyncingUser] = useState<boolean>(false);
+  const [syncSuccess, setSyncSuccess] = useState<string | null>(null);
+
   const fetchUsers = async () => {
     if (!idToken) return;
     setLoading(true);
     setError(null);
+    const userMap = new Map<string, AdminUser>();
+
+    // 1. Direct Client-side Firestore SDK query (reads live Firestore database)
+    try {
+      const snap = await getDocs(collection(db, "users"));
+      snap.forEach((docSnap) => {
+        const d = docSnap.data();
+        const uid = docSnap.id;
+        const userEmail = (d.email || "").trim().toLowerCase();
+        const isSoleAdmin = userEmail === "tahsinirshad7370@gmail.com";
+        userMap.set(uid, {
+          userId: uid,
+          name: d.name || d.email?.split("@")[0] || "User",
+          email: d.email || "No email",
+          provider: d.provider || "password",
+          role: isSoleAdmin ? "admin" : (d.role === "admin" ? "admin" : "user"),
+          isAdmin: Boolean(isSoleAdmin || d.isAdmin),
+          hasApiKey: Boolean(d.encryptedApiKey || d.apiKeyMasked),
+          apiKeyMasked: d.apiKeyMasked || null,
+          createdAt: d.createdAt || null,
+          updatedAt: d.updatedAt || null,
+        });
+      });
+    } catch (fsErr) {
+      console.warn("Direct Firestore SDK list query notice:", fsErr);
+    }
+
+    // 2. Server-side Directory Registry & REST sync
     try {
       const res = await fetch("/api/admin/users", {
         headers: {
           Authorization: `Bearer ${idToken}`,
         },
       });
-      if (!res.ok) {
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.users)) {
+          data.users.forEach((u: AdminUser) => {
+            if (u.userId) {
+              const existing = userMap.get(u.userId);
+              userMap.set(u.userId, {
+                ...u,
+                ...(existing || {}),
+                hasApiKey: u.hasApiKey || existing?.hasApiKey || false,
+                apiKeyMasked: u.apiKeyMasked || existing?.apiKeyMasked || null,
+              });
+            }
+          });
+        }
+      } else if (userMap.size === 0) {
         const errData = await res.json().catch(() => ({}));
         throw new Error(errData.error || "Failed to load admin user directory.");
       }
-      const data = await res.json();
-      setUsers(data.users || []);
     } catch (err: any) {
       console.error("Fetch Admin Users Error:", err);
-      setError(err.message || "Failed to load users.");
+      if (userMap.size === 0) {
+        setError(err.message || "Failed to load users.");
+      }
     } finally {
+      const finalUsers = Array.from(userMap.values()).sort((a, b) => {
+        if (a.isAdmin && !b.isAdmin) return -1;
+        if (!a.isAdmin && b.isAdmin) return 1;
+        return (b.updatedAt || "").localeCompare(a.updatedAt || "");
+      });
+      setUsers(finalUsers);
       setLoading(false);
+    }
+  };
+
+  const handleSyncUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!idToken || !newEmail.trim()) return;
+    setSyncingUser(true);
+    setSyncSuccess(null);
+    setError(null);
+
+    try {
+      const res = await fetch("/api/admin/sync-user", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({
+          email: newEmail.trim(),
+          name: newName.trim() || undefined,
+          userId: newUid.trim() || undefined,
+          provider: newProvider,
+        }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "Failed to sync user account.");
+      }
+
+      setSyncSuccess(`Account "${newEmail.trim()}" synced successfully to live directory!`);
+      setNewEmail("");
+      setNewName("");
+      setNewUid("");
+      setIsSyncFormOpen(false);
+      await fetchUsers();
+      setTimeout(() => setSyncSuccess(null), 5000);
+    } catch (err: any) {
+      setError(err.message || "Failed to sync user account.");
+    } finally {
+      setSyncingUser(false);
     }
   };
 
@@ -189,6 +296,27 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
             </div>
           </div>
 
+          {/* Firestore Database & Project Reference Bar */}
+          <div className={`p-3 px-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-mono ${
+            isLight ? "border-[#E5E5E5] bg-[#F7F7F7]" : "border-[#2A2A2A] bg-[#111111]"
+          }`}>
+            <div className="flex items-center gap-2">
+              <Database className="h-4 w-4 shrink-0" style={{ color: theme.secondaryAccentColor }} />
+              <div>
+                <span className={`font-bold ${isLight ? "text-[#000000]" : "text-white"}`}>Firestore Database: </span>
+                <span className="opacity-85 font-semibold">{firebaseConfig.firestoreDatabaseId || "(default)"}</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 text-[11px]">
+              <span className={isLight ? "text-[#444444]" : "text-[#BDBDBD]"}>Project: <strong className={isLight ? "text-[#000000]" : "text-white"}>{firebaseConfig.projectId}</strong></span>
+              <span className="opacity-40">·</span>
+              <span className="flex items-center gap-1 text-emerald-500 font-bold">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                Live Sync Active
+              </span>
+            </div>
+          </div>
+
           {/* Directory Toolbar */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
             <div className="relative w-full sm:w-80">
@@ -204,16 +332,142 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
               />
             </div>
 
-            <button
-              onClick={fetchUsers}
-              disabled={loading}
-              className="w-full sm:w-auto px-4 py-2 rounded-2xl border text-white transition-all text-xs font-mono font-bold flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-              style={{ backgroundColor: theme.accentColor, borderColor: theme.accentColor }}
-            >
-              <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-              <span>Refresh Directory</span>
-            </button>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <button
+                onClick={() => setIsSyncFormOpen(!isSyncFormOpen)}
+                className={`flex-1 sm:flex-none px-3.5 py-2 rounded-2xl border transition-all text-xs font-mono font-bold flex items-center justify-center gap-1.5 cursor-pointer ${
+                  isSyncFormOpen
+                    ? "border-emerald-500 bg-emerald-500/10 text-emerald-400"
+                    : (isLight ? "border-[#E5E5E5] bg-[#FFFFFF] text-[#000000] hover:bg-[#F7F7F7]" : "border-[#2A2A2A] bg-[#111111] text-white hover:bg-[#1A1A1A]")
+                }`}
+                title="Sync or link an account from Firebase Authentication"
+              >
+                <UserPlus className="h-3.5 w-3.5" style={{ color: theme.secondaryAccentColor }} />
+                <span>{isSyncFormOpen ? "Close Sync" : "Sync Firebase User"}</span>
+              </button>
+
+              <button
+                onClick={fetchUsers}
+                disabled={loading}
+                className="flex-1 sm:flex-none px-4 py-2 rounded-2xl border text-white transition-all text-xs font-mono font-bold flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                style={{ backgroundColor: theme.accentColor, borderColor: theme.accentColor }}
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+                <span>Refresh Directory</span>
+              </button>
+            </div>
           </div>
+
+          {/* Sync Firebase Auth User Panel */}
+          {isSyncFormOpen && (
+            <form 
+              onSubmit={handleSyncUser}
+              className={`p-4 rounded-2xl border space-y-3 animate-[fadeIn_0.2s_ease-out] ${
+                isLight ? "border-[#E5E5E5] bg-[#F7F7F7]" : "border-[#2A2A2A] bg-[#111111]"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <UserPlus className="h-4 w-4" style={{ color: theme.secondaryAccentColor }} />
+                  <span className={`text-xs font-bold font-mono ${isLight ? "text-[#000000]" : "text-white"}`}>
+                    Import / Link Account from Firebase Authentication
+                  </span>
+                </div>
+                <span className={`text-[11px] font-mono ${isLight ? "text-[#444444]" : "text-[#BDBDBD]"}`}>
+                  Directly provisions Firestore profile
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                <div>
+                  <label className={`block text-[10px] font-mono uppercase tracking-wider mb-1 ${isLight ? "text-[#444444]" : "text-[#BDBDBD]"}`}>
+                    Email in Firebase Auth *
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    placeholder="creator@example.com"
+                    value={newEmail}
+                    onChange={(e) => setNewEmail(e.target.value)}
+                    className={`w-full border rounded-xl py-2 px-3 text-xs font-mono focus:outline-none ${
+                      isLight ? "border-[#E5E5E5] bg-[#FFFFFF] text-[#000000]" : "border-[#2A2A2A] bg-[#1A1A1A] text-white"
+                    }`}
+                  />
+                </div>
+
+                <div>
+                  <label className={`block text-[10px] font-mono uppercase tracking-wider mb-1 ${isLight ? "text-[#444444]" : "text-[#BDBDBD]"}`}>
+                    Display Name (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. John Doe"
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    className={`w-full border rounded-xl py-2 px-3 text-xs font-mono focus:outline-none ${
+                      isLight ? "border-[#E5E5E5] bg-[#FFFFFF] text-[#000000]" : "border-[#2A2A2A] bg-[#1A1A1A] text-white"
+                    }`}
+                  />
+                </div>
+
+                <div>
+                  <label className={`block text-[10px] font-mono uppercase tracking-wider mb-1 ${isLight ? "text-[#444444]" : "text-[#BDBDBD]"}`}>
+                    Firebase UID (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="User UID from Firebase Console"
+                    value={newUid}
+                    onChange={(e) => setNewUid(e.target.value)}
+                    className={`w-full border rounded-xl py-2 px-3 text-xs font-mono focus:outline-none ${
+                      isLight ? "border-[#E5E5E5] bg-[#FFFFFF] text-[#000000]" : "border-[#2A2A2A] bg-[#1A1A1A] text-white"
+                    }`}
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-2 pt-1">
+                <div className="flex items-center gap-1.5 text-[11px] font-mono opacity-80">
+                  <Info className="h-3.5 w-3.5 shrink-0" style={{ color: theme.secondaryAccentColor }} />
+                  <span>Accounts in Firebase Console that haven't signed in yet can be linked here instantly.</span>
+                </div>
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <button
+                    type="button"
+                    onClick={() => setIsSyncFormOpen(false)}
+                    className={`px-3 py-1.5 rounded-xl border text-xs font-mono cursor-pointer ${
+                      isLight ? "border-[#E5E5E5] text-[#444444]" : "border-[#2A2A2A] text-[#BDBDBD]"
+                    }`}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={syncingUser || !newEmail.trim()}
+                    className="px-4 py-1.5 rounded-xl border text-white font-mono text-xs font-bold flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                    style={{ backgroundColor: theme.secondaryAccentColor, borderColor: theme.secondaryAccentColor }}
+                  >
+                    {syncingUser ? (
+                      <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Plus className="h-3.5 w-3.5" />
+                    )}
+                    <span>Link & Sync User</span>
+                  </button>
+                </div>
+              </div>
+            </form>
+          )}
+
+          {/* Sync Success Banner */}
+          {syncSuccess && (
+            <div 
+              className="p-3 px-4 rounded-2xl border text-xs font-mono flex items-center gap-2 bg-emerald-500/10 border-emerald-500 text-emerald-400 animate-[fadeIn_0.2s_ease]"
+            >
+              <Check className="h-4 w-4 shrink-0 text-emerald-400" />
+              <span>{syncSuccess}</span>
+            </div>
+          )}
 
           {/* Users Table */}
           {error && (

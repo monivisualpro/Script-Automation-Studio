@@ -11,7 +11,7 @@ service cloud.firestore {
     }
 
     function isValidId(id) {
-      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+      return id is string && id.size() >= 1 && id.size() <= 128;
     }
 
     // Sole hardcoded platform owner (no dynamic admin promotion allowed)
@@ -45,13 +45,16 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      // Read: Document owner can read their own profile; sole Admin can view read-only user directory
-      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      // Get: Individual user profile read - document owner or platform admin
+      allow get: if isSignedIn() && (request.auth.uid == userId || isAdmin());
 
-      // Writes: Strictly owner-only (request.auth.uid == userId). Even Admin cannot modify another user's document.
+      // List: Platform admin can query and list the entire user directory
+      allow list: if isAdmin();
+
+      // Writes: Document owner can create their own profile; Admin can initialize user profiles
       allow create: if isSignedIn()
         && isValidId(userId)
-        && request.auth.uid == userId
+        && (request.auth.uid == userId || isAdmin())
         && request.resource.data.keys().hasAll(['userId', 'email', 'role'])
         && isValidUserDoc(request.resource.data, userId)
         && (

@@ -113,11 +113,11 @@ function sanitizeString(value: string | null | undefined, maxLength: number, fal
 export async function syncUserProfile(user: User, providerName: string = "password", customName?: string): Promise<UserProfile> {
   const userPath = `users/${user.uid}`;
   const userRef = doc(db, "users", user.uid);
-  let snap;
+  let snap = null;
   try {
     snap = await getDoc(userRef);
   } catch (err) {
-    handleFirestoreError(err, OperationType.GET, userPath);
+    console.warn("Could not read user profile from Firestore (attempting sync):", err);
   }
 
   const fallbackAvatar = `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(user.uid)}`;
@@ -135,7 +135,7 @@ export async function syncUserProfile(user: User, providerName: string = "passwo
   const safeProvider = sanitizeString(providerName, 64, "password");
   const nowIso = new Date().toISOString().slice(0, 64);
 
-  if (!snap.exists()) {
+  if (!snap || !snap.exists()) {
     const newProfile: UserProfile = {
       userId: user.uid.slice(0, 128),
       name: safeName,

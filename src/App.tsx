@@ -4120,23 +4120,60 @@ export default function App() {
                         className="glass-card p-4 rounded-xl border space-y-3 transition-all duration-300 relative group"
                         style={{ backgroundColor: `${theme.accentColor}06`, borderColor: `${theme.accentColor}25` }}
                       >
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-lg border glass-card" style={{ backgroundColor: `${theme.accentColor}15`, borderColor: `${theme.accentColor}30`, color: theme.accentColor }}>
-                            SCENE {scene.id}
-                          </span>
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-2" style={{ borderColor: `${theme.accentColor}20` }}>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-lg border glass-card" style={{ backgroundColor: `${theme.accentColor}15`, borderColor: `${theme.accentColor}30`, color: theme.accentColor }}>
+                              SCENE {scene.id}
+                            </span>
+                            <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md border" style={{ backgroundColor: `${theme.accentColor}10`, borderColor: `${theme.accentColor}25`, color: theme.accentColor }}>
+                              {scene.text ? scene.text.split("\n").filter(l => l.trim().length > 0).length : 0} Lines
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => handleCopySingleScene(scene.text)}
+                              className="glass-button py-1 px-2 rounded-lg border transition-all text-[10px] font-mono flex items-center gap-1 cursor-pointer hover:scale-105"
+                              style={{ backgroundColor: `${theme.accentColor}12`, borderColor: `${theme.accentColor}35`, color: theme.textColor }}
+                              title={`Copy Scene ${scene.id} prompt`}
+                            >
+                              <Copy className="h-3 w-3" /> Copy
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDownloadSingleScene(scene.id, scene.text)}
+                              className="glass-button py-1 px-2 rounded-lg border transition-all text-[10px] font-mono flex items-center gap-1 cursor-pointer hover:scale-105"
+                              style={{ backgroundColor: `${theme.accentColor}12`, borderColor: `${theme.accentColor}35`, color: theme.textColor }}
+                              title={`Download Scene ${scene.id} .txt`}
+                            >
+                              <Download className="h-3 w-3" /> .txt
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleRegenerateSingleScene(scene.id)}
+                              disabled={scene.loading}
+                              className="glass-button py-1 px-2 rounded-lg border transition-all text-[10px] font-mono flex items-center gap-1 cursor-pointer hover:scale-105"
+                              style={{ backgroundColor: `${theme.accentColor}18`, borderColor: theme.accentColor, color: theme.accentColor }}
+                              title={`Regenerate Scene ${scene.id} with ${promptLineCount} lines`}
+                            >
+                              <RefreshCw className={`h-3 w-3 ${scene.loading ? "animate-spin" : ""}`} /> Regen
+                            </button>
+                          </div>
                         </div>
 
                         {scene.loading ? (
-                          <div className="py-6 flex flex-col items-center justify-center space-y-2">
-                            <Loader2 className="h-6 w-6 animate-spin" style={{ color: theme.accentColor }} />
-                            <p className="text-[10px] font-mono text-gray-400">Regenerating Scene...</p>
+                          <div className="py-12 flex flex-col items-center justify-center space-y-2">
+                            <Loader2 className="h-7 w-7 animate-spin" style={{ color: theme.accentColor }} />
+                            <p className="text-[10px] font-mono text-gray-400">Regenerating Scene with {promptLineCount} Lines...</p>
                           </div>
                         ) : (
                           <textarea
                             value={scene.text}
                             onChange={(e) => handleEditSceneText(scene.id, e.target.value)}
-                            className="glass-input w-full rounded-lg p-3 text-xs focus:outline-none border leading-relaxed font-sans h-28 resize-none"
+                            className="glass-input w-full rounded-lg p-3 text-xs focus:outline-none border leading-relaxed font-mono min-h-[220px] h-60 resize-y whitespace-pre"
                             style={{ backgroundColor: theme.inputBg, borderColor: `${theme.accentColor}40`, color: theme.textColor }}
+                            placeholder={`Scene ${scene.id} detailed ${promptLineCount}-line cinematic prompt...`}
                           />
                         )}
                       </div>

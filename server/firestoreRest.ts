@@ -148,7 +148,7 @@ export async function listFirestoreCollection(
   collectionPath: string,
   idToken: string
 ): Promise<Array<{ id: string; data: Record<string, any> }>> {
-  const url = `${getBaseUrl()}/${collectionPath}`;
+  const url = `${getBaseUrl()}/${collectionPath}?pageSize=300`;
   const response = await fetch(url, {
     method: "GET",
     headers: {
