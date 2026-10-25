@@ -243,7 +243,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({ isOpen, onClose }) => {
                 </span>
               </div>
               <p className={`text-xs font-mono mt-0.5 ${isLight ? "text-[#444444]" : "text-[#BDBDBD]"}`}>
-                Locked exclusively to <span className={`font-bold ${isLight ? "text-[#000000]" : "text-white"}`}>{profile?.email}</span> · Role delegation disabled for security
+                Moni Visual Pro Owner Console · Role delegation disabled for security
               </p>
             </div>
           </div>
