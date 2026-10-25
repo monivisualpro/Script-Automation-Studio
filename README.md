@@ -1,65 +1,22 @@
-# 🎬 Moni Visual Pro — AI Script Automation & Flow Image Studio
+# 🎬 Script Automation Studio
+### AI Script Automation, Storyboard Prompts & YouTube Growth Suite
 
-> An enterprise-grade AI script rephrasing, anti-plagiarism automation, and multi-engine visual storyboard studio designed for content creators, video editors, digital agencies, and social media strategists.
+> An all-in-one AI production suite engineered for content creators, YouTubers, social media growth managers, documentary filmmakers, and educators. Transforms raw ideas, rough notes, or unformatted video transcripts into 100% original, viral-retention voiceover scripts, shot-by-shot cinematic storyboard prompts, YouTube CTR metadata packages, and thumb-stopping visual concepts.
 
 🌐 **Launch the Live Web App**: [https://script-automation-studio.ai.studio/](https://script-automation-studio.ai.studio/)  
-📖 **User Guide & Tutorials**: [HOW_TO_USE.md](./HOW_TO_USE.md)  
-📄 **License**: [MIT License](./LICENSE.md)
-
----
-
-## 🌟 Overview
-
-**Moni Visual Pro** transforms the entire video production workflow. Whether you're producing long-form YouTube documentaries, TikTok / Instagram Reels, educational explainers, or viral marketing campaigns, **Moni Visual Pro** automates the journey from raw transcript to visual storyboards in seconds.
-
-Accessible instantly from any web browser without any manual installation:
-👉 **[Open Moni Visual Pro](https://script-automation-studio.ai.studio/)**
-
----
-
-## ✨ Key Features
-
-### 1. ✍️ Anti-Plagiarism Script Automation
-- **Anti-Plagiarism Rephrasing**: Transforms existing transcripts, articles, or notes into fresh, engaging, copyright-safe scripts.
-- **Configurable Prompt Lines**: Choose exact scene breakdowns (`5`, `10`, `15`, or `20` lines) for fine-grained pacing and B-roll alignment.
-- **Audience & Tone Tuning**: Tailor tone between *Conversational*, *Storyteller*, *Energetic*, *Professional*, *Humorous*, *Dramatic*, and *Mysterious*.
-- **Multi-Platform Adaptation**: Instant formatting for YouTube (16:9), TikTok / Shorts (9:16), Facebook, Podcasts, and voiceovers.
-- **Multilingual Support**: Supports English, Spanish, French, German, Urdu, Hindi, Arabic, Japanese, and more.
-
-### 2. 🎨 Flow Image Studio (Visual Storyboards)
-- **Multi-Engine Visual Generation**: High-resolution generative visuals created specifically for your scene prompts.
-- **Aspect Ratio Mastery**: Direct support for `16:9` (Landscape), `9:16` (Vertical Story/Reels), `1:1` (Square), `4:3`, `3:2`, and `21:9` (Cinematic Ultra-Wide).
-- **Curated Style Presets**: Photorealistic Cinema, Anime/Manga, Cyberpunk Neon, Watercolor, Vintage 35mm Film, and Concept Digital Art.
-- **Image Inspector & Export**: High-resolution zoom, visual comparisons, and one-click image downloads.
-
-### 3. 📱 Progressive Web App (PWA) & Instant Access
-- **No Complex Installers Needed**: Access directly via [https://script-automation-studio.ai.studio/](https://script-automation-studio.ai.studio/).
-- **1-Click Desktop App**: On Google Chrome, Microsoft Edge, or Brave, click the **Install App** button in the browser address bar to install **Moni Visual Pro** as a standalone desktop app on Windows, macOS, or Linux.
-- **Mobile Friendly**: Works smoothly on iOS and Android devices with "Add to Home Screen" support.
-
-### 4. 🔒 Enterprise Security & Cloud Profiles
-- **Cloud Account Sync**: Sign in with Google or Email/Password to store your scripts and visual projects across devices.
-- **Secure Cloud Storage**: All projects and assets are securely organized in your personal cloud workspace.
-
----
-
-# 📖 Complete User & Creator Manual: Moni Visual Pro
-
-Welcome to the official, exhaustive guide for **Moni Visual Pro** created by **Muhammad Tehseen Irshad**.
-
-**Moni Visual Pro** is an all-in-one AI production suite engineered for content creators, YouTubers, social media growth managers, documentary filmmakers, and educators. It transforms raw ideas, rough notes, or unformatted video transcripts into 100% original, viral-retention voiceover scripts, shot-by-shot cinematic storyboard prompts, YouTube CTR metadata packages, and thumb-stopping visual concepts.
-
-🌐 **Live Web Application**: [https://script-automation-studio.ai.studio/](https://script-automation-studio.ai.studio/)  
 👑 **Created by**: Muhammad Tehseen Irshad  
 🏷️ **Brand**: Moni Visual Pro  
-⚡ **Access**: Web App & Progressive Web App (PWA) on any device — no code or command-line installation needed.
+⚡ **Access**: Instant Web App & Progressive Web App (PWA) — no command-line tools, Python environments, or compilation required.  
+📄 **License**: [MIT License](./LICENSE.md)
 
 ---
 
 ## 📑 Table of Contents
 
-1. [Quick Start: The 4-Step Production Pipeline](#1-quick-start-the-4-step-production-pipeline)
-2. [Left Sidebar: Core Script Configuration Engine](#2-left-sidebar-core-script-configuration-engine)
+1. [Overview & Why Script Automation Studio?](#1-overview--why-script-automation-studio)
+2. [Instant Access & Web App Installation (PWA)](#2-instant-access--web-app-installation-pwa)
+3. [Quick Start: The 4-Step Production Pipeline](#3-quick-start-the-4-step-production-pipeline)
+4. [Left Sidebar: Core Script Configuration Engine](#4-left-sidebar-core-script-configuration-engine)
    - [Voice Persona (Speaker)](#voice-persona-speaker)
    - [Domain (50+ SEO Niches)](#domain-50-seo-niches)
    - [Tutorial & Literature Tool (50+ Tones)](#tutorial--literature-tool-50-tones)
@@ -70,29 +27,60 @@ Welcome to the official, exhaustive guide for **Moni Visual Pro** created by **M
    - [Greeting (Prefix)](#greeting-prefix)
    - [Custom Hook Input & Sectional Structuring](#custom-hook-input--sectional-structuring)
    - [Fast Lite Mode Toggle](#fast-lite-mode-toggle)
-3. [Script Workspace: Input Sources & Polished Voiceover](#3-script-workspace-input-sources--polished-voiceover)
+5. [Script Workspace: Input Sources & Polished Voiceover](#5-script-workspace-input-sources--polished-voiceover)
    - [Input Source: Topic, Video URL & Files](#input-source-topic-video-url--files)
    - [RAW SOURCE SCRIPT Box & Voice Speech-to-Text](#raw-source-script-box--voice-speech-to-text)
    - [POLISHED V.O. SCRIPT Output Box & Audio TTS Player](#polished-vo-script-output-box--audio-tts-player)
    - [Quick Instant Transformation Buttons](#quick-instant-transformation-buttons)
-4. [Cinematic Storyboard & Scene Prompt Creator](#4-cinematic-storyboard--scene-prompt-creator)
+6. [Cinematic Storyboard & Scene Prompt Creator](#6-cinematic-storyboard--scene-prompt-creator)
    - [TRANSCRIPT INPUT & Parameters](#transcript-input--parameters)
    - [Duration-Based Shots Calculator](#duration-based-shots-calculator)
    - [GENERATED SCENE PROMPTS & Storyboard Manager](#generated-scene-prompts--storyboard-manager)
-5. [YouTube & Social Media Growth Strategist Suite](#5-youtube--social-media-growth-strategist-suite)
+7. [YouTube & Social Media Growth Strategist Suite](#7-youtube--social-media-growth-strategist-suite)
    - [Growth Strategist Sidebar Toggles](#growth-strategist-sidebar-toggles)
    - [Video Transcript Input](#video-transcript-input)
    - [CTR YT & SM Output Breakdown](#ctr-yt--sm-output-breakdown)
-6. [Thumbnail Director & Tagline Studio](#6-thumbnail-director--tagline-studio)
+8. [Thumbnail Director & Tagline Studio](#8-thumbnail-director--tagline-studio)
    - [Thumbnail Design Sidebar Controls](#thumbnail-design-sidebar-controls)
    - [Thumbnail Transcript Input & Character Photo Upload](#thumbnail-transcript-input--character-photo-upload)
    - [YT Thumbnails Prompt Output (Google Flow, Nano Banana 2 & Flux 1)](#yt-thumbnails-prompt-output-google-flow-nano-banana-2--flux-1)
-7. [Flow Image Studio & Visual Rendering](#7-flow-image-studio--visual-rendering)
-8. [Top Navigation, Themes & In-App Documentation](#8-top-navigation-themes--in-app-documentation)
+9. [Flow Image Studio & Visual Rendering](#9-flow-image-studio--visual-rendering)
+10. [Top Navigation, Themes & In-App Documentation](#10-top-navigation-themes--in-app-documentation)
+11. [Optimal Configuration Presets Reference](#11-optimal-configuration-presets-reference)
+12. [Brand, Author & License](#12-brand-author--license)
 
 ---
 
-## 1. Quick Start: The 4-Step Production Pipeline
+## 1. Overview & Why Script Automation Studio?
+
+**Script Automation Studio** is designed and architected by **Muhammad Tehseen Irshad** under the **Moni Visual Pro** brand. 
+
+Content creators face three major bottlenecks:
+1. **Scriptwriter's Block & Plagiarism Risks**: Rewriting existing articles or transcripts manually takes hours, and generic AI often produces robotic, copyrighted, or hallucinated output.
+2. **Visual Storyboard Formatting**: Translating a 10-minute script into 40+ specific B-roll prompts for Runway, Kling, Midjourney, or Flux requires meticulous framing, lighting, and camera angle notation.
+3. **Packaging & Algorithm Discoverability**: High-retention hooks, 10 high-CTR title variations, SEO descriptions, timestamped chapters, and click-worthy thumbnail concepts are often treated as an afterthought.
+
+**Script Automation Studio** solves all three in a single, fluid workspace. From an initial raw idea or video link, creators can generate:
+- 100% plagiarism-free voiceover scripts in 40+ languages and dialects (including Urdu Nastaliq, Roman Urdu, and polished English).
+- Exact shot-by-shot cinematic storyboard prompts with an automated B-roll duration calculator.
+- Complete YouTube & TikTok CTR metadata packages (titles, descriptions, timestamps, tags, hashtags).
+- Precision thumbnail prompts for Google Flow, Nano Banana 2, and Flux 1 (including ComfyUI node fields and negative prompts).
+
+---
+
+## 2. Instant Access & Web App Installation (PWA)
+
+You do **not** need to install Python, configure Node.js, run terminal commands, or build desktop `.exe` binaries. **Script Automation Studio** is deployed as an enterprise web application:
+
+### 👉 **[https://script-automation-studio.ai.studio/](https://script-automation-studio.ai.studio/)**
+
+### 📱 1-Click Desktop & Mobile App (PWA)
+- **Windows / macOS / Linux**: Open the link in Google Chrome, Microsoft Edge, or Brave. Click the **Install App** icon in the address bar to add **Script Automation Studio** as a dedicated desktop application with native windowing and offline caching.
+- **Android / iOS**: Open the link in Chrome or Safari. Tap **Share / Options** ➔ **Add to Home Screen** to run it as a full-screen mobile app with microphone permissions.
+
+---
+
+## 3. Quick Start: The 4-Step Production Pipeline
 
 ```
 [1. Input Source]           [2. Core Settings]           [3. Generation]               [4. Publishing Suite]
@@ -102,14 +90,14 @@ Welcome to the official, exhaustive guide for **Moni Visual Pro** created by **M
 • Speech-to-Text Mic        • Target Countries           • Cinematic Storyboard Shots       • Thumbnail AI Prompts
 ```
 
-1. **Input Your Idea or Transcript**: Choose **Topic**, paste a **Video URL**, upload a **File**, or dictate using the **Speech-to-Text Mic**.
-2. **Tune Your Production Parameters**: Pick your **Domain (Niche)**, **Tone**, **Target Audience**, and **Script Length**.
-3. **Generate Polished Voiceover Script**: Click **GENERATE SCRIPT**. Preview with the built-in **Listen AI (TTS)** player.
-4. **Export Visuals & Metadata**: Generate timestamped **Scene Prompts**, calculate camera shots with the **Shots Calculator**, optimize YouTube CTR metadata, and synthesize viral thumbnail concepts.
+1. **Input Your Content**: Type a topic, paste a video URL, drag-and-drop a file, or speak into the Speech-to-Text microphone.
+2. **Configure Your Strategy**: Set your niche domain, tone, demographic audience, and target duration/word count.
+3. **Generate Voiceover**: Click **GENERATE SCRIPT**. Preview delivery with the built-in **Listen AI (TTS)** voice player.
+4. **Deploy Media & Metadata**: Send your script directly into the **Storyboard Creator** for camera prompts, the **Growth Strategist** for titles/tags, and the **Thumbnail Director** for visual concepts.
 
 ---
 
-## 2. Left Sidebar: Core Script Configuration Engine
+## 4. Left Sidebar: Core Script Configuration Engine
 
 The left sidebar gives you precision control over how the AI writes, formats, and sounds. Every setting directly impacts audience retention and search engine performance.
 
@@ -239,14 +227,14 @@ The left sidebar gives you precision control over how the AI writes, formats, an
 
 ---
 
-## 3. Script Workspace: Input Sources & Polished Voiceover
+## 5. Script Workspace: Input Sources & Polished Voiceover
 
 The main upper workspace features a side-by-side editing interface designed for speed, revision, and audio preview.
 
 ---
 
 ### Input Source: Topic, Video URL & Files
-Above the script boxes, the **Input Source** switcher lets you import content three different ways:
+Above the script boxes, the **Input Source** switcher lets you import content four different ways:
 1. **● Topic**: Type any topic title (e.g., *"How Black Holes Bend Space-Time"*), specify your word count limit, and click **GENERATE DRAFT**. The engine researches and creates a comprehensive first draft from scratch.
 2. **● Video URL**: Paste any YouTube, Facebook, TikTok, or Instagram video link and click **GET YOUTUBE TRANSCRIPT** to automatically extract and format the underlying video dialogue.
 3. **● Files**: Drag and drop `.txt` or standard `.pdf` documents (research papers, scripts, ebook chapters) to load them directly into the workspace.
@@ -257,8 +245,7 @@ Above the script boxes, the **Input Source** switcher lets you import content th
 ### RAW SOURCE SCRIPT Box & Voice Speech-to-Text
 - **Textarea Area**: Paste your rough outlines, bullet points, article snippets, or messy notes.
 - **Real-Time Character Counter**: Displays live character volume in the top-right header badge.
-- **🎙️ Speech-to-Text Mic (Gemini Voice Scriptwriter)**:
-  - Click the microphone icon to dictate ideas verbally. A live animated waveform displays while the AI transcribes your voice in real-time. Click **Finish & Save Script** when done.
+- **🎙️ Speech-to-Text Mic (Gemini Voice Scriptwriter)**: Click the microphone icon to dictate ideas verbally. A live animated waveform displays while the AI transcribes your voice in real-time. Click **Finish & Save Script** when done.
 - **🗑️ Clear Button**: Empties the box with one click to begin a fresh project.
 - **Why You Need This**:
   - You do not need to write polished sentences in the Raw box. The engine takes fragmented thoughts and transforms them into cohesive, professional prose.
@@ -285,7 +272,7 @@ Located inside the output header, these 4 instant buttons let you re-translate a
 
 ---
 
-## 4. Cinematic Storyboard & Scene Prompt Creator
+## 6. Cinematic Storyboard & Scene Prompt Creator
 
 Located directly below the script workspace, this studio divides long scripts into timestamped, camera-ready scenes for video editors and AI video/image generators (Midjourney, Runway, Kling, Pika, Flux).
 
@@ -332,7 +319,7 @@ Located directly below the script workspace, this studio divides long scripts in
 
 ---
 
-## 5. YouTube & Social Media Growth Strategist Suite
+## 7. YouTube & Social Media Growth Strategist Suite
 
 Faceless and automated channels require comprehensive metadata to trigger YouTube's recommendation algorithm. This suite turns your script into a complete CTR package.
 
@@ -361,7 +348,7 @@ Control which metadata components get generated with dedicated switches:
 
 ---
 
-## 6. Thumbnail Director & Tagline Studio
+## 8. Thumbnail Director & Tagline Studio
 
 Thumbnails account for over 80% of click-through rate decisions. This studio directs high-impact thumbnail compositions, typography overlays, and negative prompts.
 
@@ -404,7 +391,7 @@ Thumbnails account for over 80% of click-through rate decisions. This studio dir
 
 ---
 
-## 7. Flow Image Studio & Visual Rendering
+## 9. Flow Image Studio & Visual Rendering
 
 The built-in **Flow Image Studio** lets you turn prompts into finished visual assets directly inside your browser:
 - **Aspect Ratio Selector**: `16:9 Landscape`, `9:16 Vertical`, `1:1 Square`, `4:3 Classic`, `21:9 Ultra-Wide`.
@@ -413,7 +400,7 @@ The built-in **Flow Image Studio** lets you turn prompts into finished visual as
 
 ---
 
-## 8. Top Navigation, Themes & In-App Documentation
+## 10. Top Navigation, Themes & In-App Documentation
 
 - **🟠 Orange / 🔵 Blue Brand Switcher**: Toggles accent theme color palettes across all panels.
 - **☀️ Day / 🌙 Night Mode**: Switches between high-contrast light and dark mode.
@@ -431,7 +418,7 @@ The built-in **Flow Image Studio** lets you turn prompts into finished visual as
 
 ---
 
-## 📌 Summary: Optimal Configuration Presets
+## 11. Optimal Configuration Presets Reference
 
 | Video Format | Recommended Transformation | Target Word Count | Recommended Tone | Voice Persona | Key Controls to Enable |
 |---|---|---|---|---|---|
@@ -443,19 +430,10 @@ The built-in **Flow Image Studio** lets you turn prompts into finished visual as
 
 ---
 
-*Moni Visual Pro — Designed and Developed by **Muhammad Tehseen Irshad**.*  
-*Visit the live web app: [https://script-automation-studio.ai.studio/](https://script-automation-studio.ai.studio/)*
+## 12. Brand, Author & License
 
----
-
-## 📄 License
-
-This software and documentation are licensed under the MIT License. See [LICENSE.md](./LICENSE.md) for details.
-
----
-
-## 👤 Author & Brand
-
+- **Software Name**: Script Automation Studio
 - **Brand**: Moni Visual Pro
-- **Author**: Muhammad Tehseen Irshad
-- **Website**: [https://script-automation-studio.ai.studio/](https://script-automation-studio.ai.studio/)
+- **Architect & Author**: Muhammad Tehseen Irshad
+- **Live Web App**: [https://script-automation-studio.ai.studio/](https://script-automation-studio.ai.studio/)
+- **License**: MIT License (see [LICENSE.md](./LICENSE.md))

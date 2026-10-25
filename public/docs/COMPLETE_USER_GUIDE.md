@@ -1,8 +1,8 @@
-# 📖 Complete User & Creator Manual: Moni Visual Pro
+# 📖 Complete User & Creator Manual: Script Automation Studio
 
-Welcome to the official, exhaustive guide for **Moni Visual Pro** created by **Muhammad Tehseen Irshad**.
+Welcome to the official, exhaustive guide for **Script Automation Studio** created by **Muhammad Tehseen Irshad** under the **Moni Visual Pro** brand.
 
-**Moni Visual Pro** is an all-in-one AI production suite engineered for content creators, YouTubers, social media growth managers, documentary filmmakers, and educators. It transforms raw ideas, rough notes, or unformatted video transcripts into 100% original, viral-retention voiceover scripts, shot-by-shot cinematic storyboard prompts, YouTube CTR metadata packages, and thumb-stopping visual concepts.
+**Script Automation Studio** is an all-in-one AI production suite engineered for content creators, YouTubers, social media growth managers, documentary filmmakers, and educators. It transforms raw ideas, rough notes, or unformatted video transcripts into 100% original, viral-retention voiceover scripts, shot-by-shot cinematic storyboard prompts, YouTube CTR metadata packages, and thumb-stopping visual concepts.
 
 🌐 **Live Web Application**: [https://script-automation-studio.ai.studio/](https://script-automation-studio.ai.studio/)  
 👑 **Created by**: Muhammad Tehseen Irshad  
@@ -154,5 +154,5 @@ Welcome to the official, exhaustive guide for **Moni Visual Pro** created by **M
 
 ---
 
-*Moni Visual Pro — Designed and Developed by **Muhammad Tehseen Irshad**.*  
+*Script Automation Studio — Designed and Developed by **Muhammad Tehseen Irshad** (Brand: **Moni Visual Pro**).*  
 *Visit the live web app: [https://script-automation-studio.ai.studio/](https://script-automation-studio.ai.studio/)*

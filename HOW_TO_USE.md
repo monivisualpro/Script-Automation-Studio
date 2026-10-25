@@ -1,13 +1,16 @@
-# 📖 Complete User & Creator Manual: Moni Visual Pro
+# 📖 Complete User & Creator Manual: Script Automation Studio
+### Official Creator & Operations Guide
 
-Welcome to the official, exhaustive guide for **Moni Visual Pro** created by **Muhammad Tehseen Irshad**.
+Welcome to the official, exhaustive guide for **Script Automation Studio** created by **Muhammad Tehseen Irshad** under the **Moni Visual Pro** brand.
 
-**Moni Visual Pro** is an all-in-one AI production suite engineered for content creators, YouTubers, social media growth managers, documentary filmmakers, and educators. It transforms raw ideas, rough notes, or unformatted video transcripts into 100% original, viral-retention voiceover scripts, shot-by-shot cinematic storyboard prompts, YouTube CTR metadata packages, and thumb-stopping visual concepts.
+**Script Automation Studio** is an all-in-one AI production suite engineered for content creators, YouTubers, social media growth managers, documentary filmmakers, and educators. It transforms raw ideas, rough notes, or unformatted video transcripts into 100% original, viral-retention voiceover scripts, shot-by-shot cinematic storyboard prompts, YouTube CTR metadata packages, and thumb-stopping visual concepts.
 
 🌐 **Live Web Application**: [https://script-automation-studio.ai.studio/](https://script-automation-studio.ai.studio/)  
 👑 **Created by**: Muhammad Tehseen Irshad  
 🏷️ **Brand**: Moni Visual Pro  
-⚡ **Access**: Web App & Progressive Web App (PWA) on any device — no code or command-line installation needed.
+⚡ **Access**: Web App & Progressive Web App (PWA) on any device — no code or command-line installation needed.  
+📄 **License**: [MIT License](./LICENSE.md)  
+📚 **Unified Documentation**: Full combined guide is also available in [README.md](./README.md).
 
 ---
 
@@ -44,6 +47,7 @@ Welcome to the official, exhaustive guide for **Moni Visual Pro** created by **M
    - [YT Thumbnails Prompt Output (Google Flow, Nano Banana 2 & Flux 1)](#yt-thumbnails-prompt-output-google-flow-nano-banana-2--flux-1)
 7. [Flow Image Studio & Visual Rendering](#7-flow-image-studio--visual-rendering)
 8. [Top Navigation, Themes & In-App Documentation](#8-top-navigation-themes--in-app-documentation)
+9. [Optimal Configuration Presets Reference](#9-optimal-configuration-presets-reference)
 
 ---
 
@@ -201,7 +205,7 @@ The main upper workspace features a side-by-side editing interface designed for 
 ---
 
 ### Input Source: Topic, Video URL & Files
-Above the script boxes, the **Input Source** switcher lets you import content three different ways:
+Above the script boxes, the **Input Source** switcher lets you import content four different ways:
 1. **● Topic**: Type any topic title (e.g., *"How Black Holes Bend Space-Time"*), specify your word count limit, and click **GENERATE DRAFT**. The engine researches and creates a comprehensive first draft from scratch.
 2. **● Video URL**: Paste any YouTube, Facebook, TikTok, or Instagram video link and click **GET YOUTUBE TRANSCRIPT** to automatically extract and format the underlying video dialogue.
 3. **● Files**: Drag and drop `.txt` or standard `.pdf` documents (research papers, scripts, ebook chapters) to load them directly into the workspace.
@@ -212,8 +216,7 @@ Above the script boxes, the **Input Source** switcher lets you import content th
 ### RAW SOURCE SCRIPT Box & Voice Speech-to-Text
 - **Textarea Area**: Paste your rough outlines, bullet points, article snippets, or messy notes.
 - **Real-Time Character Counter**: Displays live character volume in the top-right header badge.
-- **🎙️ Speech-to-Text Mic (Gemini Voice Scriptwriter)**:
-  - Click the microphone icon to dictate ideas verbally. A live animated waveform displays while the AI transcribes your voice in real-time. Click **Finish & Save Script** when done.
+- **🎙️ Speech-to-Text Mic (Gemini Voice Scriptwriter)**: Click the microphone icon to dictate ideas verbally. A live animated waveform displays while the AI transcribes your voice in real-time. Click **Finish & Save Script** when done.
 - **🗑️ Clear Button**: Empties the box with one click to begin a fresh project.
 - **Why You Need This**:
   - You do not need to write polished sentences in the Raw box. The engine takes fragmented thoughts and transforms them into cohesive, professional prose.
@@ -386,7 +389,7 @@ The built-in **Flow Image Studio** lets you turn prompts into finished visual as
 
 ---
 
-## 📌 Summary: Optimal Configuration Presets
+## 9. Optimal Configuration Presets Reference
 
 | Video Format | Recommended Transformation | Target Word Count | Recommended Tone | Voice Persona | Key Controls to Enable |
 |---|---|---|---|---|---|
@@ -398,5 +401,5 @@ The built-in **Flow Image Studio** lets you turn prompts into finished visual as
 
 ---
 
-*Moni Visual Pro — Designed and Developed by **Muhammad Tehseen Irshad**.*  
+*Script Automation Studio — Designed and Developed by **Muhammad Tehseen Irshad** (Brand: **Moni Visual Pro**).*  
 *Visit the live web app: [https://script-automation-studio.ai.studio/](https://script-automation-studio.ai.studio/)*
