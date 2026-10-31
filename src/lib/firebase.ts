@@ -17,7 +17,27 @@ import {
   setDoc
 } from "firebase/firestore";
 
-import firebaseConfig from "../../firebase-applet-config.json";
+let rawConfig: any = {};
+try {
+  // @ts-ignore
+  const modules = import.meta.glob("../../firebase-applet-config.json", { eager: true });
+  const key = Object.keys(modules)[0];
+  if (key && modules[key]) {
+    rawConfig = (modules[key] as any).default || modules[key];
+  }
+} catch {
+  // Safe fallback if file is missing
+}
+
+const firebaseConfig = rawConfig && rawConfig.apiKey ? rawConfig : {
+  projectId: "script-automation-studio",
+  appId: "1:213799464433:web:4e2a4bb3935976ad60a850",
+  apiKey: "AIzaSyCf4GIuPVF53dNYzFGV59tebGzNcPpJXJQ",
+  authDomain: "script-automation-studio.firebaseapp.com",
+  firestoreDatabaseId: "ai-studio-scriptautomation-e15f32ee-b60f-4480-a137-b06b15abddef",
+  storageBucket: "script-automation-studio.firebasestorage.app",
+  messagingSenderId: "213799464433"
+};
 
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -102,6 +122,9 @@ export interface UserProfile {
   isAdmin: boolean;
   apiKeyMasked: string | null;
   hasApiKey: boolean;
+  activeProvider?: "gemini" | "openai" | "claude" | "local";
+  activeModel?: string;
+  baseUrl?: string;
   createdAt: string;
   updatedAt: string;
 }

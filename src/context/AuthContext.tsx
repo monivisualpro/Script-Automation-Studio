@@ -77,6 +77,9 @@ const AuthContext = createContext<AuthContextType>({
   profile: null,
   loading: true,
   idToken: null,
+  isStandalone: false,
+  activeProviderConfig: DEFAULT_PROVIDER_CONFIG,
+  updateProviderConfig: () => {},
   refreshProfile: async () => {},
   logout: async () => {},
   deleteAccount: async () => {},
@@ -88,12 +91,8 @@ const AuthContext = createContext<AuthContextType>({
   setIsSettingsModalOpen: () => {},
   isAdminModalOpen: false,
   setIsAdminModalOpen: () => {},
-  isImageStudioOpen: false,
-  setIsImageStudioOpen: () => {},
   isTutorialModalOpen: false,
   setIsTutorialModalOpen: () => {},
-  initialImagePrompt: "",
-  openImageStudioWithPrompt: () => {},
   modelSettings: DEFAULT_FEATURE_MODELS,
   updateModelSettings: async () => {},
   availableModels: [],
@@ -113,9 +112,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState<boolean>(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState<boolean>(false);
   const [isAdminModalOpen, setIsAdminModalOpen] = useState<boolean>(false);
-  const [isImageStudioOpen, setIsImageStudioOpen] = useState<boolean>(false);
   const [isTutorialModalOpen, setIsTutorialModalOpen] = useState<boolean>(false);
-  const [initialImagePrompt, setInitialImagePrompt] = useState<string>("");
+  const [isStandalone, setIsStandalone] = useState<boolean>(false);
+  const [activeProviderConfig, setActiveProviderConfigState] = useState<ActiveProviderConfig>(() => {
+    try {
+      const saved = localStorage.getItem("script_automation_active_provider_config");
+      if (saved) {
+        return { ...DEFAULT_PROVIDER_CONFIG, ...JSON.parse(saved) };
+      }
+    } catch {}
+    return DEFAULT_PROVIDER_CONFIG;
+  });
+
+  const updateProviderConfig = (newConfig: Partial<ActiveProviderConfig>) => {
+    setActiveProviderConfigState(prev => {
+      const merged = { ...prev, ...newConfig };
+      try {
+        localStorage.setItem("script_automation_active_provider_config", JSON.stringify(merged));
+      } catch {}
+      return merged;
+    });
+  };
+
+  useEffect(() => {
+    fetch("/api/system/mode")
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.standalone) {
+          setIsStandalone(true);
+        }
+      })
+      .catch(() => {});
+  }, []);
   const [currentTheme, setCurrentThemeState] = useState<string>(() => {
     try {
       const saved = localStorage.getItem("script_automation_app_theme");
@@ -175,10 +203,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch {}
   };
 
-  const openImageStudioWithPrompt = (prompt: string = "") => {
-    setInitialImagePrompt(prompt);
-    setIsImageStudioOpen(true);
-  };
+
   const [modelSettings, setModelSettings] = useState<FeatureModelConfig>(() => {
     try {
       const saved = localStorage.getItem("script_automation_model_settings");
@@ -276,6 +301,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setModelSettings(prev => ({ ...prev, ...data.modelSettings }));
         }
 
+        if (data.activeProvider) {
+          setActiveProviderConfigState(prev => ({
+            ...prev,
+            provider: data.activeProvider,
+            model: data.activeModel || prev.model,
+            baseUrl: data.baseUrl || prev.baseUrl,
+          }));
+        }
+
         resolved = {
           userId: currentUser.uid,
           name: data.name || currentUser.displayName || currentUser.email?.split("@")[0] || "User",
@@ -286,6 +320,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           isAdmin: isSoleAdmin,
           apiKeyMasked: data.apiKeyMasked || null,
           hasApiKey: Boolean(data.encryptedApiKey || data.apiKeyMasked),
+          activeProvider: data.activeProvider || "gemini",
+          activeModel: data.activeModel || "gemini-3.1-flash-lite",
+          baseUrl: data.baseUrl || "http://localhost:1234/v1",
           createdAt: data.createdAt || new Date().toISOString(),
           updatedAt: data.updatedAt || new Date().toISOString(),
         };
@@ -374,6 +411,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         profile,
         loading,
         idToken,
+        isStandalone,
+        activeProviderConfig,
+        updateProviderConfig,
         refreshProfile,
         logout,
         deleteAccount,
@@ -385,12 +425,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsSettingsModalOpen,
         isAdminModalOpen,
         setIsAdminModalOpen,
-        isImageStudioOpen,
-        setIsImageStudioOpen,
         isTutorialModalOpen,
         setIsTutorialModalOpen,
-        initialImagePrompt,
-        openImageStudioWithPrompt,
         modelSettings,
         updateModelSettings,
         availableModels,

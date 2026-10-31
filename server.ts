@@ -4,7 +4,16 @@ import path from "path";
 import { GoogleGenAI, Type } from "@google/genai";
 import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
-import firebaseConfig from "./firebase-applet-config.json" with { type: "json" };
+// Safe dynamic loading of firebase-applet-config.json
+let firebaseConfig: Record<string, any> = {};
+try {
+  const configPath = path.join(process.cwd(), "firebase-applet-config.json");
+  if (fs.existsSync(configPath)) {
+    firebaseConfig = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+  }
+} catch (configErr) {
+  console.warn("Could not load firebase-applet-config.json, proceeding with default standalone configuration.");
+}
 import { encryptApiKey, decryptApiKey, maskApiKey } from "./server/encryption.js";
 import {
   getFirestoreDoc,
@@ -16,6 +25,7 @@ import { validateSafeExternalUrl } from "./server/urlValidator.js";
 import {
   executeMultiProviderGeneration,
   AIProviderConfig,
+  AIProviderType,
   formatProviderErrorMessage,
 } from "./server/multiProvider.js";
 import type { Server as HttpServer } from "http";
@@ -470,115 +480,66 @@ async function generateContentWithRetry(ai: GoogleGenAI, params: any, maxRetries
 app.post("/api/user/save-key", writeRateLimiter, async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({ error: "Authentication required." });
-    }
-    const token = authHeader.substring(7);
-    const userInfo = await verifyAuthToken(token);
+    const isStandaloneReq = isStandaloneMode ||
+      req.headers["x-standalone-mode"] === "true" ||
+      (authHeader && authHeader.startsWith("Bearer standalone_"));
 
-    const { apiKey } = req.body;
-    if (!apiKey || typeof apiKey !== "string" || !apiKey.trim()) {
-      return res.status(400).json({ error: "API Key is required." });
-    }
+    const { provider = "gemini", apiKey = "", baseUrl = "", model = "" } = req.body;
+    const providerType = (provider || "gemini").toLowerCase() as AIProviderType;
+    const trimmedKey = (apiKey || "").trim();
+    const trimmedBaseUrl = (baseUrl || "").trim();
+    const trimmedModel = (model || "").trim();
 
-    const trimmedKey = apiKey.trim();
-    if (trimmedKey.length < 10 || trimmedKey.length > 512) {
-      return res.status(400).json({ error: "API Key length is invalid." });
+    if (providerType !== "local" && !trimmedKey) {
+      return res.status(400).json({ error: `API Key is required for ${providerType.toUpperCase()}.` });
     }
 
-    // Validate the key against Gemini API with test pings supporting AIza and AQ tokens
-    let pingSuccess = false;
-    let lastError: any = null;
-    const testModels = ["gemini-3.6-flash", "gemini-3.1-flash-lite"];
-
-    // Try primary auto-configured client first
-    const testAi = createGoogleGenAIClient(trimmedKey);
-    for (const modelName of testModels) {
-      try {
-        await testAi.models.generateContent({
-          model: modelName,
-          contents: "API Key Ping Test",
-        });
-        pingSuccess = true;
-        break;
-      } catch (err) {
-        lastError = err;
-      }
-    }
-
-    // Fallback 1: Bearer token mode if initial ping failed
-    if (!pingSuccess) {
-      try {
-        const bearerAi = new GoogleGenAI({
-          apiKey: "",
-          httpOptions: {
-            headers: {
-              "Authorization": `Bearer ${trimmedKey}`,
-              "User-Agent": "script-automation-studio",
-            },
-          },
-        });
-        for (const modelName of testModels) {
-          try {
-            await bearerAi.models.generateContent({
-              model: modelName,
-              contents: "API Key Ping Test",
-            });
-            pingSuccess = true;
-            break;
-          } catch (err) {
-            lastError = err;
-          }
-        }
-      } catch (e) {
-        // ignore
-      }
-    }
-
-    // Fallback 2: Standard API key mode
-    if (!pingSuccess) {
-      try {
-        const standardAi = new GoogleGenAI({
-          apiKey: trimmedKey,
-          httpOptions: {
-            headers: {
-              "User-Agent": "script-automation-studio",
-            },
-          },
-        });
-        for (const modelName of testModels) {
-          try {
-            await standardAi.models.generateContent({
-              model: modelName,
-              contents: "API Key Ping Test",
-            });
-            pingSuccess = true;
-            break;
-          } catch (err) {
-            lastError = err;
-          }
-        }
-      } catch (e) {
-        // ignore
-      }
-    }
-
-    if (!pingSuccess) {
-      logSafeError("API Key Validation Ping Failed:", lastError);
-      const formattedErr = lastError ? formatGeminiErrorMessage(lastError) : null;
+    // Ping / Test connection with chosen provider
+    try {
+      const config: AIProviderConfig = {
+        provider: providerType,
+        apiKey: trimmedKey,
+        baseUrl: trimmedBaseUrl,
+        model: trimmedModel,
+      };
+      await executeMultiProviderGeneration({
+        prompt: "Respond with the word CONNECTED to verify connection.",
+        model: trimmedModel,
+        providerConfig: config,
+        fallbackApiKey: trimmedKey,
+      });
+    } catch (testErr: any) {
+      logSafeError(`Provider ${providerType} Validation Test Failed:`, testErr);
       return res.status(400).json({
-        error: formattedErr
-          ? `API Key validation failed: ${formattedErr}`
-          : "API Key validation failed. Please check that your key is valid, has the correct permissions, and is active in Google AI Studio.",
+        error: formatProviderErrorMessage(providerType, testErr),
       });
     }
 
-    // Encrypt key and derive mask
-    const encrypted = encryptApiKey(trimmedKey);
-    const masked = maskApiKey(trimmedKey);
+    if (isStandaloneReq) {
+      return res.json({
+        success: true,
+        activeProvider: providerType,
+        apiKeyMasked: providerType === "local" ? `Local (${trimmedBaseUrl || "http://localhost:1234/v1"})` : maskApiKey(trimmedKey),
+      });
+    }
+
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ error: "Authentication required." });
+    }
+
+    const token = authHeader.substring(7);
+    const userInfo = await verifyAuthToken(token);
+
+    const encrypted = encryptApiKey(trimmedKey || "local-key");
+    const masked = providerType === "local"
+      ? `Local (${trimmedBaseUrl || "http://localhost:1234/v1"})`
+      : maskApiKey(trimmedKey);
 
     const nowIso = new Date().toISOString();
     await updateFirestoreDoc("users", userInfo.uid, {
+      activeProvider: providerType,
+      activeModel: trimmedModel,
+      baseUrl: trimmedBaseUrl,
       encryptedApiKey: encrypted,
       apiKeyMasked: masked,
       hasApiKey: true,
@@ -594,10 +555,10 @@ app.post("/api/user/save-key", writeRateLimiter, async (req, res) => {
     });
     invalidateUserAuthCache(userInfo.uid);
 
-    return res.json({ success: true, apiKeyMasked: masked });
+    return res.json({ success: true, activeProvider: providerType, apiKeyMasked: masked });
   } catch (error: any) {
-    logSafeError("Error saving API Key:", error);
-    return res.status(500).json({ error: "Failed to save API Key." });
+    logSafeError("Error saving API Key / Provider:", error);
+    return res.status(500).json({ error: "Failed to save API key / provider settings." });
   }
 });
 

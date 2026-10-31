@@ -26,8 +26,9 @@ export const UserHeader: React.FC = () => {
     setIsApiKeyModalOpen, 
     setIsSettingsModalOpen, 
     setIsAdminModalOpen,
-    setIsImageStudioOpen,
     setIsTutorialModalOpen,
+    isStandalone,
+    activeProviderConfig,
     currentTheme,
     setCurrentTheme,
     currentBrand,
@@ -193,20 +194,26 @@ export const UserHeader: React.FC = () => {
               </button>
             )}
 
-            {/* API Status Badge */}
-            {profile.hasApiKey ? (
+            {/* API / Multi-Provider Status Badge */}
+            {profile.hasApiKey || isStandalone ? (
               <button
                 onClick={() => setIsApiKeyModalOpen(true)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-2xl border transition-all cursor-pointer text-[11px] font-mono ${
                   theme.isLight ? "bg-[#FFFFFF]" : "bg-[#1A1A1A]"
                 }`}
                 style={{ color: theme.secondaryAccentColor, borderColor: `${theme.secondaryAccentColor}99` }}
-                title="Click to manage personal API key"
+                title="Click to configure AI Provider & API Key"
               >
                 <CheckCircle2 className="h-3.5 w-3.5" style={{ color: theme.secondaryAccentColor }} />
-                <span className="font-bold hidden md:inline">API Key Active</span>
+                <span className="font-bold hidden md:inline">
+                  {profile.activeProvider
+                    ? `${profile.activeProvider.toUpperCase()} Active`
+                    : activeProviderConfig.provider
+                    ? `${activeProviderConfig.provider.toUpperCase()} Active`
+                    : "AI Active"}
+                </span>
                 <span className={`text-[10px] ${theme.isLight ? "text-[#444444]" : "text-[#BDBDBD]"}`}>
-                  ({profile.apiKeyMasked})
+                  ({profile.apiKeyMasked || (isStandalone ? "Local Standalone" : "Active Key")})
                 </span>
               </button>
             ) : (
@@ -214,10 +221,10 @@ export const UserHeader: React.FC = () => {
                 onClick={() => setIsApiKeyModalOpen(true)}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl transition-all cursor-pointer text-[11px] font-mono font-bold border"
                 style={{ backgroundColor: `${theme.accentColor}1A`, color: theme.accentColor, borderColor: theme.accentColor }}
-                title="Set up your required Google AI API key"
+                title="Configure your AI Provider and API key"
               >
                 <AlertTriangle className="h-3.5 w-3.5" style={{ color: theme.accentColor }} />
-                <span>Setup API Key</span>
+                <span>Configure Provider Key</span>
               </button>
             )}
 
