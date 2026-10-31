@@ -7,7 +7,6 @@ import { AuthModal } from "./components/AuthModal";
 import { ApiKeyModal } from "./components/ApiKeyModal";
 import { SettingsModal } from "./components/SettingsModal";
 import { AdminModal } from "./components/AdminModal";
-import { ImageStudioModal } from "./components/ImageStudioModal";
 import { TutorialGuideModal } from "./components/TutorialGuideModal";
 import { isValidExternalHttpUrl } from "./lib/urlValidator";
 import {
@@ -1460,11 +1459,6 @@ export default function App() {
       />
       <SettingsModal isOpen={isSettingsModalOpen} onClose={() => setIsSettingsModalOpen(false)} />
       <AdminModal isOpen={isAdminModalOpen} onClose={() => setIsAdminModalOpen(false)} />
-      <ImageStudioModal
-        isOpen={isImageStudioOpen}
-        onClose={() => setIsImageStudioOpen(false)}
-        initialPrompt={initialImagePrompt}
-      />
       <TutorialGuideModal />
 
       {/* Unauthenticated / Missing API Key Alert Banners */}

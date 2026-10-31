@@ -23,11 +23,28 @@ export const DEFAULT_FEATURE_MODELS: FeatureModelConfig = {
   imageGeneration: "gemini-3.1-flash-image",
 };
 
+export interface ActiveProviderConfig {
+  provider: "gemini" | "openai" | "claude" | "local";
+  apiKey: string;
+  model: string;
+  baseUrl: string;
+}
+
+export const DEFAULT_PROVIDER_CONFIG: ActiveProviderConfig = {
+  provider: "gemini",
+  apiKey: "",
+  model: "gemini-3.1-flash-lite",
+  baseUrl: "http://localhost:1234/v1",
+};
+
 interface AuthContextType {
   user: User | null;
   profile: UserProfile | null;
   loading: boolean;
   idToken: string | null;
+  isStandalone: boolean;
+  activeProviderConfig: ActiveProviderConfig;
+  updateProviderConfig: (config: Partial<ActiveProviderConfig>) => void;
   refreshProfile: () => Promise<void>;
   logout: () => Promise<void>;
   deleteAccount: () => Promise<void>;

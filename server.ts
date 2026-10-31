@@ -12,8 +12,12 @@ import {
   deleteFirestoreDoc,
   listFirestoreCollection,
 } from "./server/firestoreRest.js";
-import { imageProviderRegistry } from "./server/imageProviders/index.js";
 import { validateSafeExternalUrl } from "./server/urlValidator.js";
+import {
+  executeMultiProviderGeneration,
+  AIProviderConfig,
+  formatProviderErrorMessage,
+} from "./server/multiProvider.js";
 import type { Server as HttpServer } from "http";
 
 dotenv.config();
@@ -185,11 +189,49 @@ async function verifyAuthToken(idToken: string): Promise<{ uid: string; email?: 
   };
 }
 
+// Detect Standalone / Local Offline Mode (Zero-Firebase Mode)
+export const isStandaloneMode = process.env.STANDALONE_MODE === "true" ||
+  process.env.LOCAL_OFFLINE_MODE === "true" ||
+  !firebaseConfig.apiKey ||
+  firebaseConfig.apiKey === "YOUR_FIREBASE_API_KEY";
+
+export function resolveRequestProviderConfig(req: express.Request, fallbackKey?: string): AIProviderConfig {
+  const bodyConfig = req.body?.providerConfig;
+  const headerProvider = (req.headers["x-provider-type"] as string || "").toLowerCase();
+  const headerKey = (req.headers["x-provider-key"] as string || "").trim();
+  const headerUrl = (req.headers["x-provider-baseurl"] as string || "").trim();
+  const headerModel = (req.headers["x-provider-model"] as string || "").trim();
+
+  if (bodyConfig && typeof bodyConfig === "object" && bodyConfig.provider) {
+    return {
+      provider: bodyConfig.provider,
+      apiKey: bodyConfig.apiKey || fallbackKey || "",
+      model: bodyConfig.model || "",
+      baseUrl: bodyConfig.baseUrl || "",
+    };
+  }
+
+  if (headerProvider === "openai" || headerProvider === "claude" || headerProvider === "local" || headerProvider === "gemini") {
+    return {
+      provider: headerProvider,
+      apiKey: headerKey || fallbackKey || "",
+      model: headerModel || "",
+      baseUrl: headerUrl || "",
+    };
+  }
+
+  return {
+    provider: "gemini",
+    apiKey: fallbackKey || "",
+  };
+}
+
 // Interface for Authenticated Requests
 interface AuthenticatedRequest extends express.Request {
-  userAuth?: { uid: string; email?: string; emailVerified?: boolean };
+  userAuth?: { uid: string; email?: string; name?: string; emailVerified?: boolean };
   userAiClient?: GoogleGenAI;
   userApiKey?: string;
+  providerConfig?: AIProviderConfig;
 }
 
 // Helper to create a GoogleGenAI client supporting both standard API keys (AQ..., AIzaSy...) and OAuth access tokens (ya29...)
@@ -222,6 +264,28 @@ function createGoogleGenAIClient(apiKey: string): GoogleGenAI {
 async function verifyUserAuth(req: AuthenticatedRequest, res: express.Response, next: express.NextFunction) {
   try {
     const authHeader = req.headers.authorization;
+    const isStandaloneReq = isStandaloneMode ||
+      req.headers["x-standalone-mode"] === "true" ||
+      (authHeader && authHeader.startsWith("Bearer standalone_"));
+
+    if (isStandaloneReq) {
+      req.userAuth = {
+        uid: "standalone-local-creator",
+        email: "local@standalone.workspace",
+        name: "Local Creator",
+        emailVerified: true,
+      };
+      const headerKey = (req.headers["x-provider-key"] as string) || (req.headers["x-api-key"] as string) || "";
+      const bodyKey = req.body?.providerConfig?.apiKey || req.body?.apiKey || "";
+      const envKey = process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY || "";
+      const effectiveKey = headerKey || bodyKey || envKey || "standalone-local-key";
+
+      req.userApiKey = effectiveKey;
+      req.userAiClient = createGoogleGenAIClient(effectiveKey);
+      req.providerConfig = resolveRequestProviderConfig(req, effectiveKey);
+      return next();
+    }
+
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return res.status(401).json({ error: "Authentication required. Please log in to access AI features." });
     }
@@ -303,6 +367,7 @@ async function verifyUserAuth(req: AuthenticatedRequest, res: express.Response, 
     // Create a new GoogleGenAI client exclusively using the logged-in user's API key
     req.userApiKey = plainKey;
     req.userAiClient = createGoogleGenAIClient(plainKey);
+    req.providerConfig = resolveRequestProviderConfig(req, plainKey);
 
     next();
   } catch (error: any) {
@@ -569,8 +634,80 @@ app.post("/api/user/remove-key", writeRateLimiter, async (req, res) => {
   }
 });
 
+app.get("/api/system/mode", (_req, res) => {
+  return res.json({
+    standalone: isStandaloneMode,
+    supportedProviders: [
+      { id: "gemini", name: "Google Gemini", defaultModel: "gemini-3.1-flash-lite" },
+      { id: "openai", name: "OpenAI", defaultModel: "gpt-4o-mini" },
+      { id: "claude", name: "Anthropic Claude", defaultModel: "claude-3-7-sonnet-20250219" },
+      { id: "local", name: "Local LLM (LM Studio / Ollama / Bionic)", defaultModel: "default", defaultUrl: "http://localhost:1234/v1" }
+    ],
+    appName: "Script Automation Studio",
+    author: "Muhammad Tehseen Irshad",
+    brand: "Moni Visual Pro"
+  });
+});
+
+app.post("/api/test-provider-connection", verifyUserAuth as express.RequestHandler, async (req: AuthenticatedRequest, res) => {
+  try {
+    const config = req.providerConfig || resolveRequestProviderConfig(req, req.userApiKey);
+    const testResult = await executeMultiProviderGeneration({
+      prompt: "Respond with the single word 'CONNECTED' to verify our API integration connection.",
+      model: config.model,
+      userAiClient: req.userAiClient,
+      providerConfig: config,
+      fallbackApiKey: req.userApiKey,
+    });
+    return res.json({
+      success: true,
+      message: `Successfully connected to ${config.provider.toUpperCase()}!`,
+      modelUsed: testResult.modelUsed,
+      providerUsed: testResult.providerUsed,
+      response: testResult.text.slice(0, 100),
+    });
+  } catch (error: any) {
+    const provider = req.providerConfig?.provider || "gemini";
+    return res.status(400).json({ error: formatProviderErrorMessage(provider, error) });
+  }
+});
+
 app.get("/api/user/available-models", verifyUserAuth as express.RequestHandler, async (req: AuthenticatedRequest, res) => {
   try {
+    const provider = req.providerConfig?.provider || "gemini";
+    if (provider === "openai") {
+      return res.json({
+        models: [
+          { id: "gpt-4o-mini", displayName: "GPT-4o Mini (Fast & Cost Efficient)" },
+          { id: "gpt-4o", displayName: "GPT-4o (High Intelligence)" },
+          { id: "o3-mini", displayName: "o3-mini (Advanced Reasoning)" },
+          { id: "gpt-4-turbo", displayName: "GPT-4 Turbo" },
+        ]
+      });
+    }
+
+    if (provider === "claude") {
+      return res.json({
+        models: [
+          { id: "claude-3-7-sonnet-20250219", displayName: "Claude 3.7 Sonnet (Hybrid Reasoning)" },
+          { id: "claude-3-5-haiku-20241022", displayName: "Claude 3.5 Haiku (Lightning Fast)" },
+          { id: "claude-3-5-sonnet-20241022", displayName: "Claude 3.5 Sonnet (Legacy)" },
+        ]
+      });
+    }
+
+    if (provider === "local") {
+      return res.json({
+        models: [
+          { id: "default", displayName: "Local Default Active Model (LM Studio/Ollama)" },
+          { id: "llama-3.3-70b", displayName: "Llama 3.3 (70B / 8B)" },
+          { id: "deepseek-r1", displayName: "DeepSeek-R1 (Local Reasoning)" },
+          { id: "mistral-7b", displayName: "Mistral 7B / Nemo" },
+          { id: "qwen-2.5", displayName: "Qwen 2.5 Coder / Chat" },
+        ]
+      });
+    }
+
     const ai = req.userAiClient!;
     const defaultModels = [
       { id: "gemini-3.6-flash", displayName: "Gemini 3.6 Flash (Fast & Capable)" },
@@ -913,147 +1050,7 @@ app.post("/api/admin/sync-user", async (req, res) => {
   }
 });
 
-// ============================================================================
-// Google Flow Image Studio API Routes
-// ============================================================================
 
-// GET Available Models & Provider Config
-app.get("/api/image-studio/models", async (req, res) => {
-  try {
-    const activeProvider = imageProviderRegistry.getActiveProvider();
-    const allProviders = imageProviderRegistry.getAllProviders();
-    const models = await activeProvider.getAvailableModels();
-
-    return res.json({
-      activeProvider: {
-        id: activeProvider.id,
-        name: activeProvider.name,
-        description: activeProvider.description,
-        isOfficialFlow: activeProvider.isOfficialFlow,
-      },
-      allProviders,
-      models,
-    });
-  } catch (error: any) {
-    return res.status(500).json({ error: error.message || "Failed to load image models." });
-  }
-});
-
-// POST Generate Images
-app.post("/api/image-studio/generate", verifyUserAuth as express.RequestHandler, async (req: AuthenticatedRequest, res) => {
-  try {
-    const { prompt, negativePrompt, model, aspectRatio, numberOfImages, stylePreset, seed, referenceImage } = req.body;
-
-    if (!prompt || !prompt.trim()) {
-      return res.status(400).json({ error: "Image generation prompt is required." });
-    }
-
-    const apiKey = req.userApiKey;
-    if (!apiKey) {
-      return res.status(403).json({ error: "API key required for image generation. Please add your API Key in Settings." });
-    }
-
-    const activeProvider = imageProviderRegistry.getActiveProvider();
-    const images = await activeProvider.generateImages(apiKey, {
-      prompt,
-      negativePrompt,
-      model,
-      aspectRatio,
-      numberOfImages: numberOfImages || 1,
-      stylePreset,
-      seed,
-      referenceImage,
-    });
-
-    // Save generated images to user Firestore history if authenticated
-    if (req.userAuth?.uid && req.headers.authorization) {
-      const token = req.headers.authorization.substring(7);
-      try {
-        const userDoc = await getFirestoreDoc("users", req.userAuth.uid, token);
-        const existingHistory = userDoc.data?.imageHistory || [];
-        const updatedHistory = [...images, ...existingHistory].slice(0, 50); // Keep last 50
-        await updateFirestoreDoc("users", req.userAuth.uid, {
-          imageHistory: updatedHistory,
-          updatedAt: new Date().toISOString(),
-        }, token);
-      } catch (histErr) {
-        logSafeError("Failed to save image history to Firestore:", histErr);
-      }
-    }
-
-    return res.json({ success: true, images });
-  } catch (error: any) {
-    logSafeError("Image generation error:", error);
-    return res.status(500).json({ error: "Image generation failed." });
-  }
-});
-
-// POST AI Prompt Enhancer (Google Flow Style "Enhance / Expand Prompt")
-app.post("/api/image-studio/enhance-prompt", verifyUserAuth as express.RequestHandler, async (req: AuthenticatedRequest, res) => {
-  try {
-    const { prompt, stylePreset } = req.body;
-    if (!prompt || !prompt.trim()) {
-      return res.status(400).json({ error: "Prompt text is required." });
-    }
-
-    const ai = req.userAiClient!;
-    const enhancementPrompt = `
-You are an expert AI Image Generation Prompt Engineer specializing in Google Flow Studio and Imagen 3 prompts.
-Transform the following raw user prompt into a rich, highly detailed, photorealistic visual prompt suitable for Google Flow / Imagen 3.
-Incorporate lighting, camera angle, atmospheric details, artistic composition, texture, color grading, and focal clarity.
-If a style preset is specified (${stylePreset || "None"}), seamlessly integrate that style.
-
-User Raw Prompt: "${prompt}"
-
-Return ONLY the enhanced prompt string. Do not include markdown headers, quotes, or conversational preamble.
-`;
-
-    const response = await generateContentWithRetry(ai, {
-      model: "gemini-3.1-flash-lite",
-      contents: enhancementPrompt,
-    });
-
-    const enhancedText = response.text ? response.text.trim() : prompt;
-    return res.json({ success: true, enhancedPrompt: enhancedText });
-  } catch (error: any) {
-    logSafeError("Enhance prompt error:", error);
-    return res.status(500).json({ error: "Failed to enhance prompt." });
-  }
-});
-
-// GET Image History
-app.get("/api/image-studio/history", verifyUserAuth as express.RequestHandler, async (req: AuthenticatedRequest, res) => {
-  try {
-    const token = req.headers.authorization!.substring(7);
-    const userDoc = await getFirestoreDoc("users", req.userAuth!.uid, token);
-    const history = userDoc.data?.imageHistory || [];
-    return res.json({ success: true, history });
-  } catch (error: any) {
-    logSafeError("Get image history error:", error);
-    return res.status(500).json({ error: "Failed to retrieve image history." });
-  }
-});
-
-// DELETE Image from History
-app.delete("/api/image-studio/history/:imageId", verifyUserAuth as express.RequestHandler, async (req: AuthenticatedRequest, res) => {
-  try {
-    const { imageId } = req.params;
-    const token = req.headers.authorization!.substring(7);
-    const userDoc = await getFirestoreDoc("users", req.userAuth!.uid, token);
-    const existingHistory: any[] = userDoc.data?.imageHistory || [];
-    const updatedHistory = existingHistory.filter((img: any) => img.id !== imageId);
-
-    await updateFirestoreDoc("users", req.userAuth!.uid, {
-      imageHistory: updatedHistory,
-      updatedAt: new Date().toISOString(),
-    }, token);
-
-    return res.json({ success: true });
-  } catch (error: any) {
-    logSafeError("Delete image history error:", error);
-    return res.status(500).json({ error: "Failed to delete image." });
-  }
-});
 
 // ============================================================================
 // 8-Tier Demographic Target Audience Linguistic Directive Engine
@@ -1278,16 +1275,18 @@ ${rawScript}
 Ensure the output is 100% plagiarism-free, customized for a ${voicePersona} speaker, written in the "${transOpt}" format, strictly tailored for the target audience "${getTargetAudienceDirective(targetAudience).label}" (${getTargetAudienceDirective(targetAudience).directive}), following the "${topicNiche}" niche and "${tutorialTone}" tone, and starting with greeting "${greetingsPrefix || ""}" and hook "${customHook || ""}".
 `;
 
-      const response = await generateContentWithRetry(ai, {
+      const providerConfig = req.providerConfig || resolveRequestProviderConfig(req, req.userApiKey);
+      const genResult = await executeMultiProviderGeneration({
+        prompt,
+        systemInstruction,
         model: modelToUse,
-        contents: prompt,
-        config: {
-          systemInstruction,
-          temperature: 0.82, // High temperature to force creative variations
-        },
+        temperature: 0.82,
+        userAiClient: ai,
+        providerConfig,
+        fallbackApiKey: req.userApiKey,
       });
 
-      return (response.text || "").trim();
+      return genResult.text;
     };
 
     // Execute all 4 generations in parallel to minimize response time
@@ -1298,7 +1297,8 @@ Ensure the output is 100% plagiarism-free, customized for a ${voicePersona} spea
           return { key: opt, text };
         } catch (err: any) {
           logSafeError(`Error generating transformation "${opt}":`, err);
-          return { key: opt, text: `Error generating transform: ${formatGeminiErrorMessage(err)}` };
+          const provider = req.providerConfig?.provider || "gemini";
+          return { key: opt, text: `Error generating transform: ${formatProviderErrorMessage(provider, err)}` };
         }
       })
     );
@@ -1335,20 +1335,26 @@ app.post("/api/generate-topic", verifyUserAuth as express.RequestHandler, aiBurs
 
     const ai = req.userAiClient!;
     const modelToUse = req.body.model || "gemini-3.1-flash-lite";
-    const response = await generateContentWithRetry(ai, {
-      model: modelToUse,
-      contents: `Generate a detailed, high-quality script on the topic: "${topic.slice(0, 1000)}".
+    const providerConfig = req.providerConfig || resolveRequestProviderConfig(req, req.userApiKey);
+
+    const result = await executeMultiProviderGeneration({
+      prompt: `Generate a detailed, high-quality script on the topic: "${topic.slice(0, 1000)}".
 The script should be approximately ${targetWords} words.
 Target Niche/Domain: "${(topicNiche || "General").slice(0, 100)}"
 Tone/Vibe: "${(tutorialTone || "Warm Friendly Conversational").slice(0, 100)}"
 ${audienceInfo.directive}
 Adapt the vocabulary, sentence pacing, examples, and tone specifically for "${audienceInfo.label}". Write directly as clean raw content ready for voiceover and script transformation. Return ONLY the script text itself.`,
+      model: modelToUse,
+      userAiClient: ai,
+      providerConfig,
+      fallbackApiKey: req.userApiKey,
     });
 
-    res.json({ rawScript: (response.text || "").trim(), modelUsed: modelToUse });
+    res.json({ rawScript: result.text, modelUsed: result.modelUsed, providerUsed: result.providerUsed });
   } catch (error: any) {
     logSafeError("Error in /api/generate-topic:", error);
-    res.status(500).json({ error: "An error occurred generating from topic." });
+    const provider = req.providerConfig?.provider || "gemini";
+    res.status(500).json({ error: formatProviderErrorMessage(provider, error) });
   }
 });
 
@@ -1582,34 +1588,38 @@ You MUST output exactly ${count} scenes. Return the output as a JSON object matc
 }
 `;
 
-    const response = await generateContentWithRetry(ai, {
-      model: "gemini-3.1-flash-lite",
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            scenes: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  id: { type: Type.INTEGER },
-                  text: { type: Type.STRING }
-                },
-                required: ["id", "text"]
-              }
-            }
-          },
-          required: ["scenes"]
+    const providerConfig = req.providerConfig || resolveRequestProviderConfig(req, req.userApiKey);
+    const jsonSchema = {
+      type: Type.OBJECT,
+      properties: {
+        scenes: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              id: { type: Type.INTEGER },
+              text: { type: Type.STRING }
+            },
+            required: ["id", "text"]
+          }
         }
-      }
+      },
+      required: ["scenes"]
+    };
+
+    const genResult = await executeMultiProviderGeneration({
+      prompt,
+      responseMimeType: "application/json",
+      jsonSchema,
+      model: "gemini-3.1-flash-lite",
+      userAiClient: ai,
+      providerConfig,
+      fallbackApiKey: req.userApiKey,
     });
 
     let data;
     try {
-      data = JSON.parse(response.text || "{}");
+      data = JSON.parse(genResult.text || "{}");
     } catch {
       data = { scenes: [] };
     }
@@ -1617,7 +1627,8 @@ You MUST output exactly ${count} scenes. Return the output as a JSON object matc
     res.json(data);
   } catch (error: any) {
     logSafeError("Error in /api/generate-scenes:", error);
-    res.status(500).json({ error: "An error occurred generating scenes." });
+    const provider = req.providerConfig?.provider || "gemini";
+    res.status(500).json({ error: formatProviderErrorMessage(provider, error) });
   }
 });
 
@@ -1667,15 +1678,20 @@ Please provide a fresh, significantly improved cinematic video generation prompt
 Output ONLY the ${linesCount} lines of descriptive text itself with NO "Scene X:" label, NO "Line N:" prefixes, and NO introductory or concluding commentary. Just the direct prompt in English.
 `;
 
-    const response = await generateContentWithRetry(ai, {
+    const providerConfig = req.providerConfig || resolveRequestProviderConfig(req, req.userApiKey);
+    const genResult = await executeMultiProviderGeneration({
+      prompt,
       model: "gemini-3.1-flash-lite",
-      contents: prompt,
+      userAiClient: ai,
+      providerConfig,
+      fallbackApiKey: req.userApiKey,
     });
 
-    res.json({ sceneText: (response.text || "").trim() });
+    res.json({ sceneText: genResult.text });
   } catch (error: any) {
     logSafeError("Error in /api/regenerate-scene:", error);
-    res.status(500).json({ error: "An error occurred regenerating the scene." });
+    const provider = req.providerConfig?.provider || "gemini";
+    res.status(500).json({ error: formatProviderErrorMessage(provider, error) });
   }
 });
 
@@ -1801,22 +1817,26 @@ Return your response as a valid JSON object matching this schema:
       schemaRequired.push("tags");
     }
 
-    const response = await generateContentWithRetry(ai, {
+    const providerConfig = req.providerConfig || resolveRequestProviderConfig(req, req.userApiKey);
+    const jsonSchema = {
+      type: Type.OBJECT,
+      properties: schemaProps,
+      required: schemaRequired
+    };
+
+    const genResult = await executeMultiProviderGeneration({
+      prompt,
+      responseMimeType: "application/json",
+      jsonSchema,
       model: "gemini-3.1-flash-lite",
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: schemaProps,
-          required: schemaRequired
-        }
-      }
+      userAiClient: ai,
+      providerConfig,
+      fallbackApiKey: req.userApiKey,
     });
 
     let data;
     try {
-      data = JSON.parse(response.text || "{}");
+      data = JSON.parse(genResult.text || "{}");
     } catch {
       data = {};
     }
@@ -1824,7 +1844,8 @@ Return your response as a valid JSON object matching this schema:
     res.json(data);
   } catch (error: any) {
     logSafeError("Error in /api/generate-ctr:", error);
-    res.status(500).json({ error: "An error occurred generating CTR growth assets." });
+    const provider = req.providerConfig?.provider || "gemini";
+    res.status(500).json({ error: formatProviderErrorMessage(provider, error) });
   }
 });
 
@@ -2250,26 +2271,42 @@ Return your response as a valid JSON object matching this schema:
       }
       contentsArray.push({ text: prompt });
 
-      const response = await generateContentWithRetry(ai, {
-        model: "gemini-3.1-flash-lite",
-        contents: contentsArray,
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              thumbnailPrompt: { type: Type.STRING },
-              headlineUrdu: { type: Type.STRING },
-              smallTaglineUrdu: { type: Type.STRING }
-            },
-            required: ["thumbnailPrompt", "headlineUrdu", "smallTaglineUrdu"]
+      let responseText = "";
+      const providerConfig = req.providerConfig || resolveRequestProviderConfig(req, req.userApiKey);
+
+      if (inlineDataPart || providerConfig.provider === "gemini") {
+        const response = await generateContentWithRetry(ai, {
+          model: "gemini-3.1-flash-lite",
+          contents: contentsArray,
+          config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: Type.OBJECT,
+              properties: {
+                thumbnailPrompt: { type: Type.STRING },
+                headlineUrdu: { type: Type.STRING },
+                smallTaglineUrdu: { type: Type.STRING }
+              },
+              required: ["thumbnailPrompt", "headlineUrdu", "smallTaglineUrdu"]
+            }
           }
-        }
-      });
+        });
+        responseText = response.text || "{}";
+      } else {
+        const genResult = await executeMultiProviderGeneration({
+          prompt,
+          responseMimeType: "application/json",
+          model: "gemini-3.1-flash-lite",
+          userAiClient: ai,
+          providerConfig,
+          fallbackApiKey: req.userApiKey,
+        });
+        responseText = genResult.text;
+      }
 
       let data;
       try {
-        const parsed = JSON.parse(response.text || "{}");
+        const parsed = JSON.parse(responseText);
         data = {
           engine: "nano_banana",
           thumbnailPrompt: parsed.thumbnailPrompt,
@@ -2409,22 +2446,20 @@ Return the output in the "tags" array.`;
       return res.status(400).json({ error: "Invalid field requested." });
     }
 
-    const response = await generateContentWithRetry(ai, {
-
-
+    const providerConfig = req.providerConfig || resolveRequestProviderConfig(req, req.userApiKey);
+    const genResult = await executeMultiProviderGeneration({
+      prompt: fieldPrompt,
+      responseMimeType: "application/json",
+      jsonSchema: responseSchema,
       model: "gemini-3.1-flash-lite",
-
-
-      contents: fieldPrompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema
-      }
+      userAiClient: ai,
+      providerConfig,
+      fallbackApiKey: req.userApiKey,
     });
 
     let data;
     try {
-      data = JSON.parse(response.text || "{}");
+      data = JSON.parse(genResult.text || "{}");
     } catch {
       data = {};
     }
@@ -2432,7 +2467,8 @@ Return the output in the "tags" array.`;
     res.json(data);
   } catch (error: any) {
     logSafeError("Error in /api/regenerate-ctr-field:", error);
-    res.status(500).json({ error: "An error occurred regenerating the field." });
+    const provider = req.providerConfig?.provider || "gemini";
+    res.status(500).json({ error: formatProviderErrorMessage(provider, error) });
   }
 });
 

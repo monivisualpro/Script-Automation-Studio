@@ -430,10 +430,47 @@ The built-in **Flow Image Studio** lets you turn prompts into finished visual as
 
 ---
 
-## 12. Brand, Author & License
+## 12. Local Standalone Mode & Multi-Provider LLM Engine (New)
+
+Script Automation Studio supports both **Cloud Enterprise Mode** (with Firebase authentication, Firestore synchronization, and secure team workflows) and **Zero-Setup Local Standalone Mode** for developers cloning the repository.
+
+### A. Dual-Mode Operation (`STANDALONE_MODE`)
+- **Live Cloud Web App**: Uses Firebase Auth and Firestore for multi-user management.
+- **Local GitHub Clone**: You can run the app offline on your PC without creating any Firebase account:
+  1. Clone the repository:
+     ```bash
+     git clone https://github.com/your-username/script-automation-studio.git
+     cd script-automation-studio
+     npm install
+     ```
+  2. Create a `.env` file in the root directory and add your API key:
+     ```env
+     STANDALONE_MODE=true
+     GEMINI_API_KEY=AIzaSy...
+     ```
+  3. Start the local server:
+     ```bash
+     npm run dev
+     ```
+     The app will bypass the login screen and connect directly to your local API.
+
+### B. Multi-Provider LLM Engine (Gemini, OpenAI, Claude & Local Models)
+In addition to Google Gemini, you can now seamlessly switch your AI provider in **Settings** to:
+1. **Google Gemini** (Gemini 3.1 Flash Lite, 2.5 Flash, 3.1 Pro)
+2. **OpenAI** (GPT-4o, GPT-4o-mini, o3-mini)
+3. **Anthropic Claude** (Claude 3.7 Sonnet, Claude 3.5 Haiku)
+4. **Local Models (LM Studio / Ollama / Bionic LLM Studio)**:
+   - Run open-source models (Llama 3.3, DeepSeek-R1, Mistral, Qwen 2.5) 100% offline on your own GPU.
+   - Simply enter your local endpoint URL (e.g., `http://localhost:1234/v1` for LM Studio or `http://localhost:11434/v1` for Ollama) and your model name in Settings.
+   - Cost: **$0.00** forever, zero internet required.
+
+---
+
+## 13. Brand, Author & License
 
 - **Software Name**: Script Automation Studio
 - **Brand**: Moni Visual Pro
 - **Architect & Author**: Muhammad Tehseen Irshad
 - **Live Web App**: [https://script-automation-studio.ai.studio/](https://script-automation-studio.ai.studio/)
 - **License**: MIT License (see [LICENSE.md](./LICENSE.md))
+

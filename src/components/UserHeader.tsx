@@ -149,16 +149,7 @@ export const UserHeader: React.FC = () => {
           <span className="text-xs font-mono font-bold hidden sm:inline">Tutorials & Guides</span>
         </button>
 
-        {/* Image Studio Modal Trigger Button */}
-        <button
-          onClick={() => setIsImageStudioOpen(true)}
-          className="px-3.5 py-2 rounded-2xl text-white transition-all cursor-pointer flex items-center gap-1.5 shadow-lg border"
-          style={{ backgroundColor: theme.accentColor, borderColor: theme.accentColor }}
-          title="Open Image Generation Studio"
-        >
-          <Wand2 className="h-4 w-4" />
-          <span className="text-xs font-mono font-bold hidden sm:inline">Image Studio</span>
-        </button>
+
 
         {/* Settings Button */}
         <button
