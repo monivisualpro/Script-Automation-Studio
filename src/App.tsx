@@ -318,6 +318,7 @@ export default function App() {
     modelSettings,
     currentTheme,
     currentBrand,
+    isStandalone,
   } = useAuth();
 
   const theme = getThemeConfig(currentTheme, currentBrand);
@@ -326,6 +327,13 @@ export default function App() {
 
   // Access validation and auth header constructor
   const checkAccessAndGetHeaders = (): Record<string, string> | null => {
+    if (isStandalone) {
+      return {
+        "Content-Type": "application/json",
+        Authorization: "Bearer standalone_local",
+        "x-standalone-mode": "true",
+      };
+    }
     if (!user) {
       setIsAuthModalOpen(true);
       setError("Authentication required: Please Sign Up or Log In first.");
@@ -333,7 +341,7 @@ export default function App() {
     }
     if (!profile?.hasApiKey) {
       setIsApiKeyModalOpen(true);
-      setError("Google AI API Key required: Please add your personal API key to continue.");
+      setError("AI Provider Key required: Please add your API key or configure your provider.");
       return null;
     }
     return {
@@ -1462,7 +1470,7 @@ export default function App() {
       <TutorialGuideModal />
 
       {/* Unauthenticated / Missing API Key Alert Banners */}
-      {!user && (
+      {!user && !isStandalone && (
         <div
           className="border-b px-4 py-3 text-center text-xs font-mono flex flex-col sm:flex-row items-center justify-center gap-3 backdrop-blur-md shadow-md"
           style={{
