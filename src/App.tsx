@@ -9,6 +9,7 @@ import { SettingsModal } from "./components/SettingsModal";
 import { AdminModal } from "./components/AdminModal";
 import { ImageStudioModal } from "./components/ImageStudioModal";
 import { TutorialGuideModal } from "./components/TutorialGuideModal";
+import { isValidExternalHttpUrl } from "./lib/urlValidator";
 import {
   Volume2,
   VolumeX,
@@ -36,7 +37,6 @@ import {
   Calculator,
   Image,
   User,
-  ShieldCheck,
   Key,
   LogIn,
   Youtube,
@@ -1119,7 +1119,12 @@ export default function App() {
 
   const handleExtractTranscript = async (mode: "direct" | "gemini" = "direct") => {
     if (!videoUrl.trim()) {
-      alert("Please enter a video URL first.");
+      setError("Please enter a video URL first.");
+      return;
+    }
+    const urlValidation = isValidExternalHttpUrl(videoUrl);
+    if (!urlValidation.valid) {
+      setError(urlValidation.error || "Please enter a valid http:// or https:// video URL.");
       return;
     }
     const headers = checkAccessAndGetHeaders();
@@ -1137,11 +1142,14 @@ export default function App() {
         headers,
         body: JSON.stringify({
           model: modelSettings.youtubeTranscript,
-          url: videoUrl,
+          url: videoUrl.trim(),
           mode,
         }),
       });
-      if (!res.ok) throw new Error("Failed to extract transcript.");
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "Failed to extract transcript.");
+      }
       const data = await res.json();
       setRawScript(data.transcript);
     } catch (err: any) {
@@ -1159,12 +1167,23 @@ export default function App() {
   ) => {
     if (!file) return;
     setError(null);
+
+    // Client-side file size check (5MB limit)
+    const MAX_FILE_SIZE = 5 * 1024 * 1024;
+    if (file.size > MAX_FILE_SIZE) {
+      setError("File exceeds the 5MB size limit. Please upload a smaller document.");
+      return;
+    }
+
     const reader = new FileReader();
 
     if (file.name.endsWith(".txt")) {
       reader.onload = (event) => {
         const text = event.target?.result as string;
         onSuccess(text);
+      };
+      reader.onerror = () => {
+        setError("Failed to read text file. Please try again.");
       };
       reader.readAsText(file);
     } else if (file.name.endsWith(".pdf")) {
@@ -1189,7 +1208,10 @@ export default function App() {
               fileData: base64Data,
             }),
           });
-          if (!res.ok) throw new Error("Failed to parse PDF.");
+          if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.error || "Failed to parse PDF.");
+          }
           const data = await res.json();
           onSuccess(data.extractedText);
         } catch (err: any) {
@@ -1199,9 +1221,12 @@ export default function App() {
           else setLoading(false);
         }
       };
+      reader.onerror = () => {
+        setError("Failed to read PDF file. Please try again.");
+      };
       reader.readAsDataURL(file);
     } else {
-      alert("Unsupported file type. Please upload a .txt or .pdf file.");
+      setError("Unsupported file type. Please upload a valid .txt or .pdf file.");
     }
   };
 
@@ -1234,10 +1259,18 @@ export default function App() {
     if (!file) return;
     
     if (!file.type.startsWith("image/")) {
-      alert("Please upload a valid image file (PNG, JPG, JPEG, WEBP).");
+      setError("Please upload a valid image file (PNG, JPG, JPEG, WEBP).");
+      return;
+    }
+
+    // Client-side image size check (5MB limit)
+    const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+    if (file.size > MAX_IMAGE_SIZE) {
+      setError("Character image exceeds the 5MB size limit. Please upload a smaller image.");
       return;
     }
     
+    setError(null);
     const reader = new FileReader();
     reader.onload = () => {
       if (typeof reader.result === "string") {
@@ -1247,7 +1280,7 @@ export default function App() {
       }
     };
     reader.onerror = () => {
-      alert("Failed to read image file.");
+      setError("Failed to read image file. Please try again.");
     };
     reader.readAsDataURL(file);
   };

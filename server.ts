@@ -13,6 +13,7 @@ import {
   listFirestoreCollection,
 } from "./server/firestoreRest.js";
 import { imageProviderRegistry } from "./server/imageProviders/index.js";
+import { validateSafeExternalUrl } from "./server/urlValidator.js";
 import type { Server as HttpServer } from "http";
 
 dotenv.config();
@@ -41,6 +42,29 @@ function logSafeError(context: string, error: unknown): void {
 }
 
 app.disable("x-powered-by");
+
+// Security Headers & Content-Security-Policy
+app.use((_req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(self), geolocation=()");
+  res.setHeader(
+    "Content-Security-Policy",
+    [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://apis.google.com https://www.gstatic.com",
+      "connect-src 'self' https://*.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com https://*.firebaseio.com",
+      "img-src 'self' data: blob: https://*.googleusercontent.com https://api.dicebear.com https://images.unsplash.com https://*.run.app",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      "font-src 'self' https://fonts.gstatic.com data:",
+      "media-src 'self' blob: data:",
+      "frame-src 'self' https://*.firebaseapp.com https://*.google.com",
+      "frame-ancestors 'self' https://*.google.com https://*.googleusercontent.com https://*.ai.studio https://*.run.app https://script-automation-studio.ai.studio"
+    ].join("; ")
+  );
+  next();
+});
+
 const PORT = Number(process.env.PORT) || 3000;
 const HOST = "0.0.0.0";
 const isElectron = Boolean(process.versions?.electron);
@@ -93,6 +117,8 @@ function createRateLimiter(maxRequests: number, windowMs: number, errorMessage: 
 const apiRateLimiter = createRateLimiter(60, 60 * 1000, "Rate limit exceeded (max 60 requests/minute).");
 // Sensitive account/key write rate limit (15 requests / 15 minutes per client)
 const writeRateLimiter = createRateLimiter(15, 15 * 60 * 1000, "Too many account or key update attempts.");
+// Heavy AI generation burst limit (30 requests / 1 minute per client)
+const aiBurstLimiter = createRateLimiter(30, 60 * 1000, "Too many AI generation requests. Please wait a moment before sending more.");
 
 app.use("/api", apiRateLimiter);
 
@@ -1099,7 +1125,7 @@ function getTargetAudienceDirective(targetAudience?: string): { label: string; d
 }
 
 // Protected AI Script Generation API Routes
-app.post("/api/generate", verifyUserAuth as express.RequestHandler, async (req: AuthenticatedRequest, res) => {
+app.post("/api/generate", verifyUserAuth as express.RequestHandler, aiBurstLimiter, async (req: AuthenticatedRequest, res) => {
   try {
     const {
       rawScript,
@@ -1115,8 +1141,12 @@ app.post("/api/generate", verifyUserAuth as express.RequestHandler, async (req: 
       selectedCountries,
     } = req.body;
 
-    if (!rawScript || rawScript.trim() === "") {
+    if (!rawScript || typeof rawScript !== "string" || rawScript.trim() === "") {
       return res.status(400).json({ error: "Source script is required." });
+    }
+
+    if (rawScript.length > 100000) {
+      return res.status(400).json({ error: "Source script exceeds the maximum length limit of 100,000 characters." });
     }
 
     const ai = req.userAiClient!;
@@ -1290,23 +1320,27 @@ Ensure the output is 100% plagiarism-free, customized for a ${voicePersona} spea
 });
 
 // Generate a script draft based on a Topic & Word Count limit
-app.post("/api/generate-topic", verifyUserAuth as express.RequestHandler, async (req: AuthenticatedRequest, res) => {
+app.post("/api/generate-topic", verifyUserAuth as express.RequestHandler, aiBurstLimiter, async (req: AuthenticatedRequest, res) => {
   try {
     const { topic, wordCount, targetAudience, topicNiche, tutorialTone } = req.body;
-    if (!topic || !topic.trim()) {
+    if (!topic || typeof topic !== "string" || !topic.trim()) {
       return res.status(400).json({ error: "Topic is required." });
     }
-    const targetWords = parseInt(wordCount) || 300;
+    if (topic.length > 1000) {
+      return res.status(400).json({ error: "Topic exceeds the maximum limit of 1,000 characters." });
+    }
+    const rawWordCount = parseInt(wordCount, 10);
+    const targetWords = isNaN(rawWordCount) ? 300 : Math.min(5000, Math.max(50, rawWordCount));
     const audienceInfo = getTargetAudienceDirective(targetAudience);
 
     const ai = req.userAiClient!;
     const modelToUse = req.body.model || "gemini-3.1-flash-lite";
     const response = await generateContentWithRetry(ai, {
       model: modelToUse,
-      contents: `Generate a detailed, high-quality script on the topic: "${topic}".
+      contents: `Generate a detailed, high-quality script on the topic: "${topic.slice(0, 1000)}".
 The script should be approximately ${targetWords} words.
-Target Niche/Domain: "${topicNiche || "General"}"
-Tone/Vibe: "${tutorialTone || "Warm Friendly Conversational"}"
+Target Niche/Domain: "${(topicNiche || "General").slice(0, 100)}"
+Tone/Vibe: "${(tutorialTone || "Warm Friendly Conversational").slice(0, 100)}"
 ${audienceInfo.directive}
 Adapt the vocabulary, sentence pacing, examples, and tone specifically for "${audienceInfo.label}". Write directly as clean raw content ready for voiceover and script transformation. Return ONLY the script text itself.`,
     });
@@ -1319,19 +1353,26 @@ Adapt the vocabulary, sentence pacing, examples, and tone specifically for "${au
 });
 
 // Extract clean word-by-word spoken transcript from Video URL via Gemini
-app.post("/api/extract-transcript", verifyUserAuth as express.RequestHandler, async (req: AuthenticatedRequest, res) => {
+app.post("/api/extract-transcript", verifyUserAuth as express.RequestHandler, aiBurstLimiter, async (req: AuthenticatedRequest, res) => {
   try {
     const { url, mode } = req.body;
-    if (!url || !url.trim()) {
+    if (!url || typeof url !== "string" || !url.trim()) {
       return res.status(400).json({ error: "URL is required." });
     }
+
+    // SSRF and DNS Rebinding Protection
+    const urlValidation = await validateSafeExternalUrl(url);
+    if (!urlValidation.valid) {
+      return res.status(400).json({ error: urlValidation.error || "Invalid or restricted URL." });
+    }
+    const safeUrl = urlValidation.sanitizedUrl || url.trim();
 
     const ai = req.userAiClient!;
     
     let prompt = "";
     if (mode === "gemini") {
       prompt = `You are an expert content creator, AI transcriber, and scriptwriter.
-We have a social media video link: "${url}".
+We have a social media video link: "${safeUrl}".
 Based on the URL structure, keywords, handles, usernames, video ID, slug, and topic indicators found in this link, generate/reconstruct the complete, high-quality, word-for-word spoken transcript of this video.
 Rules:
 - Generate a highly realistic, full-length spoken transcript as if it were spoken word-for-word in the video.
@@ -1340,7 +1381,7 @@ Rules:
 - DO NOT write any meta-introductions or commentary.
 - Return ONLY the clean transcript text, starting directly with the spoken dialogue.`;
     } else {
-      prompt = `You are an advanced video transcribing and content generation agent. Given this video/social media URL: "${url}", use your web browsing tool and url context tool to access the URL if possible and retrieve or reconstruct the complete, high-quality, word-for-word spoken transcript of the video.
+      prompt = `You are an advanced video transcribing and content generation agent. Given this video/social media URL: "${safeUrl}", use your web browsing tool and url context tool to access the URL if possible and retrieve or reconstruct the complete, high-quality, word-for-word spoken transcript of the video.
 If direct transcription is restricted, extract metadata from the page structure, usernames, handles, keywords, video ID, or slug keywords, and reconstruct an incredibly natural, high-quality, word-for-word spoken transcript of this video (such as an educational tutorial, medical advice, culinary vlog, or documentary).
 Ensure the transcript has a native human conversational feel with clear hooks and transitions.
 Return ONLY the clean, word-by-word spoken transcript text with NO speaker tags, timestamps, meta-introductions, descriptions, or surrounding commentary. Start directly with the spoken dialogue.`;
@@ -1348,7 +1389,7 @@ Return ONLY the clean, word-by-word spoken transcript text with NO speaker tags,
 
     let transcript = "";
     try {
-      console.log("Calling Antigravity Agent for transcript extraction of URL:", url);
+      console.log("Calling Antigravity Agent for transcript extraction of URL:", safeUrl);
       const interaction = await ai.interactions.create({
         agent: "antigravity-preview-05-2026",
         input: prompt,
@@ -1384,22 +1425,49 @@ Return ONLY the clean, word-by-word spoken transcript text with NO speaker tags,
 });
 
 // Parse File (.txt or PDF) using Gemini for direct text extraction
-app.post("/api/parse-file", verifyUserAuth as express.RequestHandler, async (req: AuthenticatedRequest, res) => {
+app.post("/api/parse-file", verifyUserAuth as express.RequestHandler, aiBurstLimiter, async (req: AuthenticatedRequest, res) => {
   try {
     const { fileName, fileType, fileData } = req.body;
-    if (!fileData) {
+    if (!fileData || typeof fileData !== "string") {
       return res.status(400).json({ error: "File data is required." });
+    }
+
+    // Clean and sanitize file name (prevent path traversal or header injection)
+    const sanitizedFileName = typeof fileName === "string" 
+      ? path.basename(fileName).slice(0, 100) 
+      : "document";
+
+    // Clean base64 string
+    const rawBase64 = fileData.includes(",") ? fileData.split(",")[1] : fileData;
+    
+    // Prevent oversized base64 payloads from memory-intensive processing (5MB limit)
+    // 5MB decoded ~ 6.7MB base64
+    if (rawBase64.length > 7 * 1024 * 1024) {
+      return res.status(400).json({ error: "File payload exceeds the 5MB size limit." });
+    }
+
+    const buffer = Buffer.from(rawBase64, "base64");
+    if (buffer.length > 5 * 1024 * 1024) {
+      return res.status(400).json({ error: "Decoded file exceeds the 5MB size limit." });
     }
 
     const ai = req.userAiClient!;
     let contents: any[] = [];
     
-    if (fileType && fileType.includes("pdf")) {
+    const isPdf = Boolean(fileType && fileType.includes("pdf")) || sanitizedFileName.toLowerCase().endsWith(".pdf");
+
+    if (isPdf) {
+      // Validate PDF Magic Bytes: 0x25 0x50 0x44 0x46 ("%PDF-")
+      const magic = buffer.subarray(0, 5).toString("ascii");
+      if (!magic.startsWith("%PDF")) {
+        return res.status(400).json({ error: "Invalid PDF format. File header does not match PDF specification (%PDF-)." });
+      }
+
       contents = [
         {
           inlineData: {
             mimeType: "application/pdf",
-            data: fileData, // assumes fileData is base64 string
+            data: buffer.toString("base64"),
           }
         },
         {
@@ -1407,22 +1475,24 @@ app.post("/api/parse-file", verifyUserAuth as express.RequestHandler, async (req
         }
       ];
     } else {
-      let plainText = fileData;
-      if (fileData.startsWith("data:") || (fileType && (fileType.includes("text") || fileType.includes("plain")))) {
-        try {
-          const buffer = Buffer.from(fileData, "base64");
-          plainText = buffer.toString("utf-8");
-        } catch {
-          plainText = fileData;
-        }
+      // Plain text validation: check for valid UTF-8 and no excessive binary/null bytes
+      const sample = buffer.subarray(0, Math.min(buffer.length, 1024));
+      let nullByteCount = 0;
+      for (let i = 0; i < sample.length; i++) {
+        if (sample[i] === 0) nullByteCount++;
       }
-      contents = [`Extract and return the full text content of this document:\n\n${plainText}`];
+      if (nullByteCount > 2) {
+        return res.status(400).json({ error: "Invalid text file format. Binary content detected." });
+      }
+
+      const plainText = buffer.toString("utf-8");
+      // Cap extracted text length to prevent prompt injection overflow
+      const cappedText = plainText.slice(0, 100000);
+      contents = [`Extract and return the full text content of this document:\n\n${cappedText}`];
     }
 
     const response = await generateContentWithRetry(ai, {
-
       model: "gemini-3.1-flash-lite",
-      
       contents,
     });
 
@@ -1434,11 +1504,14 @@ app.post("/api/parse-file", verifyUserAuth as express.RequestHandler, async (req
 });
 
 // Divide Transcript into scenes and generate Text-to-Video prompts for each
-app.post("/api/generate-scenes", verifyUserAuth as express.RequestHandler, async (req: AuthenticatedRequest, res) => {
+app.post("/api/generate-scenes", verifyUserAuth as express.RequestHandler, aiBurstLimiter, async (req: AuthenticatedRequest, res) => {
   try {
     const { transcript, numScenes, category, format, promptLineCount } = req.body;
-    if (!transcript || !transcript.trim()) {
+    if (!transcript || typeof transcript !== "string" || !transcript.trim()) {
       return res.status(400).json({ error: "Transcript is required." });
+    }
+    if (transcript.length > 100000) {
+      return res.status(400).json({ error: "Transcript exceeds the maximum length limit of 100,000 characters." });
     }
     const count = parseInt(numScenes) || 10;
     const cat = category || "General";
@@ -1549,9 +1622,12 @@ You MUST output exactly ${count} scenes. Return the output as a JSON object matc
 });
 
 // Regenerate single scene prompt
-app.post("/api/regenerate-scene", verifyUserAuth as express.RequestHandler, async (req: AuthenticatedRequest, res) => {
+app.post("/api/regenerate-scene", verifyUserAuth as express.RequestHandler, aiBurstLimiter, async (req: AuthenticatedRequest, res) => {
   try {
     const { transcript, sceneNumber, totalScenes, category, previousPrompt, format, promptLineCount } = req.body;
+    if (transcript && typeof transcript === "string" && transcript.length > 100000) {
+      return res.status(400).json({ error: "Transcript exceeds the maximum length limit of 100,000 characters." });
+    }
     const ai = req.userAiClient!;
     const linesCount = Math.min(50, Math.max(3, parseInt(promptLineCount) || 15));
 
@@ -1604,7 +1680,7 @@ Output ONLY the ${linesCount} lines of descriptive text itself with NO "Scene X:
 });
 
 // YouTube & Social Media Growth Strategist Metadata API
-app.post("/api/generate-ctr", verifyUserAuth as express.RequestHandler, async (req: AuthenticatedRequest, res) => {
+app.post("/api/generate-ctr", verifyUserAuth as express.RequestHandler, aiBurstLimiter, async (req: AuthenticatedRequest, res) => {
   try {
     const {
       transcript,
@@ -1617,8 +1693,11 @@ app.post("/api/generate-ctr", verifyUserAuth as express.RequestHandler, async (r
       targetAudience,
     } = req.body;
 
-    if (!transcript || !transcript.trim()) {
+    if (!transcript || typeof transcript !== "string" || !transcript.trim()) {
       return res.status(400).json({ error: "Transcript is required." });
+    }
+    if (transcript.length > 100000) {
+      return res.status(400).json({ error: "Transcript exceeds the maximum length limit of 100,000 characters." });
     }
 
     const ai = req.userAiClient!;
@@ -1750,7 +1829,7 @@ Return your response as a valid JSON object matching this schema:
 });
 
 // YouTube & Social Media Thumbnail Director API
-app.post("/api/generate-thumbnail-prompt", verifyUserAuth as express.RequestHandler, async (req: AuthenticatedRequest, res) => {
+app.post("/api/generate-thumbnail-prompt", verifyUserAuth as express.RequestHandler, aiBurstLimiter, async (req: AuthenticatedRequest, res) => {
   try {
     const {
       transcript,
@@ -1767,8 +1846,20 @@ app.post("/api/generate-thumbnail-prompt", verifyUserAuth as express.RequestHand
       characterImageType,
     } = req.body;
 
-    if (!transcript || !transcript.trim()) {
+    if (!transcript || typeof transcript !== "string" || !transcript.trim()) {
       return res.status(400).json({ error: "Transcript is required." });
+    }
+    if (transcript.length > 100000) {
+      return res.status(400).json({ error: "Transcript exceeds the maximum length limit of 100,000 characters." });
+    }
+    if (headline && typeof headline === "string" && headline.length > 500) {
+      return res.status(400).json({ error: "Headline exceeds the 500 character limit." });
+    }
+    if (smallTagline && typeof smallTagline === "string" && smallTagline.length > 500) {
+      return res.status(400).json({ error: "Tagline exceeds the 500 character limit." });
+    }
+    if (characterImage && typeof characterImage === "string" && characterImage.length > 7 * 1024 * 1024) {
+      return res.status(400).json({ error: "Character image exceeds the 5MB payload size limit." });
     }
 
     const ai = req.userAiClient!;
@@ -2203,11 +2294,14 @@ Return your response as a valid JSON object matching this schema:
 });
 
 // Granular segment/key level regeneration for CTR
-app.post("/api/regenerate-ctr-field", verifyUserAuth as express.RequestHandler, async (req: AuthenticatedRequest, res) => {
+app.post("/api/regenerate-ctr-field", verifyUserAuth as express.RequestHandler, aiBurstLimiter, async (req: AuthenticatedRequest, res) => {
   try {
     const { transcript, field, videoDuration } = req.body;
-    if (!transcript || !transcript.trim()) {
+    if (!transcript || typeof transcript !== "string" || !transcript.trim()) {
       return res.status(400).json({ error: "Transcript is required." });
+    }
+    if (transcript.length > 100000) {
+      return res.status(400).json({ error: "Transcript exceeds the maximum length limit of 100,000 characters." });
     }
 
     const ai = req.userAiClient!;

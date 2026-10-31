@@ -3,7 +3,6 @@ import { useAuth, FeatureModelConfig } from "../context/AuthContext";
 import { getThemeConfig } from "../lib/themeConfig";
 import { 
   User, 
-  Mail, 
   Key, 
   ShieldCheck, 
   LogOut, 
@@ -13,7 +12,6 @@ import {
   AlertTriangle, 
   RefreshCw, 
   Sparkles,
-  Lock,
   Cpu,
   Sliders
 } from "lucide-react";

@@ -16,8 +16,6 @@ import {
   Image as ImageIcon,
   History,
   Info,
-  ShieldCheck,
-  Zap,
   Globe,
   SlidersHorizontal,
   Upload,

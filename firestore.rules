@@ -14,14 +14,16 @@ service cloud.firestore {
       return id is string && id.size() >= 1 && id.size() <= 128;
     }
 
-    // Sole hardcoded platform owner (no dynamic admin promotion allowed)
+    // Sole platform owner check: verified authentication, verified email, exact matching email
     function isAdmin() {
       return isSignedIn()
         && ('email' in request.auth.token)
         && request.auth.token.email != null
+        && ('email_verified' in request.auth.token && request.auth.token.email_verified == true)
         && request.auth.token.email.lower() == "tahsinirshad7370@gmail.com";
     }
 
+    // Strict schema & payload validation for user documents
     function isValidUserDoc(data, userId) {
       return data.keys().hasOnly([
           'userId', 'name', 'email', 'profilePhoto', 'provider',
@@ -30,7 +32,7 @@ service cloud.firestore {
         ])
         && (!('userId' in data) || (data.userId is string && data.userId == userId && data.userId.size() <= 128))
         && (!('name' in data) || (data.name is string && data.name.size() <= 120))
-        && (!('email' in data) || (data.email is string && data.email.size() <= 254))
+        && (!('email' in data) || (data.email is string && data.email.size() <= 254 && data.email.matches('.*@.*')))
         && (!('profilePhoto' in data) || (data.profilePhoto is string && data.profilePhoto.size() <= 1024))
         && (!('provider' in data) || (data.provider is string && data.provider.size() <= 64))
         && (!('role' in data) || (data.role in ['user', 'admin']))
@@ -45,13 +47,13 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      // Get: Individual user profile read - document owner or platform admin
+      // Read: individual user reads their own document; verified owner/admin can read any
       allow get: if isSignedIn() && (request.auth.uid == userId || isAdmin());
 
-      // List: Platform admin can query and list the entire user directory
+      // List: Platform admin can query and audit the user directory
       allow list: if isAdmin();
 
-      // Writes: Document owner can create their own profile; Admin can initialize user profiles
+      // Create: User initializes their profile document on registration
       allow create: if isSignedIn()
         && isValidId(userId)
         && (request.auth.uid == userId || isAdmin())
@@ -64,11 +66,17 @@ service cloud.firestore {
           )
         );
 
+      // Update: User updates their profile or server updates settings
       allow update: if isSignedIn()
         && isValidId(userId)
-        && request.auth.uid == userId
+        && (request.auth.uid == userId || isAdmin())
         && isValidUserDoc(request.resource.data, userId)
+        // Prevent tampering with creation timestamp or userId
+        && (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId)
         && (!('createdAt' in request.resource.data) || !('createdAt' in resource.data) || request.resource.data.createdAt == resource.data.createdAt)
+        // Prevent email tampering by ordinary users
+        && (isAdmin() || !('email' in request.resource.data) || request.resource.data.email == resource.data.email)
+        // Prevent non-admins from self-promoting to admin
         && (
           isAdmin() || (
             (!('role' in request.resource.data) || request.resource.data.role == 'user')
@@ -76,10 +84,11 @@ service cloud.firestore {
           )
         );
 
-      allow delete: if isSignedIn() && isValidId(userId) && request.auth.uid == userId;
+      // Delete: Users can delete their own account, and Admin can remove accounts
+      allow delete: if isSignedIn() && isValidId(userId) && (request.auth.uid == userId || isAdmin());
     }
 
-    // Dynamic admin promotion collection is permanently locked
+    // Admins collection permanently protected
     match /admins/{userId} {
       allow read, write: if false;
     }

@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
+import { initializeAppCheck, ReCaptchaEnterpriseProvider, ReCaptchaV3Provider } from "firebase/app-check";
 import { 
   getAuth, 
   GoogleAuthProvider, 
@@ -7,19 +7,14 @@ import {
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
   signOut, 
-  updateProfile,
   onAuthStateChanged,
-  deleteUser,
   User
 } from "firebase/auth";
 import { 
   getFirestore, 
   doc, 
   getDoc, 
-  setDoc, 
-  updateDoc, 
-  deleteDoc,
-  serverTimestamp 
+  setDoc
 } from "firebase/firestore";
 
 import firebaseConfig from "../../firebase-applet-config.json";
@@ -29,15 +24,23 @@ const auth = getAuth(app);
 const db = getFirestore(app, firebaseConfig.firestoreDatabaseId || "(default)");
 const googleProvider = new GoogleAuthProvider();
 
-// Conditionally initialize free Firebase App Check (reCAPTCHA v3) when a site key is configured
-if (typeof window !== "undefined" && firebaseConfig.recaptchaSiteKey && firebaseConfig.recaptchaSiteKey.trim() !== "") {
-  try {
-    initializeAppCheck(app, {
-      provider: new ReCaptchaV3Provider(firebaseConfig.recaptchaSiteKey.trim()),
-      isTokenAutoRefreshEnabled: true,
-    });
-  } catch (err) {
-    console.warn("Firebase App Check initialization skipped:", err);
+// Conditionally initialize Firebase App Check (reCAPTCHA Enterprise / Google Cloud Fraud Defense or reCAPTCHA v3)
+if (typeof window !== "undefined") {
+  const config = firebaseConfig as any;
+  const siteKey = (config.recaptchaEnterpriseSiteKey || config.recaptchaSiteKey || "").trim();
+  if (siteKey !== "") {
+    try {
+      const provider = config.useRecaptchaV3
+        ? new ReCaptchaV3Provider(siteKey)
+        : new ReCaptchaEnterpriseProvider(siteKey);
+
+      initializeAppCheck(app, {
+        provider,
+        isTokenAutoRefreshEnabled: true,
+      });
+    } catch (err) {
+      console.warn("Firebase App Check initialization skipped:", err);
+    }
   }
 }
 

@@ -5,7 +5,6 @@ import {
   LogOut, 
   Settings, 
   Key, 
-  Sparkles, 
   CheckCircle2, 
   AlertTriangle, 
   Crown, 
@@ -16,8 +15,7 @@ import {
   Wand2,
   Sun,
   Moon,
-  BookOpen,
-  Download
+  BookOpen
 } from "lucide-react";
 
 export const UserHeader: React.FC = () => {

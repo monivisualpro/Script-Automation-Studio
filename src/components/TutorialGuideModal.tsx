@@ -9,12 +9,9 @@ import {
   FileText,
   Sliders,
   Sparkles,
-  HelpCircle,
   CheckCircle2,
   Copy,
   ExternalLink,
-  Layers,
-  Wand2,
   Terminal,
   Zap,
   Video
