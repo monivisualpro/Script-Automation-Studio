@@ -1,0 +1,510 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>Buttons & Controls Reference Dictionary | Script Automation Studio</title>
+    <meta name="description" content="Complete itemized reference dictionary of all UI controls, toggles, parameters, and action triggers in Script Automation Studio." />
+    <meta name="author" content="Muhammad Tehseen Irshad" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --accent: #ff073a;
+        --secondary-accent: #2774fc;
+        --bg-page: #0d0e12;
+        --bg-header: rgba(13, 14, 18, 0.92);
+        --bg-card: rgba(22, 24, 33, 0.88);
+        --bg-subtle: rgba(255, 255, 255, 0.04);
+        --border-color: rgba(255, 255, 255, 0.1);
+        --text-primary: #ffffff;
+        --text-secondary: #d1d5db;
+        --text-muted: #9ca3af;
+        --shadow-card: 0 12px 32px rgba(0, 0, 0, 0.35);
+      }
+
+      [data-brand="blue"] {
+        --accent: #2774fc;
+        --secondary-accent: #ff073a;
+      }
+
+      [data-brand="red"] {
+        --accent: #ff073a;
+        --secondary-accent: #2774fc;
+      }
+
+      [data-theme="day"] {
+        --bg-page: #fafafa;
+        --bg-header: rgba(255, 255, 255, 0.94);
+        --bg-card: #ffffff;
+        --bg-subtle: #f4f4f5;
+        --border-color: #e5e7eb;
+        --text-primary: #000000;
+        --text-secondary: #1f2937;
+        --text-muted: #4b5563;
+        --shadow-card: 0 8px 24px rgba(0, 0, 0, 0.06);
+      }
+
+      *, *::before, *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        min-height: 100vh;
+        font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
+        background-color: var(--bg-page);
+        color: var(--text-primary);
+        line-height: 1.65;
+        transition: background-color 0.2s ease, color 0.2s ease;
+      }
+
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      .font-mono {
+        font-family: 'Fira Code', ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+
+      .site-header {
+        position: sticky;
+        top: 0;
+        z-index: 50;
+        background: var(--bg-header);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border-bottom: 1px solid var(--border-color);
+      }
+
+      .header-inner {
+        max-width: 1280px;
+        margin: 0 auto;
+        padding: 12px 20px;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .brand-link {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .brand-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 12px;
+        background-color: var(--accent);
+        color: #ffffff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 800;
+        flex-shrink: 0;
+      }
+
+      .brand-title {
+        font-size: 13px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-primary);
+      }
+
+      .brand-subtitle {
+        font-size: 11px;
+        color: var(--text-muted);
+      }
+
+      .doc-tabs {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+
+      .doc-tab {
+        padding: 7px 12px;
+        border-radius: 10px;
+        font-size: 11px;
+        font-weight: 700;
+        border: 1px solid var(--border-color);
+        background: var(--bg-subtle);
+        color: var(--text-primary);
+        transition: all 0.2s ease;
+        white-space: nowrap;
+      }
+
+      .doc-tab:hover {
+        border-color: var(--accent);
+      }
+
+      .doc-tab.active {
+        background-color: var(--accent);
+        border-color: var(--accent);
+        color: #ffffff;
+      }
+
+      .header-controls {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .switcher-group {
+        display: flex;
+        align-items: center;
+        padding: 3px;
+        border-radius: 12px;
+        border: 1px solid var(--border-color);
+        background: var(--bg-subtle);
+        gap: 4px;
+      }
+
+      .ctrl-btn {
+        border: 1px solid transparent;
+        background: transparent;
+        color: var(--text-muted);
+        padding: 5px 9px;
+        border-radius: 8px;
+        font-size: 11px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      .ctrl-btn.active-red { background: #ff073a; color: #ffffff; }
+      .ctrl-btn.active-blue { background: #2774fc; color: #ffffff; }
+
+      .theme-toggle {
+        padding: 6px 11px;
+        border-radius: 12px;
+        border: 1px solid var(--border-color);
+        background: var(--bg-subtle);
+        color: var(--text-primary);
+        font-size: 11px;
+        font-weight: 700;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .btn-primary {
+        padding: 8px 14px;
+        border-radius: 12px;
+        background-color: var(--accent);
+        color: #ffffff;
+        font-size: 12px;
+        font-weight: 700;
+        border: 1px solid var(--accent);
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        cursor: pointer;
+      }
+
+      .btn-secondary {
+        padding: 8px 14px;
+        border-radius: 12px;
+        background-color: var(--bg-subtle);
+        color: var(--text-primary);
+        font-size: 12px;
+        font-weight: 700;
+        border: 1px solid var(--border-color);
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        cursor: pointer;
+      }
+
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 28px 20px 48px;
+        display: flex;
+        flex-direction: column;
+        gap: 28px;
+      }
+
+      .glass-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 24px;
+        padding: 26px;
+        box-shadow: var(--shadow-card);
+      }
+
+      .hero-pill {
+        display: inline-block;
+        padding: 5px 12px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 700;
+        border: 1px solid var(--border-color);
+        background: var(--bg-subtle);
+        color: var(--text-primary);
+        margin-bottom: 12px;
+      }
+
+      h1 {
+        font-size: clamp(1.6rem, 3vw, 2.3rem);
+        font-weight: 800;
+        line-height: 1.2;
+        margin-bottom: 12px;
+        color: var(--text-primary);
+      }
+
+      .lead {
+        font-size: 14.5px;
+        color: var(--text-secondary);
+        max-width: 720px;
+        margin-bottom: 18px;
+      }
+
+      .action-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .group-title {
+        font-size: 13px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--text-primary);
+        margin-bottom: 12px;
+        padding-left: 10px;
+        border-left: 3px solid var(--accent);
+      }
+
+      .grid-2 {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 14px;
+      }
+
+      .control-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 18px;
+        padding: 20px;
+        box-shadow: var(--shadow-card);
+      }
+
+      .control-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 8px;
+      }
+
+      .control-name {
+        font-size: 13px;
+        font-weight: 800;
+        color: var(--text-primary);
+      }
+
+      .control-loc {
+        font-size: 10px;
+        font-weight: 700;
+        padding: 2px 8px;
+        border-radius: 999px;
+        border: 1px solid var(--border-color);
+        background: var(--bg-subtle);
+        color: var(--text-muted);
+      }
+
+      .control-desc {
+        font-size: 12.5px;
+        color: var(--text-secondary);
+      }
+
+      footer {
+        border-top: 1px solid var(--border-color);
+        padding: 24px 20px;
+        text-align: center;
+        font-size: 12px;
+        color: var(--text-muted);
+      }
+    </style>
+  </head>
+  <body data-brand="red" data-theme="night">
+    <header class="site-header">
+      <div class="header-inner">
+        <a href="/" class="brand-link">
+          <div class="brand-icon font-mono">UI</div>
+          <div>
+            <div class="brand-title font-mono">Script Automation Studio</div>
+            <div class="brand-subtitle font-mono">Controls &amp; Buttons Dictionary</div>
+          </div>
+        </a>
+
+        <nav class="doc-tabs font-mono" aria-label="Documentation Pages">
+          <a href="/docs/complete-user-guide.html" class="doc-tab" data-doc-link>User Guide</a>
+          <a href="/docs/controls-reference.html" class="doc-tab active" data-doc-link>Controls Reference</a>
+          <a href="/docs/prompt-masterclass.html" class="doc-tab" data-doc-link>Prompt Masterclass</a>
+        </nav>
+
+        <div class="header-controls font-mono">
+          <div class="switcher-group">
+            <button id="btnBrandRed" type="button" onclick="setBrand('red')" class="ctrl-btn active-red">Red</button>
+            <button id="btnBrandBlue" type="button" onclick="setBrand('blue')" class="ctrl-btn">Blue</button>
+          </div>
+          <button id="btnThemeToggle" type="button" onclick="toggleTheme()" class="theme-toggle">
+            <span id="themeIcon">☀️</span>
+            <span id="themeLabel">Day</span>
+          </button>
+          <a href="/" class="btn-primary">Open Studio &rarr;</a>
+        </div>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="glass-card">
+        <span class="hero-pill font-mono">UI Reference Manual</span>
+        <h1>Buttons &amp; UI Controls — Complete Dictionary</h1>
+        <p class="lead">
+          Detailed purpose, location, and optimal settings for every control, input field, multi-provider setting, and trigger inside the platform.
+        </p>
+        <div class="action-row font-mono">
+          <a href="/docs/BUTTONS_AND_CONTROLS_REFERENCE.txt" download class="btn-primary">Download .TXT</a>
+          <a href="/docs/BUTTONS_AND_CONTROLS_REFERENCE.txt" target="_blank" class="btn-secondary">View Plain Text</a>
+        </div>
+      </section>
+
+      <section>
+        <h2 class="group-title font-mono">1. Header &amp; Top Navigation Controls</h2>
+        <div class="grid-2">
+          <div class="control-card">
+            <div class="control-head font-mono">
+              <span class="control-name">Brand Switcher (Red / Blue)</span>
+              <span class="control-loc">Header</span>
+            </div>
+            <p class="control-desc">Dynamically alters primary and secondary accent colors (#FF073A / #2774FC) across buttons, borders, and highlights.</p>
+          </div>
+          <div class="control-card">
+            <div class="control-head font-mono">
+              <span class="control-name">Day / Night Theme Toggle</span>
+              <span class="control-loc">Header</span>
+            </div>
+            <p class="control-desc">Switches between Night Mode (white text on dark surfaces) and Day Mode (black text on bright surfaces).</p>
+          </div>
+          <div class="control-card">
+            <div class="control-head font-mono">
+              <span class="control-name">Personal AI Provider &amp; API Key Status</span>
+              <span class="control-loc">Header</span>
+            </div>
+            <p class="control-desc">Configure Google Gemini, OpenAI, Anthropic Claude, or Local LLM URLs (LM Studio / Ollama / Bionic LLM Studio).</p>
+          </div>
+          <div class="control-card">
+            <div class="control-head font-mono">
+              <span class="control-name">Settings &amp; Model Selection</span>
+              <span class="control-loc">Header</span>
+            </div>
+            <p class="control-desc">Adjusts active model tier, encryption/provider status, and account security controls.</p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2 class="group-title font-mono">2. Scriptmaking &amp; Configuration Controls</h2>
+        <div class="grid-2">
+          <div class="control-card">
+            <div class="control-head font-mono">
+              <span class="control-name">Voice Persona (Speaker)</span>
+              <span class="control-loc">Sidebar</span>
+            </div>
+            <p class="control-desc">Specifies voiceover delivery persona (Female / Male) alongside tone and pacing.</p>
+          </div>
+          <div class="control-card">
+            <div class="control-head font-mono">
+              <span class="control-name">Shots Calculator (Scene Splitter)</span>
+              <span class="control-loc">Storyboard</span>
+            </div>
+            <p class="control-desc">Calculates total camera shots from video duration and divides scripts into detailed B-roll scene prompts.</p>
+          </div>
+          <div class="control-card">
+            <div class="control-head font-mono">
+              <span class="control-name">Transformation Option (40+ Languages)</span>
+              <span class="control-loc">Sidebar</span>
+            </div>
+            <p class="control-desc">Selects the single target output language (Hindi Urdu Accent, Urdu Roman, Urdu Nastaliq RTL, English, or 40+ global languages) for fast, token-efficient script generation.</p>
+          </div>
+          <div class="control-card">
+            <div class="control-head font-mono">
+              <span class="control-name">CTR Metadata &amp; Thumbnail Director</span>
+              <span class="control-loc">Bottom Suites</span>
+            </div>
+            <p class="control-desc">Generates 10 High-CTR Titles, SEO Descriptions, Chapters, Hashtags, Tags, and Nano Banana 2 / Flux 1 thumbnail prompts.</p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="font-mono">
+      Script Automation Studio &bull; Created by Muhammad Tehseen Irshad
+    </footer>
+
+    <script>
+      function updateDocLinks(theme, brand) {
+        var links = document.querySelectorAll('[data-doc-link]');
+        links.forEach(function (a) {
+          var base = a.getAttribute('href').split('?')[0];
+          a.setAttribute('href', base + '?theme=' + theme + '&brand=' + brand);
+        });
+      }
+
+      function setBrand(brand) {
+        var normalized = brand === 'blue' ? 'blue' : 'red';
+        document.body.setAttribute('data-brand', normalized);
+        var btnRed = document.getElementById('btnBrandRed');
+        var btnBlue = document.getElementById('btnBrandBlue');
+        if (btnRed && btnBlue) {
+          btnRed.className = normalized === 'red' ? 'ctrl-btn active-red' : 'ctrl-btn';
+          btnBlue.className = normalized === 'blue' ? 'ctrl-btn active-blue' : 'ctrl-btn';
+        }
+        try { localStorage.setItem('doc_brand', normalized); } catch (e) {}
+        updateDocLinks(document.body.getAttribute('data-theme') || 'night', normalized);
+      }
+
+      function applyTheme(theme) {
+        var normalized = theme === 'day' ? 'day' : 'night';
+        document.body.setAttribute('data-theme', normalized);
+        var icon = document.getElementById('themeIcon');
+        var label = document.getElementById('themeLabel');
+        if (icon) icon.textContent = normalized === 'day' ? '🌙' : '☀️';
+        if (label) label.textContent = normalized === 'day' ? 'Night' : 'Day';
+        try { localStorage.setItem('doc_theme', normalized); } catch (e) {}
+        updateDocLinks(normalized, document.body.getAttribute('data-brand') || 'red');
+      }
+
+      function toggleTheme() {
+        var current = document.body.getAttribute('data-theme') || 'night';
+        applyTheme(current === 'night' ? 'day' : 'night');
+      }
+
+      (function init() {
+        var params = new URLSearchParams(window.location.search);
+        var brand = params.get('brand');
+        var theme = params.get('theme');
+        try {
+          if (!brand) brand = localStorage.getItem('doc_brand');
+          if (!theme) theme = localStorage.getItem('doc_theme');
+        } catch (e) {}
+        setBrand(brand || 'red');
+        applyTheme(theme || 'night');
+      })();
+    </script>
+  </body>
+</html>

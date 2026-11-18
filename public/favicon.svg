@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="gradDay" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF3E00" />
+      <stop offset="100%" stop-color="#0098FE" />
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000000" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="128" fill="url(#gradDay)" />
+  <!-- Main Magic Sparkle -->
+  <path d="M256 80 L282 190 L392 216 L282 242 L256 352 L230 242 L120 216 L230 190 Z" fill="#FFFFFF" filter="url(#glow)" />
+  <!-- Top Right Sparkle -->
+  <path d="M384 310 L397 360 L447 373 L397 386 L384 436 L371 386 L321 373 L371 360 Z" fill="#FFFFFF" opacity="0.95" />
+  <!-- Bottom Left Sparkle -->
+  <path d="M144 330 L153 368 L191 377 L153 386 L144 424 L135 386 L97 377 L135 368 Z" fill="#FFFFFF" opacity="0.9" />
+</svg>
