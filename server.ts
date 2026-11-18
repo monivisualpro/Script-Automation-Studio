@@ -4,16 +4,9 @@ import path from "path";
 import { GoogleGenAI, Type } from "@google/genai";
 import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
-// Safe dynamic loading of firebase-applet-config.json
-let firebaseConfig: Record<string, any> = {};
-try {
-  const configPath = path.join(process.cwd(), "firebase-applet-config.json");
-  if (fs.existsSync(configPath)) {
-    firebaseConfig = JSON.parse(fs.readFileSync(configPath, "utf-8"));
-  }
-} catch (configErr) {
-  console.warn("Could not load firebase-applet-config.json, proceeding with default standalone configuration.");
-}
+import { loadFirebaseServerConfig } from "./server/firebaseConfig.js";
+
+const firebaseConfig = loadFirebaseServerConfig();
 import { encryptApiKey, decryptApiKey, maskApiKey } from "./server/encryption.js";
 import {
   getFirestoreDoc,
@@ -2954,16 +2947,17 @@ app.post("/api/chat", aiBurstLimiter, verifyUserAuth as express.RequestHandler, 
     }
 
     const rawMessages = Array.isArray(req.body?.messages) ? req.body.messages : [];
+
     if (!isStandaloneMode && rawMessages.some((m: any) => m && m.imageDataUrl)) {
       return res.status(400).json({
-        error: "Pasting or uploading images is disabled on the online website (Firebase Spark free storage limit). Use text or .txt/.md/.pdf files.",
+        error: "Direct image uploads are disabled on the free Firebase Spark plan. Paste a public Google Drive image link ('Anyone with the link') instead.",
       });
     }
 
     if (!isStandaloneMode) {
       if (rawMessages.length > 40) {
         return res.status(400).json({
-          error: "This chat has grown too large for the online Firebase Spark free tier (40-message limit). Please start a New Chat.",
+          error: "This chat reached the 40-message limit for free Firebase Spark storage. Please delete this chat or start a new chat.",
         });
       }
       const oversized = rawMessages.some(
@@ -2971,20 +2965,97 @@ app.post("/api/chat", aiBurstLimiter, verifyUserAuth as express.RequestHandler, 
       );
       if (oversized) {
         return res.status(400).json({
-          error: "Message is too large for online Firebase Spark mode (max 24,000 characters). Please shorten the text or start a New Chat.",
+          error: "Message is too large (max 24,000 characters). Please shorten the text.",
         });
       }
     }
 
-    const messages: ChatTurnMessage[] = rawMessages
-      .filter((m: any) => m && typeof m.content === "string" && (m.content.trim() || (isStandaloneMode && m.imageDataUrl)))
-      .map((m: any) => ({
+    const resolveDriveFileIdFromMessage = (m: any): string | null => {
+      if (typeof m?.driveFileId === "string" && /^[a-zA-Z0-9_-]{10,80}$/.test(m.driveFileId.trim())) {
+        return m.driveFileId.trim();
+      }
+      if (typeof m?.driveImageUrl === "string") {
+        try {
+          const parsed = new URL(m.driveImageUrl.trim());
+          const host = parsed.hostname.toLowerCase();
+          if (host === "drive.google.com" || host === "docs.google.com") {
+            const pathMatch = parsed.pathname.match(/\/d\/([a-zA-Z0-9_-]{10,80})/);
+            if (pathMatch?.[1]) return pathMatch[1];
+            const idParam = parsed.searchParams.get("id");
+            if (idParam && /^[a-zA-Z0-9_-]{10,80}$/.test(idParam)) return idParam;
+          }
+        } catch {
+          return null;
+        }
+      }
+      return null;
+    };
+
+    const fetchGoogleDriveImageAsDataUrl = async (fileId: string): Promise<string> => {
+      if (!/^[a-zA-Z0-9_-]{10,80}$/.test(fileId)) {
+        throw new Error("Invalid Google Drive image file ID.");
+      }
+
+      const targetUrl = `https://drive.google.com/uc?export=download&id=${encodeURIComponent(fileId)}`;
+      const driveRes = await fetch(targetUrl, {
+        redirect: "follow",
+        signal: AbortSignal.timeout(10000),
+      });
+
+      if (!driveRes.ok) {
+        throw new Error("Could not fetch image from Google Drive link. Make sure sharing is set to 'Anyone with the link'.");
+      }
+
+      const contentType = (driveRes.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
+      if (!contentType.startsWith("image/")) {
+        throw new Error("Google Drive link did not return an image (set sharing to 'Anyone with the link' on a PNG/JPG/WEBP file).");
+      }
+
+      const buf = Buffer.from(await driveRes.arrayBuffer());
+      if (buf.byteLength > 5 * 1024 * 1024) {
+        throw new Error("Google Drive image exceeds the 5MB maximum size.");
+      }
+      return `data:${contentType};base64,${buf.toString("base64")}`;
+    };
+
+    const messages: ChatTurnMessage[] = [];
+    const filteredRaw = rawMessages.filter(
+      (m: any) =>
+        m &&
+        typeof m.content === "string" &&
+        (m.content.trim() || (isStandaloneMode && m.imageDataUrl) || resolveDriveFileIdFromMessage(m))
+    );
+
+    // Fetch up to the latest 3 public Google Drive images in memory for vision context
+    const driveIndicesToFetch = new Set<number>();
+    let driveCount = 0;
+    for (let i = filteredRaw.length - 1; i >= 0 && driveCount < 3; i--) {
+      if (resolveDriveFileIdFromMessage(filteredRaw[i])) {
+        driveIndicesToFetch.add(i);
+        driveCount++;
+      }
+    }
+
+    for (let i = 0; i < filteredRaw.length; i++) {
+      const m = filteredRaw[i];
+      let resolvedImageDataUrl: string | undefined =
+        isStandaloneMode && typeof m.imageDataUrl === "string" && m.imageDataUrl.startsWith("data:image/")
+          ? m.imageDataUrl
+          : undefined;
+
+      if (!resolvedImageDataUrl && driveIndicesToFetch.has(i)) {
+        const fid = resolveDriveFileIdFromMessage(m);
+        if (fid) {
+          resolvedImageDataUrl = await fetchGoogleDriveImageAsDataUrl(fid);
+        }
+      }
+
+      messages.push({
         role: m.role === "assistant" ? "assistant" : "user",
-        content: String(m.content || ""),
-        ...(isStandaloneMode && typeof m.imageDataUrl === "string" && m.imageDataUrl.startsWith("data:image/")
-          ? { imageDataUrl: m.imageDataUrl }
-          : {}),
-      }));
+        content: String(m.content || (resolvedImageDataUrl ? "Analyze this attached image." : "")),
+        ...(resolvedImageDataUrl ? { imageDataUrl: resolvedImageDataUrl } : {}),
+      });
+    }
 
     if (messages.length === 0) {
       return res.status(400).json({ error: "Please enter a message or prompt to send." });
@@ -3153,6 +3224,7 @@ app.post("/api/chat/storage", writeRateLimiter, async (req, res) => {
             title: String(s.title || "Chat").slice(0, 80),
             projectId: s.projectId || null,
             updatedAt: s.updatedAt || Date.now(),
+            storageType: "spark",
             messages: Array.isArray(s?.messages)
               ? s.messages.slice(-maxMsgs).map((m: any) => {
                   const { imageDataUrl: _omitImage, ...rest } = m || {};
@@ -3331,6 +3403,13 @@ export async function setupServer(): Promise<HttpServer> {
       // This is intentionally NOT process.cwd(), because Electron's working
       // directory can be outside the application's resources directory.
       const distPath = __dirname;
+      app.use(
+        "/assets",
+        express.static(path.join(distPath, "assets"), {
+          maxAge: "365d",
+          immutable: true,
+        })
+      );
       app.use(express.static(distPath));
       app.get("*", (req, res) => {
         res.sendFile(path.join(distPath, "index.html"));

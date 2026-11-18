@@ -13,7 +13,7 @@ import {
   RefreshCw, 
   Sparkles,
   Cpu,
-  Sliders
+  Sliders,
 } from "lucide-react";
 
 interface SettingsModalProps {
@@ -40,7 +40,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
     availableLocalModels,
     fetchAvailableModels,
     currentTheme,
-    currentBrand
+    currentBrand,
   } = useAuth();
   const theme = getThemeConfig(currentTheme, currentBrand);
 
@@ -50,6 +50,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
   const [refreshingModels, setRefreshingModels] = useState<boolean>(false);
   const [quickLocalModel, setQuickLocalModel] = useState<string>("");
   const [removingKey, setRemovingKey] = useState<boolean>(false);
+  const [confirmRemoveKey, setConfirmRemoveKey] = useState<boolean>(false);
+  const [confirmClearChats, setConfirmClearChats] = useState<boolean>(false);
+  const [clearingChats, setClearingChats] = useState<boolean>(false);
   const [deletingAcc, setDeletingAcc] = useState<boolean>(false);
   const [confirmDelete, setConfirmDelete] = useState<boolean>(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -192,12 +195,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
   };
 
   const handleRemoveApiKey = async () => {
-    const confirmMsg = isStandalone
-      ? "Clear saved API keys from your local .env file and browser storage?"
-      : "Are you sure you want to remove your stored personal API key? You will not be able to generate scripts until a new key is added.";
-    if (!window.confirm(confirmMsg)) {
-      return;
-    }
     setRemovingKey(true);
     setMessage(null);
     try {
@@ -217,6 +214,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
         throw new Error("Failed to remove API key.");
       }
 
+      setConfirmRemoveKey(false);
       if (isStandalone) {
         updateProviderConfig({ apiKey: "" });
         await refreshSystemMode();
@@ -230,6 +228,35 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
       setMessage({ type: "error", text: err.message || "Failed to remove key." });
     } finally {
       setRemovingKey(false);
+    }
+  };
+
+  const handleClearSyncedChats = async () => {
+    setClearingChats(true);
+    setMessage(null);
+    try {
+      if (!isStandalone && idToken) {
+        await fetch("/api/chat/storage", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${idToken}`,
+          },
+          body: JSON.stringify({ sessions: [], projects: [] }),
+        });
+      }
+      try {
+        localStorage.removeItem("sas_chat_sessions_v1");
+        localStorage.removeItem("sas_chat_projects_v1");
+        localStorage.removeItem("sas_desktop_chat_sessions_v1");
+        localStorage.removeItem("sas_desktop_chat_projects_v1");
+      } catch {}
+      setConfirmClearChats(false);
+      setMessage({ type: "success", text: "Cloud & browser chat history cleared." });
+    } catch (err: any) {
+      setMessage({ type: "error", text: err?.message || "Failed to clear chat history." });
+    } finally {
+      setClearingChats(false);
     }
   };
 
@@ -697,17 +724,36 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                       <span>Edit Keys / Local Engine</span>
                     </button>
 
-                    {(envKeyStatus?.gemini?.configured || envKeyStatus?.openai?.configured || envKeyStatus?.claude?.configured || activeProviderConfig.apiKey) && (
+                    {(envKeyStatus?.gemini?.configured || envKeyStatus?.openai?.configured || envKeyStatus?.claude?.configured || activeProviderConfig.apiKey) && !confirmRemoveKey && (
                       <button
-                        onClick={handleRemoveApiKey}
-                        disabled={removingKey}
-                        className="py-2.5 px-3 rounded-xl bg-red-950/60 text-white border border-red-900/60 hover:bg-red-900 hover:text-white transition-all text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                        onClick={() => setConfirmRemoveKey(true)}
+                        className="py-2.5 px-3 rounded-xl bg-red-950/60 text-white border border-red-900/60 hover:bg-red-900 hover:text-white transition-all text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer"
                       >
-                        {removingKey ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                        <Trash2 className="h-3.5 w-3.5" />
                         <span>Clear Local Keys</span>
                       </button>
                     )}
                   </div>
+                  {confirmRemoveKey && (
+                    <div className="p-3 rounded-xl bg-red-950/90 border border-red-800 space-y-2 text-xs font-mono text-white">
+                      <p>Clear saved API keys from your local .env file and browser storage?</p>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={handleRemoveApiKey}
+                          disabled={removingKey}
+                          className="px-3 py-1.5 rounded-lg bg-red-600 text-white font-bold cursor-pointer disabled:opacity-50"
+                        >
+                          {removingKey ? "Clearing..." : "Yes, Clear Keys"}
+                        </button>
+                        <button
+                          onClick={() => setConfirmRemoveKey(false)}
+                          className="px-3 py-1.5 rounded-lg bg-gray-800 text-gray-200 cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className={`p-4 rounded-2xl border text-xs font-mono opacity-85 space-y-2 ${isLight ? "border-slate-200" : "border-white/10"}`} style={{ backgroundColor: isLight ? "#f8fafc" : "rgba(0,0,0,0.2)", color: modalTextColor }}>
@@ -770,17 +816,36 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                       <span>{profile?.hasApiKey ? "Change / Re-test API Key" : "Add Personal API Key"}</span>
                     </button>
 
-                    {profile?.hasApiKey && (
+                    {profile?.hasApiKey && !confirmRemoveKey && (
                       <button
-                        onClick={handleRemoveApiKey}
-                        disabled={removingKey}
-                        className="py-2.5 px-3 rounded-xl bg-red-950/60 text-white border border-red-900/60 hover:bg-red-900 hover:text-white transition-all text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                        onClick={() => setConfirmRemoveKey(true)}
+                        className="py-2.5 px-3 rounded-xl bg-red-950/60 text-white border border-red-900/60 hover:bg-red-900 hover:text-white transition-all text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer"
                       >
-                        {removingKey ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                        <Trash2 className="h-3.5 w-3.5" />
                         <span>Remove Key</span>
                       </button>
                     )}
                   </div>
+                  {confirmRemoveKey && (
+                    <div className="p-3 rounded-xl bg-red-950/90 border border-red-800 space-y-2 text-xs font-mono text-white">
+                      <p>Remove your stored API key from Firestore? You won't be able to generate until you add a new key.</p>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={handleRemoveApiKey}
+                          disabled={removingKey}
+                          className="px-3 py-1.5 rounded-lg bg-red-600 text-white font-bold cursor-pointer disabled:opacity-50"
+                        >
+                          {removingKey ? "Removing..." : "Yes, Remove Key"}
+                        </button>
+                        <button
+                          onClick={() => setConfirmRemoveKey(false)}
+                          className="px-3 py-1.5 rounded-lg bg-gray-800 text-gray-200 cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className={`p-4 rounded-2xl border text-xs font-mono opacity-80 space-y-2 ${isLight ? "border-slate-200" : "border-white/10"}`} style={{ backgroundColor: isLight ? "#f8fafc" : "rgba(0,0,0,0.2)", color: modalTextColor }}>
@@ -853,6 +918,44 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                 <span>Log Out of Studio</span>
               </button>
 
+              {!confirmClearChats ? (
+                <button
+                  type="button"
+                  onClick={() => setConfirmClearChats(true)}
+                  className="w-full py-2.5 px-4 rounded-xl border transition-all font-mono text-xs flex items-center justify-center gap-2 cursor-pointer"
+                  style={{
+                    borderColor: isLight ? "#E5E5E5" : "#333333",
+                    color: modalTextColor,
+                  }}
+                >
+                  <Trash2 className="h-4 w-4 opacity-75" />
+                  <span>Clear Cloud &amp; Browser Chat History</span>
+                </button>
+              ) : (
+                <div className="p-3.5 rounded-2xl bg-red-950/90 border border-red-800 space-y-2 text-white font-mono text-xs">
+                  <p className="text-center font-bold">
+                    Clear all synced Chat Workspace sessions from Firebase &amp; this browser?
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleClearSyncedChats}
+                      disabled={clearingChats}
+                      className="flex-1 py-2 rounded-xl bg-red-600 text-white font-bold cursor-pointer disabled:opacity-50"
+                    >
+                      {clearingChats ? "Clearing..." : "Yes, Clear Chats"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmClearChats(false)}
+                      className="px-4 py-2 rounded-xl bg-gray-800 text-gray-300 font-bold cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {!confirmDelete ? (
                 <button
                   onClick={() => setConfirmDelete(true)}
@@ -864,7 +967,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
               ) : (
                 <div className="p-3.5 rounded-2xl bg-red-950/90 border border-red-800 space-y-2 animate-[fadeIn_0.2s_ease]">
                   <p className="text-xs text-white font-mono text-center font-bold">
-                    Are you absolutely sure? This will delete your profile and encrypted key permanently.
+                    Are you absolutely sure? This will delete your profile, synced chats, and encrypted API key permanently.
                   </p>
                   <div className="flex items-center gap-2">
                     <button

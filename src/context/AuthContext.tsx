@@ -1,6 +1,11 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { User, onAuthStateChanged, signOut, deleteUser } from "firebase/auth";
-import { auth, db, syncUserProfile, UserProfile } from "../lib/firebase";
+import {
+  auth,
+  db,
+  syncUserProfile,
+  UserProfile,
+} from "../lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 
 export interface FeatureModelConfig {
@@ -522,6 +527,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } catch (err) {
         console.error("Failed to delete account on backend:", err);
       }
+      try {
+        localStorage.removeItem("sas_chat_sessions_v1");
+        localStorage.removeItem("sas_chat_projects_v1");
+        localStorage.removeItem("sas_desktop_chat_sessions_v1");
+        localStorage.removeItem("sas_desktop_chat_projects_v1");
+      } catch {}
       await deleteUser(user);
       setUser(null);
       setProfile(null);

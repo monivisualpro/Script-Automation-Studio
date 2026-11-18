@@ -39,6 +39,8 @@ import {
   Loader2,
   HardDrive,
   Lock,
+  Link2,
+  AlertTriangle,
 } from "lucide-react";
 import {
   AgentSkillItem,
@@ -48,6 +50,10 @@ import {
   PROMPT_OPTIMIZER_SYSTEM_INSTRUCTION,
 } from "../lib/agentSkills";
 import { SkillsAgentsModal } from "./SkillsAgentsModal";
+import {
+  extractGoogleDriveFileId,
+  getPublicDriveThumbnailUrl,
+} from "../lib/googleDrive";
 
 export type StudioTransferTarget = "script" | "scenes" | "ctr" | "thumbnail";
 
@@ -60,6 +66,9 @@ interface ChatMessageItem {
   role: "user" | "assistant";
   content: string;
   imageDataUrl?: string;
+  driveFileId?: string;
+  driveImageUrl?: string;
+  driveSource?: "public-link";
   attachmentName?: string;
   modelUsed?: string;
   providerUsed?: string;
@@ -79,6 +88,7 @@ interface ChatSession {
   projectId: string | null;
   messages: ChatMessageItem[];
   updatedAt: number;
+  storageType?: "spark" | "local-disk";
 }
 
 interface UnifiedModelChoice {
@@ -339,6 +349,19 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
   const storageHydratedRef = useRef<boolean>(false);
 
   useEffect(() => {
+    setStorageMode(
+      isStandalone ? "local-disk" : idToken ? "cloud-firestore" : "browser-local"
+    );
+    setStorageLocation(
+      isStandalone
+        ? "local-engine/chat-workspace.json"
+        : idToken
+        ? "Firebase Spark (Text-Only Lightweight Sync)"
+        : "Browser Storage"
+    );
+  }, [isStandalone, idToken]);
+
+  useEffect(() => {
     try {
       localStorage.setItem(STORAGE_PROJECTS_KEY, JSON.stringify(projects));
     } catch {}
@@ -359,6 +382,16 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
   // Composer & Generation State
   const [promptInput, setPromptInput] = useState<string>("");
   const [attachedImage, setAttachedImage] = useState<{ dataUrl: string; name: string } | null>(null);
+  const [attachedDriveImage, setAttachedDriveImage] = useState<{
+    fileId: string;
+    name: string;
+    source: "public-link";
+    previewUrl: string;
+    driveUrl?: string;
+  } | null>(null);
+  const [showDriveLinkInput, setShowDriveLinkInput] = useState<boolean>(false);
+  const [driveLinkInput, setDriveLinkInput] = useState<string>("");
+  const [limitModalOpen, setLimitModalOpen] = useState<boolean>(false);
   const [attachedFileText, setAttachedFileText] = useState<{ name: string; content: string } | null>(null);
   const [isSending, setIsSending] = useState<boolean>(false);
   const [chatError, setChatError] = useState<string | null>(null);
@@ -917,16 +950,19 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
     setChatError(null);
 
     if (file.type.startsWith("image/")) {
-      if (!isStandalone) {
-        setChatError(
-          "Image uploads & pasting are disabled on the online website (Firebase Spark free storage limit). Please use text or .txt / .md / .pdf files."
-        );
-        return;
-      }
       if (file.size > 5 * 1024 * 1024) {
         setChatError("Attached image must be under 5MB.");
         return;
       }
+
+      if (!isStandalone) {
+        setShowDriveLinkInput(true);
+        setChatError(
+          "Direct image uploads are disabled on the free Firebase Spark plan. Paste a public Google Drive image link ('Anyone with the link') instead."
+        );
+        return;
+      }
+
       const reader = new FileReader();
       reader.onload = () => {
         if (typeof reader.result === "string") {
@@ -1207,7 +1243,10 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
           messages: messagesForRequest.map((m) => ({
             role: m.role,
             content: m.content,
-            ...(m.imageDataUrl ? { imageDataUrl: m.imageDataUrl } : {}),
+            ...(isStandalone && m.imageDataUrl ? { imageDataUrl: m.imageDataUrl } : {}),
+            ...(m.driveFileId ? { driveFileId: m.driveFileId } : {}),
+            ...(m.driveImageUrl ? { driveImageUrl: m.driveImageUrl } : {}),
+            ...(m.driveSource ? { driveSource: m.driveSource } : {}),
           })),
         }),
       });
@@ -1226,10 +1265,11 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
         createdAt: Date.now(),
       };
 
+      const nextMessages = [...messagesForRequest, assistantMsg];
       setSessions((prev) =>
         prev.map((s) =>
           s.id === sessionIdToUpdate
-            ? { ...s, messages: [...messagesForRequest, assistantMsg], updatedAt: Date.now() }
+            ? { ...s, messages: nextMessages, updatedAt: Date.now() }
             : s
         )
       );
@@ -1240,22 +1280,43 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
     }
   };
 
-  const handlePastePrompt = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+  const handleAttachDriveLink = () => {
+    const fileId = extractGoogleDriveFileId(driveLinkInput);
+    if (!fileId) {
+      setChatError("Please paste a valid Google Drive share link (e.g. https://drive.google.com/file/d/...).");
+      return;
+    }
+    setAttachedDriveImage({
+      fileId,
+      name: "Shared Google Drive Image",
+      source: "public-link",
+      previewUrl: getPublicDriveThumbnailUrl(fileId),
+      driveUrl: driveLinkInput.trim(),
+    });
+    setDriveLinkInput("");
+    setShowDriveLinkInput(false);
+    setChatError(null);
+  };
+
+  const handlePastePrompt = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
     if (isStandalone) return;
     const clipboard = e.clipboardData;
     if (!clipboard) return;
 
-    const hasImageFile =
-      Array.from(clipboard.files as FileList).some((f: File) => f.type.startsWith("image/")) ||
+    const pastedFiles = Array.from(clipboard.files as FileList);
+    const imageFile = pastedFiles.find((f: File) => f.type.startsWith("image/"));
+    const hasImageItem =
+      Boolean(imageFile) ||
       Array.from(clipboard.items as DataTransferItemList).some((item: DataTransferItem) =>
         item.type.startsWith("image/")
       );
 
-    if (hasImageFile) {
+    if (hasImageItem) {
       e.preventDefault();
       setAttachedImage(null);
+      setShowDriveLinkInput(true);
       setChatError(
-        "Pasting images is disabled on the online website (Firebase Spark free storage limit). Please paste text or attach .txt / .md / .pdf files."
+        "Direct image pasting is disabled on the free Firebase Spark plan. Paste a public Google Drive image link ('Anyone with the link') instead."
       );
       return;
     }
@@ -1276,18 +1337,20 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
     if (isSending) return;
     if (!ensureChatAccess()) return;
     const rawText = promptInput.trim();
-    if (!rawText && !(isStandalone && attachedImage) && !attachedFileText) return;
+    if (!rawText && !(isStandalone && attachedImage) && !attachedDriveImage && !attachedFileText) return;
 
     if (!isStandalone && attachedImage) {
       setAttachedImage(null);
-      setChatError("Images cannot be sent or stored on the online website (Firebase Spark free plan).");
+      setChatError("Direct image storage in Firebase is disabled. Paste a public Google Drive image link instead.");
       return;
     }
 
-    if (!isStandalone && activeSession && activeSession.messages.length >= 40) {
-      setChatError(
-        "This chat reached the 40-message limit for the Firebase Spark free plan. Please click 'New Chat' in the sidebar."
-      );
+    if (
+      !isStandalone &&
+      activeSession &&
+      activeSession.messages.length >= 40
+    ) {
+      setLimitModalOpen(true);
       return;
     }
 
@@ -1302,11 +1365,37 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
       return;
     }
 
+    // Auto-detect if user pasted a standalone Google Drive image URL directly in text
+    let inlineDriveAttachment = attachedDriveImage;
+    if (!isStandalone && !inlineDriveAttachment) {
+      const urlMatch = rawText.match(/https?:\/\/(?:drive|docs)\.google\.com\/[^\s]+/i);
+      if (urlMatch?.[0]) {
+        const detectedId = extractGoogleDriveFileId(urlMatch[0]);
+        if (detectedId) {
+          inlineDriveAttachment = {
+            fileId: detectedId,
+            name: "Shared Google Drive Image",
+            source: "public-link",
+            previewUrl: getPublicDriveThumbnailUrl(detectedId),
+            driveUrl: urlMatch[0],
+          };
+        }
+      }
+    }
+
     const userMsg: ChatMessageItem = {
       id: `msg-${Date.now()}-usr`,
       role: "user",
-      content: fullUserText,
+      content: fullUserText || (inlineDriveAttachment ? "Analyze this Google Drive image." : ""),
       ...(isStandalone && attachedImage ? { imageDataUrl: attachedImage.dataUrl } : {}),
+      ...(inlineDriveAttachment
+        ? {
+            driveFileId: inlineDriveAttachment.fileId,
+            driveSource: inlineDriveAttachment.source,
+            ...(inlineDriveAttachment.driveUrl ? { driveImageUrl: inlineDriveAttachment.driveUrl } : {}),
+            attachmentName: inlineDriveAttachment.name,
+          }
+        : {}),
       ...(attachedFileText
         ? { attachmentName: attachedFileText.name }
         : isStandalone && attachedImage
@@ -1320,7 +1409,13 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
 
     if (!targetSessionId || !activeSession) {
       const newId = `chat-${Date.now()}`;
-      const cleanTitle = (rawText || attachedFileText?.name || attachedImage?.name || "New Chat")
+      const cleanTitle = (
+        rawText ||
+        attachedFileText?.name ||
+        inlineDriveAttachment?.name ||
+        attachedImage?.name ||
+        "New Chat"
+      )
         .replace(/\s+/g, " ")
         .slice(0, 48);
       nextMessages = [userMsg];
@@ -1330,6 +1425,7 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
         projectId: activeProjectId,
         messages: nextMessages,
         updatedAt: Date.now(),
+        storageType: isStandalone ? "local-disk" : "spark",
       };
       setSessions((prev) => [newSession, ...prev]);
       setActiveSessionId(newId);
@@ -1345,6 +1441,7 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
 
     setPromptInput("");
     setAttachedImage(null);
+    setAttachedDriveImage(null);
     setAttachedFileText(null);
     await sendChatTurn(nextMessages, targetSessionId);
   };
@@ -1891,7 +1988,15 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
                             style={{ borderColor: borderCol }}
                           />
                         )}
-                        {msg.attachmentName && !msg.imageDataUrl && (
+                        {!msg.imageDataUrl && msg.driveFileId && (
+                          <img
+                            src={getPublicDriveThumbnailUrl(msg.driveFileId)}
+                            alt={msg.attachmentName || "Google Drive visual"}
+                            className="max-h-52 rounded-xl mb-2 object-contain border"
+                            style={{ borderColor: borderCol }}
+                          />
+                        )}
+                        {msg.attachmentName && !msg.imageDataUrl && !msg.driveFileId && (
                           <div
                             className="text-[11px] font-mono mb-1.5 flex items-center gap-1.5"
                             style={{ color: theme.secondaryAccentColor }}
@@ -2096,6 +2201,69 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
         onUnlinkFolder={handleUnlinkFolder}
         onRescanFolders={handleRescanFolders}
       />
+
+      {/* Strict 40-Message Limit Modal (Delete Chat OR Export & Start New Chat) */}
+      {limitModalOpen && activeSession && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
+          <div
+            className="w-full max-w-md rounded-3xl border p-6 space-y-4 shadow-2xl"
+            style={{ backgroundColor: sidebarBg, borderColor: borderCol, color: primaryText }}
+          >
+            <div className="flex items-start gap-3">
+              <div
+                className="p-2.5 rounded-2xl border shrink-0"
+                style={{ borderColor: borderCol, backgroundColor: `${theme.accentColor}15` }}
+              >
+                <AlertTriangle className="h-5 w-5" style={{ color: theme.accentColor }} />
+              </div>
+              <div>
+                <h3 className="text-base font-extrabold">40-Message Free Storage Limit</h3>
+                <p className="text-xs mt-1 leading-relaxed" style={{ color: mutedText }}>
+                  This chat has reached 40 messages on free Firebase Spark storage. Please <strong>delete this chat</strong> or start a fresh chat to stay within free cloud limits.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-2.5 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setSessions((prev) => prev.filter((x) => x.id !== activeSession.id));
+                  setActiveSessionId(null);
+                  setLimitModalOpen(false);
+                }}
+                className="w-full py-2.5 px-4 rounded-xl bg-red-600 text-white font-bold text-xs flex items-center justify-center gap-2 cursor-pointer hover:bg-red-500"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                <span>Delete This Chat (Free Spark Plan)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  handleExportSession();
+                  handleNewChat(activeProjectId);
+                  setLimitModalOpen(false);
+                }}
+                className="w-full py-2.5 px-4 rounded-xl border font-bold text-xs flex items-center justify-center gap-2 cursor-pointer"
+                style={{ borderColor: borderCol, color: primaryText }}
+              >
+                <Download className="h-3.5 w-3.5" />
+                <span>Export .md &amp; Start New Chat</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setLimitModalOpen(false)}
+                className="w-full py-2 rounded-xl border text-xs font-semibold cursor-pointer"
+                style={{ borderColor: borderCol, color: mutedText }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 
@@ -2115,7 +2283,7 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
         <input
           ref={fileInputRef}
           type="file"
-          accept={isStandalone ? ".txt,.md,.pdf,image/*" : ".txt,.md,.pdf"}
+          accept=".txt,.md,.pdf,image/*"
           className="hidden"
           onChange={handleAttachFile}
         />
@@ -2136,7 +2304,42 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
           </div>
         )}
 
-        {(attachedImage || attachedFileText) && (
+        {showDriveLinkInput && (
+          <div className="mx-3.5 mt-3 flex items-center gap-2">
+            <input
+              type="url"
+              placeholder="Paste public Google Drive image link (https://drive.google.com/file/d/...)"
+              value={driveLinkInput}
+              onChange={(e) => setDriveLinkInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleAttachDriveLink();
+                }
+              }}
+              className="flex-1 rounded-xl border px-3 py-1.5 text-xs focus:outline-none"
+              style={{ borderColor: borderCol, backgroundColor: sidebarBg, color: primaryText }}
+            />
+            <button
+              type="button"
+              onClick={handleAttachDriveLink}
+              className="px-3 py-1.5 rounded-xl text-xs font-bold text-white cursor-pointer"
+              style={{ backgroundColor: theme.secondaryAccentColor }}
+            >
+              Attach Link
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowDriveLinkInput(false)}
+              className="p-1.5 rounded-lg cursor-pointer"
+              style={{ color: mutedText }}
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
+
+        {(attachedImage || attachedDriveImage || attachedFileText) && (
           <div className="px-4 pt-3 flex flex-wrap gap-2">
             {attachedImage && (
               <div
@@ -2152,6 +2355,27 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
                 <button
                   type="button"
                   onClick={() => setAttachedImage(null)}
+                  className="cursor-pointer opacity-75 hover:opacity-100"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            )}
+            {attachedDriveImage && (
+              <div
+                className="inline-flex items-center gap-2 px-2.5 py-1 rounded-xl border text-xs"
+                style={{ borderColor: borderCol, backgroundColor: sidebarBg }}
+              >
+                <img
+                  src={attachedDriveImage.previewUrl}
+                  alt={attachedDriveImage.name}
+                  className="h-5 w-5 rounded object-cover"
+                />
+                <Link2 className="h-3 w-3 shrink-0" style={{ color: theme.secondaryAccentColor }} />
+                <span className="truncate max-w-[160px]">{attachedDriveImage.name}</span>
+                <button
+                  type="button"
+                  onClick={() => setAttachedDriveImage(null)}
                   className="cursor-pointer opacity-75 hover:opacity-100"
                 >
                   <X className="h-3 w-3" />
@@ -2203,11 +2427,27 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
               title={
                 isStandalone
                   ? "Attach .txt, .md, .pdf, or image"
-                  : "Attach .txt, .md, or .pdf (Images disabled on Firebase Spark)"
+                  : "Attach .txt, .md, or .pdf (use Drive Image button for public Google Drive image links)"
               }
             >
               <Plus className="h-4 w-4" />
             </button>
+
+            {!isStandalone && (
+              <button
+                type="button"
+                onClick={() => setShowDriveLinkInput((v) => !v)}
+                className="h-8 px-2.5 rounded-full border flex items-center gap-1 text-xs cursor-pointer transition-colors hover:opacity-90"
+                style={{
+                  borderColor: showDriveLinkInput ? theme.secondaryAccentColor : borderCol,
+                  color: primaryText,
+                }}
+                title="Attach a public Google Drive image link (0 KB Firebase storage)"
+              >
+                <Link2 className="h-3.5 w-3.5" style={{ color: theme.secondaryAccentColor }} />
+                <span className="hidden sm:inline font-medium">Drive Image</span>
+              </button>
+            )}
 
             <div className="relative" ref={optionsMenuRef}>
               <button
@@ -2606,7 +2846,10 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
 
             <button
               type="submit"
-              disabled={isSending || (!promptInput.trim() && !attachedImage && !attachedFileText)}
+              disabled={
+                isSending ||
+                (!promptInput.trim() && !attachedImage && !attachedDriveImage && !attachedFileText)
+              }
               className="h-8 w-8 rounded-full flex items-center justify-center text-white cursor-pointer disabled:opacity-40 transition-transform active:scale-95"
               style={{ backgroundColor: theme.secondaryAccentColor }}
               title="Send message"

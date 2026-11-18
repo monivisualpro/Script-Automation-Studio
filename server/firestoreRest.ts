@@ -1,15 +1,6 @@
-import fs from "fs";
-import path from "path";
+import { loadFirebaseServerConfig } from "./firebaseConfig.js";
 
-let firebaseConfig: Record<string, any> = {};
-try {
-  const configPath = path.join(process.cwd(), "firebase-applet-config.json");
-  if (fs.existsSync(configPath)) {
-    firebaseConfig = JSON.parse(fs.readFileSync(configPath, "utf-8"));
-  }
-} catch {
-  firebaseConfig = {};
-}
+const firebaseConfig = loadFirebaseServerConfig();
 
 function parseFirestoreValue(val: any): any {
   if (!val || typeof val !== "object") return null;

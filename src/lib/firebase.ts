@@ -228,5 +228,7 @@ export const logoutUser = async () => {
 };
 
 export const watchAuthState = (callback: (user: User | null) => void) => {
-  return onAuthStateChanged(auth, callback);
+  return onAuthStateChanged(auth, (user) => {
+    callback(user);
+  });
 };
