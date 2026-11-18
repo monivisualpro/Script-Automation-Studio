@@ -3,10 +3,10 @@ import React, { useEffect, useState } from "react";
 interface RenderingProgressBarProps {
   active: boolean;
   accentColor: string;
-  secondaryAccentColor: string;
-  textColor: string;
+  secondaryAccentColor?: string;
+  textColor?: string;
   isLight: boolean;
-  stages: string[];
+  stages?: string[];
   title?: string;
   compact?: boolean;
 }
@@ -17,10 +17,12 @@ export const RenderingProgressBar: React.FC<RenderingProgressBarProps> = ({
   secondaryAccentColor,
   textColor,
   isLight,
-  stages,
+  stages = [],
   title = "RENDERING",
   compact = false,
 }) => {
+  const resolvedSecondary = secondaryAccentColor || accentColor;
+  const resolvedText = textColor || (isLight ? "#0D0D0D" : "#ECECEC");
   const [progress, setProgress] = useState<number>(0);
   const [visible, setVisible] = useState<boolean>(false);
 
@@ -55,7 +57,7 @@ export const RenderingProgressBar: React.FC<RenderingProgressBarProps> = ({
 
   if (!visible) return null;
 
-  const safeStages = stages.length > 0 ? stages : ["Processing request..."];
+  const safeStages = Array.isArray(stages) && stages.length > 0 ? stages : ["Processing request..."];
   const stageIndex =
     progress >= 100
       ? safeStages.length - 1
@@ -80,18 +82,18 @@ export const RenderingProgressBar: React.FC<RenderingProgressBarProps> = ({
         <div className="flex items-center gap-2 min-w-0">
           <span
             className="inline-block w-2 h-2 rounded-full animate-pulse shrink-0"
-            style={{ backgroundColor: progress >= 100 ? secondaryAccentColor : accentColor }}
+            style={{ backgroundColor: progress >= 100 ? resolvedSecondary : accentColor }}
           />
-          <span className="font-extrabold uppercase tracking-wider shrink-0" style={{ color: textColor }}>
+          <span className="font-extrabold uppercase tracking-wider shrink-0" style={{ color: resolvedText }}>
             {title}
           </span>
-          <span className="truncate opacity-80" style={{ color: textColor }}>
+          <span className="truncate opacity-80" style={{ color: resolvedText }}>
             {currentStage}
           </span>
         </div>
         <span
           className="font-extrabold tabular-nums shrink-0"
-          style={{ color: progress >= 100 ? secondaryAccentColor : accentColor }}
+          style={{ color: progress >= 100 ? resolvedSecondary : accentColor }}
         >
           {progress}%
         </span>
@@ -106,7 +108,7 @@ export const RenderingProgressBar: React.FC<RenderingProgressBarProps> = ({
           className="h-full rounded-full transition-all duration-200 ease-out relative"
           style={{
             width: `${progress}%`,
-            background: `linear-gradient(90deg, ${accentColor}, ${secondaryAccentColor})`,
+            background: `linear-gradient(90deg, ${accentColor}, ${resolvedSecondary})`,
             boxShadow: `0 0 10px ${accentColor}80`,
           }}
         />

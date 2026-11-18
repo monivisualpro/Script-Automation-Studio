@@ -7,6 +7,24 @@ export interface AgentSkillItem {
   builtIn?: boolean;
   installed: boolean;
   enabled: boolean;
+  sourceType?: "built-in" | "custom" | "linked-folder";
+  sourceFolder?: string;
+  sourceFilePath?: string;
+  fileName?: string;
+}
+
+export interface LinkedFolderInfo {
+  path: string;
+  exists: boolean;
+  skillCount: number;
+}
+
+export interface DetectedFolderPreset {
+  id: string;
+  label: string;
+  toolName: string;
+  path: string;
+  linked: boolean;
 }
 
 export const INITIAL_SKILLS_AND_AGENTS: AgentSkillItem[] = [

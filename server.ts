@@ -42,6 +42,11 @@ import {
   cancelModelDownload,
   setCustomModelsDirectory,
 } from "./server/localEngine.js";
+import {
+  scanLinkedSkillFolders,
+  addLinkedSkillFolder,
+  removeLinkedSkillFolder,
+} from "./server/localSkills.js";
 import type { Server as HttpServer } from "http";
 import { spawn } from "child_process";
 
@@ -157,6 +162,7 @@ interface CachedUserAuthEntry {
   name?: string;
   emailVerified: boolean;
   plainApiKey: string;
+  activeProvider?: AIProviderType;
   tokenHash: string;
   expiresAt: number;
 }
@@ -234,6 +240,7 @@ export function resolveRequestProviderConfig(req: express.Request, fallbackKey?:
       apiKey: sanitizeApiKey(bodyConfig.apiKey) || cleanFallback || "",
       model: bodyConfig.model || "",
       baseUrl: bodyConfig.baseUrl || "",
+      allowEnvFallback: isStandaloneMode,
     };
   }
 
@@ -243,6 +250,7 @@ export function resolveRequestProviderConfig(req: express.Request, fallbackKey?:
       apiKey: headerKey || cleanFallback || "",
       model: headerModel || "",
       baseUrl: headerUrl || "",
+      allowEnvFallback: isStandaloneMode,
     };
   }
 
@@ -253,12 +261,14 @@ export function resolveRequestProviderConfig(req: express.Request, fallbackKey?:
       apiKey: headerKey || cleanFallback || "",
       model: headerModel || "",
       baseUrl: headerUrl || "",
+      allowEnvFallback: isStandaloneMode,
     };
   }
 
   return {
     provider: "gemini",
     apiKey: cleanFallback || "",
+    allowEnvFallback: isStandaloneMode,
   };
 }
 
@@ -300,9 +310,8 @@ function createGoogleGenAIClient(apiKey: string): GoogleGenAI {
 async function verifyUserAuth(req: AuthenticatedRequest, res: express.Response, next: express.NextFunction) {
   try {
     const authHeader = req.headers.authorization;
-    const isStandaloneReq = isStandaloneMode ||
-      req.headers["x-standalone-mode"] === "true" ||
-      (authHeader && authHeader.startsWith("Bearer standalone_"));
+    // Strictly govern standalone access via server environment — never trust spoofable client headers online
+    const isStandaloneReq = isStandaloneMode;
 
     if (isStandaloneReq) {
       req.userAuth = {
@@ -338,11 +347,15 @@ async function verifyUserAuth(req: AuthenticatedRequest, res: express.Response, 
     }
 
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({ error: "Authentication required. Please log in to access AI features." });
+      return res.status(401).json({ error: "Authentication required. Please sign in and save your personal API key first." });
     }
 
     const token = authHeader.substring(7);
+    if (!token || token.startsWith("standalone_")) {
+      return res.status(401).json({ error: "Authentication required. Please sign in with a valid account." });
+    }
     const tokenSignatureTail = token.slice(-32);
+    const isModelListingRoute = req.path.includes("available-models");
 
     // Check 5-minute in-memory cache first if same token is presented
     for (const cached of userAuthKeyCache.values()) {
@@ -351,9 +364,16 @@ async function verifyUserAuth(req: AuthenticatedRequest, res: express.Response, 
         req.userApiKey = cached.plainApiKey;
         req.userAiClient = createGoogleGenAIClient(cached.plainApiKey);
         req.providerConfig = resolveRequestProviderConfig(req, cached.plainApiKey);
-        if (!isStandaloneMode && req.providerConfig.provider === "local") {
+        if (req.providerConfig.provider === "local") {
           return res.status(403).json({
             error: "Local LLM models are only available when running the GitHub repository locally on your computer.",
+          });
+        }
+        const explicitReqKey = sanitizeApiKey((req.headers["x-provider-key"] as string) || req.body?.providerConfig?.apiKey);
+        if (!isModelListingRoute && cached.activeProvider && req.providerConfig.provider !== cached.activeProvider && !explicitReqKey) {
+          return res.status(403).json({
+            error: "NO_API_KEY",
+            message: `Your saved key is for ${cached.activeProvider.toUpperCase()}. Please paste and save your ${req.providerConfig.provider.toUpperCase()} API key in the secure API Key Saver first.`,
           });
         }
         return next();
@@ -385,7 +405,7 @@ async function verifyUserAuth(req: AuthenticatedRequest, res: express.Response, 
     if (!encryptedKey) {
       return res.status(403).json({
         error: "NO_API_KEY",
-        message: "No personal Google AI API Key set up for this account. Please add your API Key in Settings.",
+        message: "No personal AI API Key saved for this account. Please paste and save your API Key in the secure API Key Saver.",
       });
     }
 
@@ -410,6 +430,11 @@ async function verifyUserAuth(req: AuthenticatedRequest, res: express.Response, 
       }
     }
 
+    const savedProvider: AIProviderType =
+      userData.activeProvider === "openai" || userData.activeProvider === "claude" || userData.activeProvider === "gemini"
+        ? userData.activeProvider
+        : "gemini";
+
     // Store in 5-minute cache to protect Firebase Spark daily read quota
     userAuthKeyCache.set(userInfo.uid, {
       uid: userInfo.uid,
@@ -417,6 +442,7 @@ async function verifyUserAuth(req: AuthenticatedRequest, res: express.Response, 
       name: userInfo.name,
       emailVerified: userInfo.emailVerified,
       plainApiKey: plainKey,
+      activeProvider: savedProvider,
       tokenHash: tokenSignatureTail,
       expiresAt: Date.now() + USER_AUTH_CACHE_TTL_MS,
     });
@@ -426,9 +452,17 @@ async function verifyUserAuth(req: AuthenticatedRequest, res: express.Response, 
     req.userAiClient = createGoogleGenAIClient(plainKey);
     req.providerConfig = resolveRequestProviderConfig(req, plainKey);
 
-    if (!isStandaloneMode && req.providerConfig.provider === "local") {
+    if (req.providerConfig.provider === "local") {
       return res.status(403).json({
         error: "Local LLM models are only available when running the GitHub repository locally on your computer.",
+      });
+    }
+
+    const explicitReqKey = sanitizeApiKey((req.headers["x-provider-key"] as string) || req.body?.providerConfig?.apiKey);
+    if (!isModelListingRoute && req.providerConfig.provider !== savedProvider && !explicitReqKey) {
+      return res.status(403).json({
+        error: "NO_API_KEY",
+        message: `Your saved key is for ${savedProvider.toUpperCase()}. Please paste and save your ${req.providerConfig.provider.toUpperCase()} API key in the secure API Key Saver first.`,
       });
     }
 
@@ -609,9 +643,20 @@ function getStandaloneEnvKeySummary() {
 app.post("/api/user/save-key", writeRateLimiter, async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
-    const isStandaloneReq = isStandaloneMode ||
-      req.headers["x-standalone-mode"] === "true" ||
-      (authHeader && authHeader.startsWith("Bearer standalone_"));
+    const isStandaloneReq = isStandaloneMode;
+
+    let verifiedToken = "";
+    let verifiedUserInfo: { uid: string; email?: string; name?: string; emailVerified: boolean } | null = null;
+    if (!isStandaloneReq) {
+      if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        return res.status(401).json({ error: "Please sign in first before saving your personal API key." });
+      }
+      verifiedToken = authHeader.substring(7);
+      if (!verifiedToken || verifiedToken.startsWith("standalone_")) {
+        return res.status(401).json({ error: "Authentication required. Please sign in first." });
+      }
+      verifiedUserInfo = await verifyAuthToken(verifiedToken);
+    }
 
     const { provider = "gemini", apiKey = "", baseUrl = "", model = "", saveToEnv = true } = req.body;
     const providerType = (provider || "gemini").toLowerCase() as AIProviderType;
@@ -636,6 +681,7 @@ app.post("/api/user/save-key", writeRateLimiter, async (req, res) => {
         apiKey: trimmedKey,
         baseUrl: trimmedBaseUrl,
         model: trimmedModel,
+        allowEnvFallback: isStandaloneMode,
       };
       await executeMultiProviderGeneration({
         prompt: "Respond with the word CONNECTED to verify connection.",
@@ -673,12 +719,8 @@ app.post("/api/user/save-key", writeRateLimiter, async (req, res) => {
       });
     }
 
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({ error: "Authentication required." });
-    }
-
-    const token = authHeader.substring(7);
-    const userInfo = await verifyAuthToken(token);
+    const token = verifiedToken;
+    const userInfo = verifiedUserInfo!;
 
     const encrypted = encryptApiKey(trimmedKey || "local-key");
     const masked = providerType === "local"
@@ -851,6 +893,46 @@ app.post("/api/local-engine/models-dir", writeRateLimiter, (req, res) => {
   } catch (err: any) {
     return res.status(400).json({ error: err?.message || "Invalid models directory path.", status: getLocalEngineStatus() });
   }
+});
+
+// Local Linked Skills Folders (Claude, VS Code, Cursor, Bionic, Agents) - Standalone Software Only
+app.get("/api/local-skills", (_req, res) => {
+  if (!isStandaloneMode) {
+    return res.status(403).json({ error: "Local Skills Folder linking is available only in local standalone software mode." });
+  }
+  return res.json(scanLinkedSkillFolders());
+});
+
+app.post("/api/local-skills/link", writeRateLimiter, (req, res) => {
+  if (!isStandaloneMode) {
+    return res.status(403).json({ error: "Local Skills Folder linking is available only in local standalone software mode." });
+  }
+  try {
+    const { directoryPath } = req.body || {};
+    if (typeof directoryPath !== "string" || !directoryPath.trim()) {
+      return res.status(400).json({ error: "Please provide a valid folder path." });
+    }
+    const result = addLinkedSkillFolder(directoryPath);
+    return res.json({ success: true, ...result });
+  } catch (err: any) {
+    return res.status(400).json({ error: err?.message || "Could not link skills folder." });
+  }
+});
+
+app.post("/api/local-skills/unlink", writeRateLimiter, (req, res) => {
+  if (!isStandaloneMode) {
+    return res.status(403).json({ error: "Local Skills Folder linking is available only in local standalone software mode." });
+  }
+  const { directoryPath } = req.body || {};
+  const result = removeLinkedSkillFolder(typeof directoryPath === "string" ? directoryPath : "");
+  return res.json({ success: true, ...result });
+});
+
+app.post("/api/local-skills/rescan", (_req, res) => {
+  if (!isStandaloneMode) {
+    return res.status(403).json({ error: "Local Skills Folder linking is available only in local standalone software mode." });
+  }
+  return res.json({ success: true, ...scanLinkedSkillFolders() });
 });
 
 app.post("/api/test-provider-connection", verifyUserAuth as express.RequestHandler, async (req: AuthenticatedRequest, res) => {
@@ -1953,7 +2035,8 @@ app.post("/api/parse-file", verifyUserAuth as express.RequestHandler, aiBurstLim
         return res.status(400).json({ error: "Invalid PDF format. File header does not match PDF specification (%PDF-)." });
       }
 
-      if (!req.userAiClient && !sanitizeApiKey(process.env.GEMINI_API_KEY)) {
+      const standaloneGeminiEnv = isStandaloneMode ? sanitizeApiKey(process.env.GEMINI_API_KEY) : "";
+      if (!req.userAiClient && !standaloneGeminiEnv) {
         return res.status(400).json({
           error: "PDF binary extraction requires a valid Google Gemini API key. For Local Engine / OpenAI / Claude, please upload a .txt file or paste the text directly.",
         });
@@ -1961,7 +2044,7 @@ app.post("/api/parse-file", verifyUserAuth as express.RequestHandler, aiBurstLim
 
       const geminiConfig: AIProviderConfig = providerConfig.provider === "gemini"
         ? providerConfig
-        : { provider: "gemini", apiKey: sanitizeApiKey(process.env.GEMINI_API_KEY) };
+        : { provider: "gemini", apiKey: standaloneGeminiEnv, allowEnvFallback: isStandaloneMode };
 
       const result = await executeMultiProviderGeneration({
         prompt: "Extract and return the full text content of this PDF file.",
@@ -2871,12 +2954,34 @@ app.post("/api/chat", aiBurstLimiter, verifyUserAuth as express.RequestHandler, 
     }
 
     const rawMessages = Array.isArray(req.body?.messages) ? req.body.messages : [];
+    if (!isStandaloneMode && rawMessages.some((m: any) => m && m.imageDataUrl)) {
+      return res.status(400).json({
+        error: "Pasting or uploading images is disabled on the online website (Firebase Spark free storage limit). Use text or .txt/.md/.pdf files.",
+      });
+    }
+
+    if (!isStandaloneMode) {
+      if (rawMessages.length > 40) {
+        return res.status(400).json({
+          error: "This chat has grown too large for the online Firebase Spark free tier (40-message limit). Please start a New Chat.",
+        });
+      }
+      const oversized = rawMessages.some(
+        (m: any) => typeof m?.content === "string" && m.content.length > 24000
+      );
+      if (oversized) {
+        return res.status(400).json({
+          error: "Message is too large for online Firebase Spark mode (max 24,000 characters). Please shorten the text or start a New Chat.",
+        });
+      }
+    }
+
     const messages: ChatTurnMessage[] = rawMessages
-      .filter((m: any) => m && typeof m.content === "string" && (m.content.trim() || m.imageDataUrl))
+      .filter((m: any) => m && typeof m.content === "string" && (m.content.trim() || (isStandaloneMode && m.imageDataUrl)))
       .map((m: any) => ({
         role: m.role === "assistant" ? "assistant" : "user",
         content: String(m.content || ""),
-        ...(typeof m.imageDataUrl === "string" && m.imageDataUrl.startsWith("data:image/")
+        ...(isStandaloneMode && typeof m.imageDataUrl === "string" && m.imageDataUrl.startsWith("data:image/")
           ? { imageDataUrl: m.imageDataUrl }
           : {}),
       }));
@@ -2912,6 +3017,207 @@ app.post("/api/chat", aiBurstLimiter, verifyUserAuth as express.RequestHandler, 
     logSafeError("Error in /api/chat:", error);
     const provider = req.providerConfig?.provider || "gemini";
     return res.status(500).json({ error: formatProviderErrorMessage(provider, error) });
+  }
+});
+
+// Chat Workspace Persistent Storage (Local PC Disk when standalone, Firebase Cloud Firestore when online signed-in)
+const LOCAL_CHAT_WORKSPACE_FILE = path.resolve(process.cwd(), "local-engine", "chat-workspace.json");
+
+app.get("/api/chat/storage", async (req, res) => {
+  try {
+    if (isStandaloneMode) {
+      let savedData: Record<string, any> = {};
+      if (fs.existsSync(LOCAL_CHAT_WORKSPACE_FILE)) {
+        try {
+          savedData = JSON.parse(fs.readFileSync(LOCAL_CHAT_WORKSPACE_FILE, "utf-8"));
+        } catch {
+          savedData = {};
+        }
+      }
+      return res.json({
+        storageMode: "local-disk",
+        storageLocation: "local-engine/chat-workspace.json",
+        sessions: Array.isArray(savedData.sessions) ? savedData.sessions : [],
+        projects: Array.isArray(savedData.projects) ? savedData.projects : [],
+        skillsAndAgents: Array.isArray(savedData.skillsAndAgents) ? savedData.skillsAndAgents : null,
+        activeAgentId: savedData.activeAgentId !== undefined ? savedData.activeAgentId : undefined,
+      });
+    }
+
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith("Bearer ") && firebaseConfig.projectId) {
+      const token = authHeader.substring(7);
+      if (!token.startsWith("standalone_")) {
+        const userInfo = await verifyAuthToken(token);
+        const docSnap = await getFirestoreDoc("users", userInfo.uid, token);
+        const rawJson = docSnap.exists && typeof docSnap.data?.chatWorkspaceJson === "string"
+          ? docSnap.data.chatWorkspaceJson
+          : "";
+        let parsed: Record<string, any> = {};
+        if (rawJson) {
+          try {
+            parsed = JSON.parse(rawJson);
+          } catch {
+            parsed = {};
+          }
+        }
+        return res.json({
+          storageMode: "cloud-firestore",
+          storageLocation: "Firebase Spark (Text-Only Lightweight Sync)",
+          sessions: Array.isArray(parsed.sessions) ? parsed.sessions : [],
+          projects: Array.isArray(parsed.projects) ? parsed.projects : [],
+          skillsAndAgents: Array.isArray(parsed.skillsAndAgents) ? parsed.skillsAndAgents : null,
+          activeAgentId: parsed.activeAgentId !== undefined ? parsed.activeAgentId : undefined,
+        });
+      }
+    }
+
+    return res.json({
+      storageMode: "browser-local",
+      storageLocation: "Browser Storage",
+    });
+  } catch (error: any) {
+    logSafeError("Error reading /api/chat/storage:", error);
+    return res.status(500).json({ error: "Failed to load saved chat workspace." });
+  }
+});
+
+app.post("/api/chat/storage", writeRateLimiter, async (req, res) => {
+  try {
+    const rawSessions = Array.isArray(req.body?.sessions) ? req.body.sessions.slice(0, 40) : [];
+    const rawProjects = Array.isArray(req.body?.projects) ? req.body.projects.slice(0, 50) : [];
+    const rawSkills = Array.isArray(req.body?.skillsAndAgents) ? req.body.skillsAndAgents.slice(0, 160) : null;
+    const activeAgentId =
+      typeof req.body?.activeAgentId === "string" || req.body?.activeAgentId === null
+        ? req.body.activeAgentId
+        : null;
+
+    if (isStandaloneMode) {
+      const dir = path.dirname(LOCAL_CHAT_WORKSPACE_FILE);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      const payload = {
+        sessions: rawSessions,
+        projects: rawProjects,
+        ...(rawSkills ? { skillsAndAgents: rawSkills } : {}),
+        activeAgentId,
+        updatedAt: new Date().toISOString(),
+      };
+      fs.writeFileSync(LOCAL_CHAT_WORKSPACE_FILE, JSON.stringify(payload, null, 2), "utf8");
+      return res.json({
+        success: true,
+        storageMode: "local-disk",
+        storageLocation: "local-engine/chat-workspace.json",
+      });
+    }
+
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith("Bearer ") && firebaseConfig.projectId) {
+      const token = authHeader.substring(7);
+      if (!token.startsWith("standalone_")) {
+        const userInfo = await verifyAuthToken(token);
+
+        // Firebase Spark Free Tier Protection:
+        // 1) Never store any images in Firestore (0 bytes imageDataUrl)
+        // 2) Never store oversized chats (keep each user document compact <= 40 KB)
+        const compactSkills = rawSkills
+          ? rawSkills
+              .filter((it: any) => it && it.id && it.sourceType !== "linked-folder")
+              .slice(0, 25)
+              .map((it: any) =>
+                it.builtIn
+                  ? { id: it.id, builtIn: true, installed: Boolean(it.installed), enabled: Boolean(it.enabled) }
+                  : {
+                      id: it.id,
+                      name: String(it.name || "").slice(0, 80),
+                      kind: it.kind === "agent" ? "agent" : "skill",
+                      summary: String(it.summary || "").slice(0, 140),
+                      instructions: String(it.instructions || "").slice(0, 2500),
+                      installed: Boolean(it.installed),
+                      enabled: Boolean(it.enabled),
+                    }
+              )
+          : null;
+
+        const compactProjects = rawProjects.slice(0, 15).map((p: any) => ({
+          id: p.id,
+          name: String(p.name || "").slice(0, 80),
+          systemInstruction: String(p.systemInstruction || "").slice(0, 1000),
+          createdAt: p.createdAt,
+        }));
+
+        const buildSparkSessions = (maxSessions: number, maxMsgs: number, maxChars: number) =>
+          rawSessions.slice(0, maxSessions).map((s: any) => ({
+            id: s.id,
+            title: String(s.title || "Chat").slice(0, 80),
+            projectId: s.projectId || null,
+            updatedAt: s.updatedAt || Date.now(),
+            messages: Array.isArray(s?.messages)
+              ? s.messages.slice(-maxMsgs).map((m: any) => {
+                  const { imageDataUrl: _omitImage, ...rest } = m || {};
+                  const text = typeof rest.content === "string" ? rest.content : "";
+                  return {
+                    ...rest,
+                    content:
+                      text.length > maxChars
+                        ? `${text.slice(0, maxChars)}\n... [trimmed for Spark free storage]`
+                        : text,
+                  };
+                })
+              : [],
+          }));
+
+        let serialized = JSON.stringify({
+          sessions: buildSparkSessions(10, 20, 3000),
+          projects: compactProjects,
+          ...(compactSkills ? { skillsAndAgents: compactSkills } : {}),
+          activeAgentId,
+        });
+
+        // Hard cap at 40 KB per user document so Firebase Spark 1 GiB quota stays safe
+        if (serialized.length > 40000) {
+          serialized = JSON.stringify({
+            sessions: buildSparkSessions(5, 12, 1500),
+            projects: compactProjects.slice(0, 10),
+            ...(compactSkills ? { skillsAndAgents: compactSkills } : {}),
+            activeAgentId,
+          });
+        }
+        if (serialized.length > 40000) {
+          serialized = JSON.stringify({
+            sessions: buildSparkSessions(2, 6, 800),
+            projects: compactProjects.slice(0, 5),
+            activeAgentId,
+          });
+        }
+
+        await updateFirestoreDoc(
+          "users",
+          userInfo.uid,
+          {
+            chatWorkspaceJson: serialized,
+            chatWorkspaceUpdatedAt: new Date().toISOString(),
+          },
+          token
+        );
+
+        return res.json({
+          success: true,
+          storageMode: "cloud-firestore",
+          storageLocation: "Firebase Spark (Text-Only Lightweight Sync)",
+        });
+      }
+    }
+
+    return res.json({
+      success: true,
+      storageMode: "browser-local",
+      storageLocation: "Browser Storage",
+    });
+  } catch (error: any) {
+    logSafeError("Error saving /api/chat/storage:", error);
+    return res.status(500).json({ error: "Failed to save chat workspace." });
   }
 });
 

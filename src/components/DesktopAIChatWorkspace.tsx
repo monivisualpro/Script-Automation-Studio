@@ -37,9 +37,13 @@ import {
   Bot,
   Wand2,
   Loader2,
+  HardDrive,
+  Lock,
 } from "lucide-react";
 import {
   AgentSkillItem,
+  LinkedFolderInfo,
+  DetectedFolderPreset,
   INITIAL_SKILLS_AND_AGENTS,
   PROMPT_OPTIMIZER_SYSTEM_INSTRUCTION,
 } from "../lib/agentSkills";
@@ -115,23 +119,25 @@ const FormattedMessageBody: React.FC<{
 }> = ({ content, isLight, accentColor, secondaryColor }) => {
   const [copiedCodeIdx, setCopiedCodeIdx] = useState<number | null>(null);
 
+  const safeContent = typeof content === "string" ? content : String(content || "");
+
   const segments = useMemo(() => {
     const parts: Array<{ type: "text" | "code"; content: string; lang?: string }> = [];
     const regex = /```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g;
     let lastIndex = 0;
     let match: RegExpExecArray | null;
-    while ((match = regex.exec(content)) !== null) {
+    while ((match = regex.exec(safeContent)) !== null) {
       if (match.index > lastIndex) {
-        parts.push({ type: "text", content: content.slice(lastIndex, match.index) });
+        parts.push({ type: "text", content: safeContent.slice(lastIndex, match.index) });
       }
       parts.push({ type: "code", lang: match[1] || "text", content: match[2].trimEnd() });
       lastIndex = regex.lastIndex;
     }
-    if (lastIndex < content.length) {
-      parts.push({ type: "text", content: content.slice(lastIndex) });
+    if (lastIndex < safeContent.length) {
+      parts.push({ type: "text", content: safeContent.slice(lastIndex) });
     }
     return parts;
-  }, [content]);
+  }, [safeContent]);
 
   const renderInline = (line: string) => {
     const tokens = line.split(/(\*\*[^*]+\*\*|`[^`]+`)/g);
@@ -272,14 +278,17 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
   onSendToStudio,
 }) => {
   const {
+    user,
     idToken,
     isStandalone,
+    systemModeChecked,
     profile,
     envKeyStatus,
     activeProviderConfig,
     availableModels,
     availableLocalModels,
     fetchAvailableModels,
+    setIsAuthModalOpen,
     setIsApiKeyModalOpen,
     setIsSettingsModalOpen,
     setActiveWorkspace,
@@ -321,6 +330,14 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [chatSearch, setChatSearch] = useState<string>("");
 
+  const [storageMode, setStorageMode] = useState<"local-disk" | "cloud-firestore" | "browser-local">(
+    isStandalone ? "local-disk" : idToken ? "cloud-firestore" : "browser-local"
+  );
+  const [storageLocation, setStorageLocation] = useState<string>(
+    isStandalone ? "local-engine/chat-workspace.json" : idToken ? "Firebase Cloud" : "Browser Storage"
+  );
+  const storageHydratedRef = useRef<boolean>(false);
+
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_PROJECTS_KEY, JSON.stringify(projects));
@@ -329,9 +346,15 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
 
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_SESSIONS_KEY, JSON.stringify(sessions.slice(0, 40)));
+      const sanitizedSessions = !isStandalone
+        ? sessions.slice(0, 12).map((s) => ({
+            ...s,
+            messages: (s.messages || []).slice(-25).map(({ imageDataUrl: _omit, ...rest }) => rest),
+          }))
+        : sessions.slice(0, 40);
+      localStorage.setItem(STORAGE_SESSIONS_KEY, JSON.stringify(sanitizedSessions));
     } catch {}
-  }, [sessions]);
+  }, [sessions, isStandalone]);
 
   // Composer & Generation State
   const [promptInput, setPromptInput] = useState<string>("");
@@ -376,6 +399,10 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
   });
   const [isSkillsModalOpen, setIsSkillsModalOpen] = useState<boolean>(false);
   const [isOptimizing, setIsOptimizing] = useState<boolean>(false);
+  const [linkedFolders, setLinkedFolders] = useState<LinkedFolderInfo[]>([]);
+  const [detectedPresets, setDetectedPresets] = useState<DetectedFolderPreset[]>([]);
+  const [isLinkingFolder, setIsLinkingFolder] = useState<boolean>(false);
+  const [folderSyncError, setFolderSyncError] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -388,6 +415,241 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
       localStorage.setItem(STORAGE_ACTIVE_AGENT_KEY, activeAgentId || "");
     } catch {}
   }, [activeAgentId]);
+
+  // Hydrate persistent chats/projects from PC Disk (standalone) or Firebase Cloud (online signed-in)
+  useEffect(() => {
+    let cancelled = false;
+    storageHydratedRef.current = false;
+
+    const loadPersistentWorkspace = async () => {
+      try {
+        const headers: Record<string, string> = {};
+        if (isStandalone) headers["x-standalone-mode"] = "true";
+        else if (idToken) headers.Authorization = `Bearer ${idToken}`;
+
+        const res = await fetch("/api/chat/storage", { headers });
+        if (!res.ok || cancelled) {
+          storageHydratedRef.current = true;
+          return;
+        }
+        const data = await res.json();
+        if (cancelled) return;
+
+        if (data.storageMode) setStorageMode(data.storageMode);
+        if (data.storageLocation) setStorageLocation(data.storageLocation);
+
+        if (data.storageMode === "local-disk" || data.storageMode === "cloud-firestore") {
+          if (Array.isArray(data.projects) && data.projects.length > 0) {
+            setProjects((prev) => {
+              const map = new Map<string, ChatProject>();
+              for (const p of [...data.projects, ...prev]) {
+                if (p?.id && p.id !== "proj-scripts" && p.id !== "proj-prompts") {
+                  map.set(p.id, p);
+                }
+              }
+              return Array.from(map.values()).sort((a, b) => b.createdAt - a.createdAt);
+            });
+          }
+          if (Array.isArray(data.sessions) && data.sessions.length > 0) {
+            setSessions((prev) => {
+              const map = new Map<string, ChatSession>();
+              for (const s of [...data.sessions, ...prev]) {
+                if (s?.id) {
+                  const existing = map.get(s.id);
+                  if (!existing || (s.updatedAt || 0) > (existing.updatedAt || 0)) {
+                    map.set(s.id, s);
+                  }
+                }
+              }
+              return Array.from(map.values())
+                .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
+                .slice(0, 40);
+            });
+          }
+          if (Array.isArray(data.skillsAndAgents) && data.skillsAndAgents.length > 0) {
+            setSkillsAndAgents((prev) => {
+              const map = new Map<string, AgentSkillItem>();
+              for (const it of prev) if (it?.id) map.set(it.id, it);
+              for (const it of data.skillsAndAgents) {
+                if (!it?.id) continue;
+                const existing = map.get(it.id);
+                if (existing && (!it.instructions || !it.name)) {
+                  map.set(it.id, {
+                    ...existing,
+                    installed: it.installed !== undefined ? Boolean(it.installed) : existing.installed,
+                    enabled: it.enabled !== undefined ? Boolean(it.enabled) : existing.enabled,
+                  });
+                } else {
+                  map.set(it.id, it);
+                }
+              }
+              return Array.from(map.values());
+            });
+          }
+          if (data.activeAgentId !== undefined) {
+            setActiveAgentId(data.activeAgentId || null);
+          }
+        }
+      } catch {
+        // Fallback smoothly to browser localStorage
+      } finally {
+        if (!cancelled) {
+          storageHydratedRef.current = true;
+        }
+      }
+    };
+
+    void loadPersistentWorkspace();
+    return () => {
+      cancelled = true;
+    };
+  }, [isStandalone, idToken]);
+
+  // Auto-sync workspace edits to PC Disk (standalone) or Firebase Cloud (online signed-in)
+  useEffect(() => {
+    if (!storageHydratedRef.current) return;
+    if (!isStandalone && !idToken) return;
+
+    const timer = setTimeout(async () => {
+      try {
+        const headers: Record<string, string> = { "Content-Type": "application/json" };
+        if (isStandalone) headers["x-standalone-mode"] = "true";
+        else if (idToken) headers.Authorization = `Bearer ${idToken}`;
+
+        const syncSessions = !isStandalone
+          ? sessions.slice(0, 10).map((s) => ({
+              ...s,
+              messages: (s.messages || []).slice(-20).map(({ imageDataUrl: _omit, ...rest }) => rest),
+            }))
+          : sessions.slice(0, 40);
+        const syncProjects = !isStandalone ? projects.slice(0, 15) : projects.slice(0, 50);
+
+        const res = await fetch("/api/chat/storage", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            sessions: syncSessions,
+            projects: syncProjects,
+            skillsAndAgents,
+            activeAgentId,
+          }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.storageMode) setStorageMode(data.storageMode);
+          if (data.storageLocation) setStorageLocation(data.storageLocation);
+        }
+      } catch {
+        // Silently retain localStorage mirror
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [sessions, projects, skillsAndAgents, activeAgentId, isStandalone, idToken]);
+
+  const applyLocalSkillsPayload = (data: {
+    linkedFolders?: LinkedFolderInfo[];
+    detectedPresets?: DetectedFolderPreset[];
+    skills?: AgentSkillItem[];
+  }) => {
+    if (Array.isArray(data.linkedFolders)) setLinkedFolders(data.linkedFolders);
+    if (Array.isArray(data.detectedPresets)) setDetectedPresets(data.detectedPresets);
+
+    if (Array.isArray(data.skills)) {
+      const diskSkills = data.skills;
+      setSkillsAndAgents((prev) => {
+        const prevMap = new Map<string, AgentSkillItem>();
+        for (const item of prev) {
+          prevMap.set(item.id, item);
+        }
+        const nonFolderItems = prev.filter((item) => item.sourceType !== "linked-folder");
+        const mergedDiskItems = diskSkills.map((diskItem) => {
+          const existing = prevMap.get(diskItem.id);
+          return existing
+            ? { ...diskItem, enabled: existing.enabled }
+            : diskItem;
+        });
+        return [...nonFolderItems, ...mergedDiskItems];
+      });
+    }
+  };
+
+  const fetchLocalSkillsFromDisk = async () => {
+    if (!isStandalone) return;
+    try {
+      const res = await fetch("/api/local-skills");
+      if (!res.ok) return;
+      const data = await res.json();
+      applyLocalSkillsPayload(data);
+    } catch {
+      // Non-fatal if offline endpoints unavailable
+    }
+  };
+
+  useEffect(() => {
+    if (isStandalone) {
+      void fetchLocalSkillsFromDisk();
+    }
+  }, [isStandalone, isSkillsModalOpen]);
+
+  const handleLinkFolder = async (directoryPath: string): Promise<boolean> => {
+    if (!isStandalone) return false;
+    setIsLinkingFolder(true);
+    setFolderSyncError(null);
+    try {
+      const res = await fetch("/api/local-skills/link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ directoryPath }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setFolderSyncError(data.error || "Could not link folder.");
+        return false;
+      }
+      applyLocalSkillsPayload(data);
+      return true;
+    } catch (err: any) {
+      setFolderSyncError(err?.message || "Failed to link local skills folder.");
+      return false;
+    } finally {
+      setIsLinkingFolder(false);
+    }
+  };
+
+  const handleUnlinkFolder = async (directoryPath: string): Promise<void> => {
+    if (!isStandalone) return;
+    setIsLinkingFolder(true);
+    setFolderSyncError(null);
+    try {
+      const res = await fetch("/api/local-skills/unlink", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ directoryPath }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        applyLocalSkillsPayload(data);
+      }
+    } finally {
+      setIsLinkingFolder(false);
+    }
+  };
+
+  const handleRescanFolders = async (): Promise<void> => {
+    if (!isStandalone) return;
+    setIsLinkingFolder(true);
+    setFolderSyncError(null);
+    try {
+      const res = await fetch("/api/local-skills/rescan", { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        applyLocalSkillsPayload(data);
+      }
+    } finally {
+      setIsLinkingFolder(false);
+    }
+  };
 
   // Unified Cloud + Local Model Selector State
   const [showModelDropdown, setShowModelDropdown] = useState<boolean>(false);
@@ -655,6 +917,12 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
     setChatError(null);
 
     if (file.type.startsWith("image/")) {
+      if (!isStandalone) {
+        setChatError(
+          "Image uploads & pasting are disabled on the online website (Firebase Spark free storage limit). Please use text or .txt / .md / .pdf files."
+        );
+        return;
+      }
       if (file.size > 5 * 1024 * 1024) {
         setChatError("Attached image must be under 5MB.");
         return;
@@ -671,11 +939,12 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
 
     if (file.name.toLowerCase().endsWith(".txt") || file.name.toLowerCase().endsWith(".md")) {
       const text = await file.text();
-      setAttachedFileText({ name: file.name, content: text.slice(0, 45000) });
+      setAttachedFileText({ name: file.name, content: text.slice(0, isStandalone ? 45000 : 18000) });
       return;
     }
 
     if (file.name.toLowerCase().endsWith(".pdf")) {
+      if (!ensureChatAccess()) return;
       const reader = new FileReader();
       reader.onload = async () => {
         if (typeof reader.result !== "string") return;
@@ -683,14 +952,18 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
           const headers: Record<string, string> = { "Content-Type": "application/json" };
           if (isStandalone) headers["x-standalone-mode"] = "true";
           else if (idToken) headers.Authorization = `Bearer ${idToken}`;
-          const res = await fetch("/api/extract-pdf", {
+          const res = await fetch("/api/parse-file", {
             method: "POST",
             headers,
-            body: JSON.stringify({ fileBase64: reader.result }),
+            body: JSON.stringify({
+              fileName: file.name,
+              fileType: file.type,
+              fileData: reader.result,
+            }),
           });
           const data = await res.json();
           if (!res.ok) throw new Error(data.error || "Could not extract PDF text.");
-          setAttachedFileText({ name: file.name, content: (data.text || "").slice(0, 45000) });
+          setAttachedFileText({ name: file.name, content: (data.rawScript || data.text || "").slice(0, 45000) });
         } catch (err: any) {
           setChatError(err.message || "Failed to read PDF attachment.");
         }
@@ -775,8 +1048,39 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
     return parts.join("\n\n");
   };
 
+  const ensureChatAccess = (): boolean => {
+    if (isStandalone) return true;
+    if (!user || !idToken) {
+      setIsAuthModalOpen(true);
+      setChatError(
+        "Sign in required: Please sign in first, then paste and save your personal API key in the secure API Key Saver to generate."
+      );
+      return false;
+    }
+    if (!profile?.hasApiKey) {
+      setIsApiKeyModalOpen(true);
+      setChatError(
+        "Personal API Key required: Please paste and save your API key in the secure API Key Saver first."
+      );
+      return false;
+    }
+    const savedProvider = profile?.activeProvider || "gemini";
+    if (
+      selectedChoice.provider !== savedProvider &&
+      !(activeProviderConfig.provider === selectedChoice.provider && activeProviderConfig.apiKey?.trim())
+    ) {
+      setIsApiKeyModalOpen(true);
+      setChatError(
+        `Your saved key is for ${savedProvider.toUpperCase()}. Please paste and save your ${selectedChoice.provider.toUpperCase()} key in the secure API Key Saver first.`
+      );
+      return false;
+    }
+    return true;
+  };
+
   const handleOptimizePrompt = async () => {
     if (isOptimizing || isSending) return;
+    if (!ensureChatAccess()) return;
     const draft = promptInput.trim();
     if (!draft) {
       setChatError("Type a brief idea or prompt first, then click Optimize Prompt.");
@@ -936,24 +1240,76 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
     }
   };
 
+  const handlePastePrompt = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    if (isStandalone) return;
+    const clipboard = e.clipboardData;
+    if (!clipboard) return;
+
+    const hasImageFile =
+      Array.from(clipboard.files as FileList).some((f: File) => f.type.startsWith("image/")) ||
+      Array.from(clipboard.items as DataTransferItemList).some((item: DataTransferItem) =>
+        item.type.startsWith("image/")
+      );
+
+    if (hasImageFile) {
+      e.preventDefault();
+      setAttachedImage(null);
+      setChatError(
+        "Pasting images is disabled on the online website (Firebase Spark free storage limit). Please paste text or attach .txt / .md / .pdf files."
+      );
+      return;
+    }
+
+    const pastedText = clipboard.getData("text/plain") || "";
+    if (pastedText.length > 20000) {
+      e.preventDefault();
+      const allowed = pastedText.slice(0, 20000);
+      setPromptInput((prev) => `${prev}${allowed}`.slice(0, 22000));
+      setChatError(
+        "Large text paste was trimmed to 20,000 characters to stay within Firebase Spark free tier limits."
+      );
+    }
+  };
+
   const handleSubmitPrompt = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (isSending) return;
+    if (!ensureChatAccess()) return;
     const rawText = promptInput.trim();
-    if (!rawText && !attachedImage && !attachedFileText) return;
+    if (!rawText && !(isStandalone && attachedImage) && !attachedFileText) return;
+
+    if (!isStandalone && attachedImage) {
+      setAttachedImage(null);
+      setChatError("Images cannot be sent or stored on the online website (Firebase Spark free plan).");
+      return;
+    }
+
+    if (!isStandalone && activeSession && activeSession.messages.length >= 40) {
+      setChatError(
+        "This chat reached the 40-message limit for the Firebase Spark free plan. Please click 'New Chat' in the sidebar."
+      );
+      return;
+    }
 
     const fullUserText = attachedFileText
       ? `${rawText ? rawText + "\n\n" : ""}--- Attached File: ${attachedFileText.name} ---\n${attachedFileText.content}`
       : rawText;
 
+    if (!isStandalone && fullUserText.length > 24000) {
+      setChatError(
+        "Prompt is too large for the online Firebase Spark free plan (max 24,000 characters). Please shorten your text."
+      );
+      return;
+    }
+
     const userMsg: ChatMessageItem = {
       id: `msg-${Date.now()}-usr`,
       role: "user",
       content: fullUserText,
-      ...(attachedImage ? { imageDataUrl: attachedImage.dataUrl } : {}),
+      ...(isStandalone && attachedImage ? { imageDataUrl: attachedImage.dataUrl } : {}),
       ...(attachedFileText
         ? { attachmentName: attachedFileText.name }
-        : attachedImage
+        : isStandalone && attachedImage
         ? { attachmentName: attachedImage.name }
         : {}),
       createdAt: Date.now(),
@@ -995,6 +1351,7 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
 
   const handleRegenerateLast = async () => {
     if (!activeSession || isSending || activeSession.messages.length === 0) return;
+    if (!ensureChatAccess()) return;
     let lastUserIdx = -1;
     for (let i = activeSession.messages.length - 1; i >= 0; i--) {
       if (activeSession.messages[i].role === "user") {
@@ -1364,6 +1721,27 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
               <Settings className="h-3.5 w-3.5" />
               <span>Settings</span>
             </button>
+
+            <div
+              className="px-2.5 py-1.5 flex items-center gap-2 text-[11px] truncate"
+              style={{ color: mutedText }}
+              title={`Chat history storage: ${storageLocation}`}
+            >
+              {storageMode === "local-disk" ? (
+                <HardDrive className="h-3 w-3 shrink-0" style={{ color: theme.secondaryAccentColor }} />
+              ) : storageMode === "cloud-firestore" ? (
+                <Cloud className="h-3 w-3 shrink-0" style={{ color: theme.accentColor }} />
+              ) : (
+                <Monitor className="h-3 w-3 shrink-0" />
+              )}
+              <span className="truncate">
+                {storageMode === "local-disk"
+                  ? "Saved on PC Disk"
+                  : storageMode === "cloud-firestore"
+                  ? "Cloud Sync (Text Only · Spark)"
+                  : "Saved in Browser"}
+              </span>
+            </div>
           </div>
         </aside>
       )}
@@ -1460,14 +1838,30 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
                         : `${activeChoiceDisplay.category} · Cloud`}
                     </span>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setIsApiKeyModalOpen(true)}
-                    className="text-[11px] font-medium underline cursor-pointer"
-                    style={{ color: mutedText }}
-                  >
-                    Manage API Keys &amp; Local Engine
-                  </button>
+                  {!isStandalone && systemModeChecked && !user ? (
+                    <button
+                      type="button"
+                      onClick={() => setIsAuthModalOpen(true)}
+                      className="text-[11px] font-bold underline cursor-pointer inline-flex items-center gap-1"
+                      style={{ color: theme.accentColor }}
+                    >
+                      <Lock className="h-3 w-3" />
+                      <span>Sign In &amp; Save API Key to Generate</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setIsApiKeyModalOpen(true)}
+                      className="text-[11px] font-medium underline cursor-pointer"
+                      style={{ color: !isStandalone && !profile?.hasApiKey ? theme.accentColor : mutedText }}
+                    >
+                      {!isStandalone && !profile?.hasApiKey
+                        ? "Paste & Save Personal API Key to Generate"
+                        : isStandalone
+                        ? "Manage API Keys & Local Engine"
+                        : "Manage Secure API Key"}
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -1636,17 +2030,23 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
                 );
               })}
 
-              {isSending && (
-                <div className="pt-1">
-                  <RenderingProgressBar
-                    active={isSending}
-                    label={`Generating response with ${activeChoiceDisplay.label}`}
-                    accentColor={theme.accentColor}
-                    secondaryColor={theme.secondaryAccentColor}
-                    isLight={isLight}
-                  />
-                </div>
-              )}
+              <div className="pt-1">
+                <RenderingProgressBar
+                  active={isSending}
+                  title="GENERATING"
+                  accentColor={theme.accentColor}
+                  secondaryAccentColor={theme.secondaryAccentColor}
+                  textColor={primaryText}
+                  isLight={isLight}
+                  stages={[
+                    `Connecting to ${activeChoiceDisplay.label}...`,
+                    selectedChoice.provider === "local"
+                      ? "Running local inference..."
+                      : "Generating cloud response...",
+                    "Formatting reply...",
+                  ]}
+                />
+              </div>
 
               <div ref={messagesEndRef} />
             </div>
@@ -1688,6 +2088,13 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
         onInstallItem={handleInstallItem}
         onUninstallItem={handleUninstallItem}
         onAddCustomItem={handleAddCustomItem}
+        linkedFolders={linkedFolders}
+        detectedPresets={detectedPresets}
+        isLinkingFolder={isLinkingFolder}
+        folderSyncError={folderSyncError}
+        onLinkFolder={handleLinkFolder}
+        onUnlinkFolder={handleUnlinkFolder}
+        onRescanFolders={handleRescanFolders}
       />
     </section>
   );
@@ -1708,7 +2115,7 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
         <input
           ref={fileInputRef}
           type="file"
-          accept=".txt,.md,.pdf,image/*"
+          accept={isStandalone ? ".txt,.md,.pdf,image/*" : ".txt,.md,.pdf"}
           className="hidden"
           onChange={handleAttachFile}
         />
@@ -1774,6 +2181,7 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
           rows={hasMessages ? 2 : 3}
           value={promptInput}
           onChange={(e) => setPromptInput(e.target.value)}
+          onPaste={handlePastePrompt}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
@@ -1792,7 +2200,11 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
               onClick={() => fileInputRef.current?.click()}
               className="h-8 w-8 rounded-full border flex items-center justify-center cursor-pointer transition-colors hover:opacity-90"
               style={{ borderColor: borderCol, color: primaryText }}
-              title="Attach .txt, .md, .pdf, or image"
+              title={
+                isStandalone
+                  ? "Attach .txt, .md, .pdf, or image"
+                  : "Attach .txt, .md, or .pdf (Images disabled on Firebase Spark)"
+              }
             >
               <Plus className="h-4 w-4" />
             </button>

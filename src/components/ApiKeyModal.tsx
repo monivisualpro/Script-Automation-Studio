@@ -100,6 +100,7 @@ interface LocalEngineStatus {
 
 export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose }) => {
   const {
+    user,
     idToken,
     refreshProfile,
     profile,
@@ -110,6 +111,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose }) => 
     refreshSystemMode,
     activeProviderConfig,
     updateProviderConfig,
+    setIsAuthModalOpen,
   } = useAuth();
 
   const theme = getThemeConfig(currentTheme, currentBrand);
@@ -409,6 +411,12 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose }) => 
     e.preventDefault();
     setError(null);
     setSuccess(false);
+
+    if (!isStandalone && !user) {
+      setError("Please sign in first before saving your personal API key.");
+      setIsAuthModalOpen(true);
+      return;
+    }
 
     if (!isStandalone && selectedProvider === "local") {
       setError("Local LLM is only available when running the GitHub repository locally.");

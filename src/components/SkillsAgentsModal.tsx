@@ -1,5 +1,9 @@
 import React, { useState, useRef } from "react";
-import { AgentSkillItem } from "../lib/agentSkills";
+import {
+  AgentSkillItem,
+  LinkedFolderInfo,
+  DetectedFolderPreset,
+} from "../lib/agentSkills";
 import { getThemeConfig } from "../lib/themeConfig";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -12,6 +16,10 @@ import {
   Trash2,
   Upload,
   Power,
+  FolderOpen,
+  RefreshCw,
+  Link2,
+  Unlink,
 } from "lucide-react";
 
 interface SkillsAgentsModalProps {
@@ -24,6 +32,13 @@ interface SkillsAgentsModalProps {
   onInstallItem: (id: string) => void;
   onUninstallItem: (id: string) => void;
   onAddCustomItem: (item: AgentSkillItem) => void;
+  linkedFolders?: LinkedFolderInfo[];
+  detectedPresets?: DetectedFolderPreset[];
+  isLinkingFolder?: boolean;
+  folderSyncError?: string | null;
+  onLinkFolder?: (directoryPath: string) => Promise<boolean>;
+  onUnlinkFolder?: (directoryPath: string) => Promise<void>;
+  onRescanFolders?: () => Promise<void>;
 }
 
 export const SkillsAgentsModal: React.FC<SkillsAgentsModalProps> = ({
@@ -36,12 +51,21 @@ export const SkillsAgentsModal: React.FC<SkillsAgentsModalProps> = ({
   onInstallItem,
   onUninstallItem,
   onAddCustomItem,
+  linkedFolders = [],
+  detectedPresets = [],
+  isLinkingFolder = false,
+  folderSyncError = null,
+  onLinkFolder,
+  onUnlinkFolder,
+  onRescanFolders,
 }) => {
-  const { currentTheme, currentBrand } = useAuth();
+  const { currentTheme, currentBrand, isStandalone } = useAuth();
   const theme = getThemeConfig(currentTheme, currentBrand);
   const isLight = theme.isLight;
 
-  const [tab, setTab] = useState<"installed" | "catalog" | "custom">("installed");
+  const [tab, setTab] = useState<"installed" | "folders" | "catalog" | "custom">("installed");
+  const [folderPathInput, setFolderPathInput] = useState("");
+  const [localFolderError, setLocalFolderError] = useState<string | null>(null);
   const [customName, setCustomName] = useState("");
   const [customKind, setCustomKind] = useState<"agent" | "skill">("agent");
   const [customSummary, setCustomSummary] = useState("");
@@ -59,6 +83,17 @@ export const SkillsAgentsModal: React.FC<SkillsAgentsModalProps> = ({
 
   const installedItems = items.filter((it) => it.installed);
   const catalogItems = items.filter((it) => !it.installed);
+  const linkedSkillCount = installedItems.filter((it) => it.sourceType === "linked-folder").length;
+
+  const handleLinkFolderSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!folderPathInput.trim() || !onLinkFolder) return;
+    setLocalFolderError(null);
+    const ok = await onLinkFolder(folderPathInput.trim());
+    if (ok) {
+      setFolderPathInput("");
+    }
+  };
 
   const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -170,7 +205,7 @@ export const SkillsAgentsModal: React.FC<SkillsAgentsModalProps> = ({
 
         {/* Navigation Tabs */}
         <div
-          className="px-6 py-2.5 border-b flex items-center gap-2"
+          className="px-6 py-2.5 border-b flex flex-wrap items-center gap-2"
           style={{ backgroundColor: subtleSurface, borderColor: borderCol }}
         >
           <button
@@ -186,6 +221,20 @@ export const SkillsAgentsModal: React.FC<SkillsAgentsModalProps> = ({
           </button>
           <button
             type="button"
+            onClick={() => setTab("folders")}
+            className="px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors"
+            style={{
+              backgroundColor: tab === "folders" ? theme.secondaryAccentColor : "transparent",
+              color: tab === "folders" ? "#FFFFFF" : mutedText,
+            }}
+          >
+            <FolderOpen className="h-3.5 w-3.5" />
+            <span>
+              Local Folders{linkedFolders.length > 0 ? ` (${linkedFolders.length})` : ""}
+            </span>
+          </button>
+          <button
+            type="button"
             onClick={() => setTab("catalog")}
             className="px-3.5 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-colors"
             style={{
@@ -193,7 +242,7 @@ export const SkillsAgentsModal: React.FC<SkillsAgentsModalProps> = ({
               color: tab === "catalog" ? "#FFFFFF" : mutedText,
             }}
           >
-            Install Skills Catalog ({catalogItems.length})
+            Catalog ({catalogItems.length})
           </button>
           <button
             type="button"
@@ -205,7 +254,7 @@ export const SkillsAgentsModal: React.FC<SkillsAgentsModalProps> = ({
             }}
           >
             <Plus className="h-3.5 w-3.5" />
-            <span>Install Custom Skill / Agent</span>
+            <span>Custom / File Import</span>
           </button>
         </div>
 
@@ -228,7 +277,7 @@ export const SkillsAgentsModal: React.FC<SkillsAgentsModalProps> = ({
                     }}
                   >
                     <div className="space-y-1 min-w-0 flex-1">
-                      <div className="flex items-center gap-2 text-xs">
+                      <div className="flex items-center gap-2 text-xs flex-wrap">
                         {item.kind === "agent" ? (
                           <Bot className="h-3.5 w-3.5 shrink-0" style={{ color: theme.accentColor }} />
                         ) : (
@@ -238,6 +287,16 @@ export const SkillsAgentsModal: React.FC<SkillsAgentsModalProps> = ({
                         <span className="text-[11px] font-mono" style={{ color: mutedText }}>
                           · {item.kind === "agent" ? "Agent" : "Modular Skill"}
                         </span>
+                        {item.sourceType === "linked-folder" && (
+                          <span
+                            className="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded border"
+                            style={{ borderColor: borderCol, color: theme.secondaryAccentColor }}
+                            title={item.sourceFilePath || item.sourceFolder}
+                          >
+                            <FolderOpen className="h-2.5 w-2.5" />
+                            {item.fileName || "Linked Folder"}
+                          </span>
+                        )}
                       </div>
                       <p className="text-xs leading-relaxed" style={{ color: mutedText }}>
                         {item.summary}
@@ -275,7 +334,7 @@ export const SkillsAgentsModal: React.FC<SkillsAgentsModalProps> = ({
                         </button>
                       )}
 
-                      {!item.builtIn && (
+                      {!item.builtIn && item.sourceType !== "linked-folder" && (
                         <button
                           type="button"
                           onClick={() => onUninstallItem(item.id)}
@@ -290,6 +349,200 @@ export const SkillsAgentsModal: React.FC<SkillsAgentsModalProps> = ({
                   </div>
                 );
               })}
+            </div>
+          )}
+
+          {tab === "folders" && (
+            <div className="space-y-4 text-xs">
+              {!isStandalone ? (
+                <div
+                  className="p-5 rounded-2xl border space-y-2"
+                  style={{ backgroundColor: subtleSurface, borderColor: borderCol }}
+                >
+                  <div className="font-bold text-sm flex items-center gap-2">
+                    <FolderOpen className="h-4 w-4" style={{ color: theme.secondaryAccentColor }} />
+                    <span>Local Folder Links Require Desktop / Standalone Software</span>
+                  </div>
+                  <p style={{ color: mutedText }}>
+                    For security, web browsers on the online website cannot read folders directly from your hard drive.
+                    When you run this app locally on your PC (Standalone / Desktop Software), you can link your Claude (<code>~/.claude/skills</code>), VS Code, Cursor, or Bionic skills folders live.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setTab("custom")}
+                    className="mt-1 px-3 py-1.5 rounded-xl font-bold text-white cursor-pointer"
+                    style={{ backgroundColor: theme.secondaryAccentColor }}
+                  >
+                    Import SKILL.md / .json File Instead
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div
+                    className="p-4 rounded-2xl border space-y-3"
+                    style={{ backgroundColor: subtleSurface, borderColor: borderCol }}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <div className="font-bold text-sm flex items-center gap-2">
+                          <Link2 className="h-4 w-4" style={{ color: theme.secondaryAccentColor }} />
+                          <span>Link Any Local Skills Folder (Claude, VS Code, Bionic, Cursor)</span>
+                        </div>
+                        <p className="text-[11px] mt-0.5" style={{ color: mutedText }}>
+                          Paste a folder path from your PC. Automatically scans <code>SKILL.md</code>, <code>.md</code>, <code>.mdc</code>, <code>.txt</code>, and <code>.json</code> skill packs and keeps them synced.
+                        </p>
+                      </div>
+                      {linkedFolders.length > 0 && onRescanFolders && (
+                        <button
+                          type="button"
+                          disabled={isLinkingFolder}
+                          onClick={() => onRescanFolders()}
+                          className="px-2.5 py-1.5 rounded-xl border font-bold flex items-center gap-1.5 cursor-pointer shrink-0 disabled:opacity-50"
+                          style={{ borderColor: borderCol, color: primaryText }}
+                          title="Re-scan all linked folders for new or edited skill files"
+                        >
+                          <RefreshCw className={`h-3.5 w-3.5 ${isLinkingFolder ? "animate-spin" : ""}`} />
+                          <span>Rescan ({linkedSkillCount})</span>
+                        </button>
+                      )}
+                    </div>
+
+                    <form onSubmit={handleLinkFolderSubmit} className="flex flex-col sm:flex-row gap-2">
+                      <input
+                        type="text"
+                        placeholder="e.g. C:\Users\You\.claude\skills  or  ~/Documents/Bionic/skills"
+                        value={folderPathInput}
+                        onChange={(e) => setFolderPathInput(e.target.value)}
+                        className="flex-1 rounded-xl border px-3 py-2 text-xs font-mono focus:outline-none"
+                        style={{
+                          backgroundColor: bgSurface,
+                          borderColor: borderCol,
+                          color: primaryText,
+                        }}
+                      />
+                      <button
+                        type="submit"
+                        disabled={isLinkingFolder || !folderPathInput.trim()}
+                        className="px-4 py-2 rounded-xl font-bold text-white cursor-pointer disabled:opacity-50 shrink-0"
+                        style={{ backgroundColor: theme.secondaryAccentColor }}
+                      >
+                        {isLinkingFolder ? "Scanning..." : "Link Folder"}
+                      </button>
+                    </form>
+
+                    {(folderSyncError || localFolderError) && (
+                      <div
+                        className="p-2.5 rounded-xl border text-xs font-mono"
+                        style={{
+                          borderColor: theme.accentColor,
+                          backgroundColor: `${theme.accentColor}15`,
+                        }}
+                      >
+                        {folderSyncError || localFolderError}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Auto-detected tool folders */}
+                  {detectedPresets.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="font-bold text-[11px] uppercase tracking-wider" style={{ color: mutedText }}>
+                        Detected Tool Skill Folders on This PC
+                      </div>
+                      <div className="grid grid-cols-1 gap-2">
+                        {detectedPresets.map((preset) => (
+                          <div
+                            key={preset.id}
+                            className="px-3.5 py-2.5 rounded-xl border flex items-center justify-between gap-3"
+                            style={{ backgroundColor: subtleSurface, borderColor: borderCol }}
+                          >
+                            <div className="min-w-0">
+                              <div className="font-bold flex items-center gap-2">
+                                <span>{preset.label}</span>
+                                <span
+                                  className="text-[10px] font-mono px-1.5 py-0.5 rounded border"
+                                  style={{ borderColor: borderCol, color: mutedText }}
+                                >
+                                  {preset.toolName}
+                                </span>
+                              </div>
+                              <div className="text-[11px] font-mono truncate mt-0.5" style={{ color: mutedText }}>
+                                {preset.path}
+                              </div>
+                            </div>
+                            {preset.linked ? (
+                              <span
+                                className="px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1 shrink-0"
+                                style={{ color: theme.secondaryAccentColor }}
+                              >
+                                <Check className="h-3.5 w-3.5" />
+                                Linked
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                disabled={isLinkingFolder}
+                                onClick={() => onLinkFolder?.(preset.path)}
+                                className="px-3 py-1.5 rounded-xl text-xs font-bold text-white cursor-pointer shrink-0 disabled:opacity-50"
+                                style={{ backgroundColor: theme.secondaryAccentColor }}
+                              >
+                                Link
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Currently Linked Folders */}
+                  <div className="space-y-2">
+                    <div className="font-bold text-[11px] uppercase tracking-wider" style={{ color: mutedText }}>
+                      Linked Folders ({linkedFolders.length})
+                    </div>
+                    {linkedFolders.length === 0 ? (
+                      <div
+                        className="p-4 rounded-2xl border border-dashed text-center"
+                        style={{ borderColor: borderCol, color: mutedText }}
+                      >
+                        No skill folders linked yet. Paste any Claude, VS Code, Cursor, or Bionic skills folder path above to fetch your skills automatically.
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {linkedFolders.map((lf) => (
+                          <div
+                            key={lf.path}
+                            className="p-3 rounded-xl border flex items-center justify-between gap-3"
+                            style={{ backgroundColor: subtleSurface, borderColor: borderCol }}
+                          >
+                            <div className="min-w-0 flex-1">
+                              <div className="font-mono text-xs truncate font-semibold">
+                                {lf.path}
+                              </div>
+                              <div className="text-[11px] mt-0.5" style={{ color: lf.exists ? theme.secondaryAccentColor : theme.accentColor }}>
+                                {lf.exists
+                                  ? `${lf.skillCount} ${lf.skillCount === 1 ? "skill" : "skills"} fetched from disk`
+                                  : "Folder not found on disk"}
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              disabled={isLinkingFolder}
+                              onClick={() => onUnlinkFolder?.(lf.path)}
+                              className="px-2.5 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1 cursor-pointer hover:opacity-80 shrink-0"
+                              style={{ borderColor: borderCol, color: mutedText }}
+                              title="Unlink folder"
+                            >
+                              <Unlink className="h-3.5 w-3.5" />
+                              <span>Unlink</span>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           )}
 

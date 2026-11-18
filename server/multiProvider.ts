@@ -7,6 +7,7 @@ export interface AIProviderConfig {
   apiKey?: string;
   model?: string;
   baseUrl?: string; // For local/OpenAI-compatible models (e.g. http://localhost:1234/v1 or http://localhost:11434/v1)
+  allowEnvFallback?: boolean;
 }
 
 export interface GenerationRequestOptions {
@@ -174,7 +175,8 @@ async function executeGemini(
   options: GenerationRequestOptions,
   config: AIProviderConfig
 ): Promise<GenerationResult> {
-  const explicitKey = sanitizeApiKey(config.apiKey) || sanitizeApiKey(options.fallbackApiKey) || sanitizeApiKey(process.env.GEMINI_API_KEY);
+  const envFallback = config.allowEnvFallback ? sanitizeApiKey(process.env.GEMINI_API_KEY) : "";
+  const explicitKey = sanitizeApiKey(config.apiKey) || sanitizeApiKey(options.fallbackApiKey) || envFallback;
   let ai = explicitKey ? new GoogleGenAI({
     apiKey: explicitKey,
     httpOptions: { headers: { "User-Agent": "script-automation-studio" } },
@@ -229,7 +231,8 @@ async function executeOpenAI(
   options: GenerationRequestOptions,
   config: AIProviderConfig
 ): Promise<GenerationResult> {
-  const apiKey = sanitizeApiKey(config.apiKey) || sanitizeApiKey(options.fallbackApiKey) || sanitizeApiKey(process.env.OPENAI_API_KEY);
+  const envFallback = config.allowEnvFallback ? sanitizeApiKey(process.env.OPENAI_API_KEY) : "";
+  const apiKey = sanitizeApiKey(config.apiKey) || sanitizeApiKey(options.fallbackApiKey) || envFallback;
   if (!apiKey) {
     throw new Error("No OpenAI API Key configured. Please add your OpenAI key in Settings or .env.");
   }
@@ -288,7 +291,8 @@ async function executeClaude(
   options: GenerationRequestOptions,
   config: AIProviderConfig
 ): Promise<GenerationResult> {
-  const apiKey = sanitizeApiKey(config.apiKey) || sanitizeApiKey(options.fallbackApiKey) || sanitizeApiKey(process.env.ANTHROPIC_API_KEY);
+  const envFallback = config.allowEnvFallback ? sanitizeApiKey(process.env.ANTHROPIC_API_KEY) : "";
+  const apiKey = sanitizeApiKey(config.apiKey) || sanitizeApiKey(options.fallbackApiKey) || envFallback;
   if (!apiKey) {
     throw new Error("No Anthropic Claude API Key configured. Please add your Claude key in Settings or .env.");
   }
@@ -457,10 +461,11 @@ async function executeGeminiChat(
   options: ChatRequestOptions,
   config: AIProviderConfig
 ): Promise<GenerationResult> {
+  const envFallback = config.allowEnvFallback ? sanitizeApiKey(process.env.GEMINI_API_KEY) : "";
   const explicitKey =
     sanitizeApiKey(config.apiKey) ||
     sanitizeApiKey(options.fallbackApiKey) ||
-    sanitizeApiKey(process.env.GEMINI_API_KEY);
+    envFallback;
   const ai = explicitKey
     ? new GoogleGenAI({
         apiKey: explicitKey,
@@ -519,10 +524,11 @@ async function executeOpenAIChat(
   options: ChatRequestOptions,
   config: AIProviderConfig
 ): Promise<GenerationResult> {
+  const envFallback = config.allowEnvFallback ? sanitizeApiKey(process.env.OPENAI_API_KEY) : "";
   const apiKey =
     sanitizeApiKey(config.apiKey) ||
     sanitizeApiKey(options.fallbackApiKey) ||
-    sanitizeApiKey(process.env.OPENAI_API_KEY);
+    envFallback;
   if (!apiKey) {
     throw new Error("No OpenAI API Key configured. Please add your OpenAI key in Settings or .env.");
   }
@@ -585,10 +591,11 @@ async function executeClaudeChat(
   options: ChatRequestOptions,
   config: AIProviderConfig
 ): Promise<GenerationResult> {
+  const envFallback = config.allowEnvFallback ? sanitizeApiKey(process.env.ANTHROPIC_API_KEY) : "";
   const apiKey =
     sanitizeApiKey(config.apiKey) ||
     sanitizeApiKey(options.fallbackApiKey) ||
-    sanitizeApiKey(process.env.ANTHROPIC_API_KEY);
+    envFallback;
   if (!apiKey) {
     throw new Error("No Anthropic Claude API Key configured. Please add your Claude key in Settings or .env.");
   }
