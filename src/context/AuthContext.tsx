@@ -69,6 +69,7 @@ interface AuthContextType {
   activeProviderConfig: ActiveProviderConfig;
   updateProviderConfig: (config: Partial<ActiveProviderConfig>) => void;
   refreshProfile: () => Promise<void>;
+  removeApiKey: () => Promise<boolean>;
   logout: () => Promise<void>;
   deleteAccount: () => Promise<void>;
   isAuthModalOpen: boolean;
@@ -110,6 +111,7 @@ const AuthContext = createContext<AuthContextType>({
   activeProviderConfig: DEFAULT_PROVIDER_CONFIG,
   updateProviderConfig: () => {},
   refreshProfile: async () => {},
+  removeApiKey: async () => false,
   logout: async () => {},
   deleteAccount: async () => {},
   isAuthModalOpen: false,
@@ -395,6 +397,59 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const fetchProfile = async (currentUser: User, token?: string) => {
+    let serverStatus: {
+      hasApiKey?: boolean;
+      apiKeyMasked?: string | null;
+      activeProvider?: "gemini" | "openai" | "claude" | "local";
+      activeModel?: string;
+      baseUrl?: string;
+      modelSettings?: Partial<FeatureModelConfig> | null;
+    } | null = null;
+
+    if (token) {
+      try {
+        const statusRes = await fetch("/api/user/profile-status", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (statusRes.ok) {
+          serverStatus = await statusRes.json();
+        }
+      } catch {
+        // non-blocking server status check
+      }
+    }
+
+    const applyServerStatus = (base: UserProfile): UserProfile => {
+      if (!serverStatus) return base;
+      const resolvedHasKey = Boolean(base.hasApiKey || serverStatus.hasApiKey);
+      const resolvedMasked = base.apiKeyMasked || serverStatus.apiKeyMasked || null;
+      const rawProv = serverStatus.activeProvider || base.activeProvider || "gemini";
+      const effectiveProv = !isStandalone && rawProv === "local" ? "gemini" : rawProv;
+      const resolvedModel = serverStatus.activeModel || base.activeModel || "gemini-3.1-flash-lite";
+      const resolvedBaseUrl = serverStatus.baseUrl || base.baseUrl || "http://127.0.0.1:1279/v1";
+
+      if (serverStatus.modelSettings) {
+        setModelSettings((prev) => ({ ...prev, ...serverStatus!.modelSettings! }));
+      }
+      if (serverStatus.activeProvider || serverStatus.activeModel) {
+        setActiveProviderConfigState((prev) => ({
+          ...prev,
+          provider: effectiveProv,
+          model: resolvedModel || prev.model,
+          baseUrl: resolvedBaseUrl || prev.baseUrl,
+        }));
+      }
+
+      return {
+        ...base,
+        hasApiKey: resolvedHasKey,
+        apiKeyMasked: resolvedMasked,
+        activeProvider: effectiveProv,
+        activeModel: resolvedModel,
+        baseUrl: resolvedBaseUrl,
+      };
+    };
+
     try {
       const userDoc = await getDoc(doc(db, "users", currentUser.uid));
       let resolved: UserProfile;
@@ -420,7 +475,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }));
         }
 
-        resolved = {
+        resolved = applyServerStatus({
           userId: currentUser.uid,
           name: data.name || currentUser.displayName || currentUser.email?.split("@")[0] || "User",
           email: data.email || currentUser.email || "",
@@ -435,21 +490,46 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           baseUrl: data.baseUrl || "http://127.0.0.1:1279/v1",
           createdAt: data.createdAt || new Date().toISOString(),
           updatedAt: data.updatedAt || new Date().toISOString(),
-        };
+        });
         setProfile(resolved);
       } else {
-        resolved = await syncUserProfile(currentUser);
+        resolved = applyServerStatus(await syncUserProfile(currentUser));
         setProfile(resolved);
       }
       if (token) {
         void syncDirectoryWithServer(token, resolved);
       }
     } catch (err) {
-      console.error("Failed to fetch user profile:", err);
-      const synced = await syncUserProfile(currentUser);
-      setProfile(synced);
+      console.warn("Firestore profile sync skipped, using authenticated profile status:", err);
+      let fallbackBase: UserProfile;
+      try {
+        fallbackBase = await syncUserProfile(currentUser);
+      } catch {
+        const rawEmail = (currentUser.email || "").trim();
+        const isSoleAdmin = rawEmail.toLowerCase() === "tahsinirshad7370@gmail.com";
+        fallbackBase = {
+          userId: currentUser.uid,
+          name: currentUser.displayName || rawEmail.split("@")[0] || "User",
+          email: rawEmail,
+          profilePhoto:
+            currentUser.photoURL ||
+            `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(currentUser.uid)}`,
+          provider: currentUser.providerData?.[0]?.providerId || "password",
+          role: isSoleAdmin ? "admin" : "user",
+          isAdmin: isSoleAdmin,
+          apiKeyMasked: null,
+          hasApiKey: false,
+          activeProvider: "gemini",
+          activeModel: "gemini-3.1-flash-lite",
+          baseUrl: "http://127.0.0.1:1279/v1",
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+      }
+      const resolved = applyServerStatus(fallbackBase);
+      setProfile(resolved);
       if (token) {
-        void syncDirectoryWithServer(token, synced);
+        void syncDirectoryWithServer(token, resolved);
       }
     }
   };
@@ -467,6 +547,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       if (currentUser) {
+        const fallbackEmail = currentUser.email || "";
+        const isSoleAdmin = fallbackEmail.toLowerCase() === "tahsinirshad7370@gmail.com";
+        setProfile((prev) =>
+          prev && prev.userId === currentUser.uid
+            ? { ...prev, email: prev.email || fallbackEmail }
+            : {
+                userId: currentUser.uid,
+                name: currentUser.displayName || fallbackEmail.split("@")[0] || "User",
+                email: fallbackEmail,
+                profilePhoto:
+                  currentUser.photoURL ||
+                  `https://api.dicebear.com/7.x/bottts/svg?seed=${currentUser.uid}`,
+                provider: currentUser.providerData?.[0]?.providerId || "password",
+                role: isSoleAdmin ? "admin" : "user",
+                isAdmin: isSoleAdmin,
+                apiKeyMasked: null,
+                hasApiKey: false,
+                activeProvider: "gemini",
+                activeModel: "gemini-3.1-flash-lite",
+                baseUrl: "http://127.0.0.1:1279/v1",
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+              }
+        );
         try {
           const token = await currentUser.getIdToken(true);
           setIdToken(token);
@@ -502,6 +606,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } catch (e) {
         console.error("Error refreshing profile:", e);
       }
+    }
+  };
+
+  const removeApiKey = async (): Promise<boolean> => {
+    try {
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      let activeToken = idToken;
+      if (!isStandalone && user && !activeToken) {
+        activeToken = await user.getIdToken(true);
+      }
+      if (!isStandalone && activeToken) {
+        headers.Authorization = `Bearer ${activeToken}`;
+      }
+      const res = await fetch("/api/user/remove-key", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ provider: "all" }),
+      });
+      if (!res.ok) return false;
+      updateProviderConfig({ apiKey: "" });
+      if (isStandalone) {
+        await refreshSystemMode();
+      } else {
+        setProfile((prev) =>
+          prev ? { ...prev, hasApiKey: false, apiKeyMasked: null } : prev
+        );
+        await refreshProfile();
+      }
+      return true;
+    } catch (err) {
+      console.error("Error removing API key:", err);
+      return false;
     }
   };
 
@@ -554,6 +690,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         activeProviderConfig,
         updateProviderConfig,
         refreshProfile,
+        removeApiKey,
         logout,
         deleteAccount,
         isAuthModalOpen: isStandalone ? false : isAuthModalOpen,

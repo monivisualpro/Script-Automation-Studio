@@ -54,6 +54,7 @@ import {
 } from "lucide-react";
 
 const CATEGORIES = [
+  "None (Auto by Topic)",
   "3D Modeling & CAD Design",
   "Animation & Motion Graphics",
   "Architecture & Interior Design",
@@ -409,10 +410,11 @@ export default function App() {
   // Config States
   const [voicePersona, setVoicePersona] = useState<"female" | "male">("female");
   const [topicNiche, setTopicNiche] = useState(() => {
-    const defaultCategory = "Medical, Health & Biotech";
+    const defaultCategory = "None (Auto by Topic)";
     try {
       const stored = localStorage.getItem("script_automation_topic_niche");
-      if (!stored || stored === "Medical & Health") return defaultCategory;
+      if (!stored) return defaultCategory;
+      if (stored.toLowerCase() === "none") return defaultCategory;
       return CATEGORIES.includes(stored) ? stored : defaultCategory;
     } catch {
       return defaultCategory;
@@ -467,11 +469,44 @@ export default function App() {
   const contentCategory = topicNiche;
   const [storyboardFormat, setStoryboardFormat] = useState<"16:9" | "9:16" | "1:1" | "none">("16:9");
   
-  // Shots Calculator States
+  // Shots Calculator States (string inputs prevent mid-typing reset bugs)
   const [calcVideoMinutes, setCalcVideoMinutes] = useState<number>(10);
   const [calcVideoSeconds, setCalcVideoSeconds] = useState<number>(0);
   const [calcShotDuration, setCalcShotDuration] = useState<number>(8);
+  const [calcMinsInput, setCalcMinsInput] = useState<string>("10");
+  const [calcSecsInput, setCalcSecsInput] = useState<string>("0");
+  const [calcShotSecInput, setCalcShotSecInput] = useState<string>("8");
+  const [shotsAppliedFeedback, setShotsAppliedFeedback] = useState<string | null>(null);
   const [showShotsCalculator, setShowShotsCalculator] = useState(false);
+
+  const computeCalculatedShots = (mins: number, secs: number, shotSec: number) => {
+    const safeMins = Math.max(0, Number.isFinite(mins) ? mins : 0);
+    const safeSecs = Math.min(59, Math.max(0, Number.isFinite(secs) ? secs : 0));
+    const safeShot = Math.max(1, Number.isFinite(shotSec) ? shotSec : 1);
+    const totalSeconds = safeMins * 60 + safeSecs;
+    const totalShots = totalSeconds > 0 ? Math.max(1, Math.ceil(totalSeconds / safeShot)) : 0;
+    return { safeMins, safeSecs, safeShot, totalSeconds, totalShots };
+  };
+
+  const handleShotsInputUpdate = (nextMinsStr: string, nextSecsStr: string, nextShotStr: string) => {
+    setCalcMinsInput(nextMinsStr);
+    setCalcSecsInput(nextSecsStr);
+    setCalcShotSecInput(nextShotStr);
+
+    const parsedMins = Math.max(0, parseInt(nextMinsStr, 10) || 0);
+    const parsedSecs = Math.min(59, Math.max(0, parseInt(nextSecsStr, 10) || 0));
+    const parsedShot = Math.max(1, parseInt(nextShotStr, 10) || 1);
+
+    setCalcVideoMinutes(parsedMins);
+    setCalcVideoSeconds(parsedSecs);
+    setCalcShotDuration(parsedShot);
+
+    const { totalShots } = computeCalculatedShots(parsedMins, parsedSecs, parsedShot);
+    if (totalShots > 0) {
+      setNumScenes(Math.min(500, totalShots));
+    }
+    setShotsAppliedFeedback(null);
+  };
   const [scenes, setScenes] = useState<Array<{ id: number; text: string; isEditing?: boolean; loading?: boolean }>>([]);
   const [scenesLoading, setScenesLoading] = useState(false);
   const [greetingsPrefix, setGreetingsPrefix] = useState("Assalamualaikum");
@@ -1697,13 +1732,18 @@ export default function App() {
                   color: theme.textColorCode
                 }}
               >
-                <span className="truncate pr-2 font-bold">{topicNiche || "Select Domain / SEO Niche..."}</span>
+                <span className="truncate pr-2 font-bold">{topicNiche || "None (Auto by Topic)"}</span>
                 {isNicheDropdownOpen ? (
                   <ChevronUp className="h-4 w-4 shrink-0" style={{ color: theme.accentColor }} />
                 ) : (
                   <ChevronDown className="h-4 w-4 shrink-0 opacity-70" style={{ color: theme.textColorCode }} />
                 )}
               </button>
+              {topicNiche === "None (Auto by Topic)" && (
+                <p className="text-[10px] font-mono opacity-80 leading-snug" style={{ color: theme.textColorCode }}>
+                  Auto mode active: Domain &amp; visual context will automatically adapt to your Topic / Script.
+                </p>
+              )}
 
               {/* Expandable Dropdown with Real-Time Search */}
               {isNicheDropdownOpen && (
@@ -3867,16 +3907,16 @@ export default function App() {
                     <input
                       type="number"
                       min="1"
-                      max="100"
+                      max="500"
                       value={numScenes}
-                      onChange={(e) => setNumScenes(Math.min(100, Math.max(1, parseInt(e.target.value) || 1)))}
-                      className="bg-transparent w-8 text-[10px] font-mono focus:outline-none font-bold text-center"
+                      onChange={(e) => setNumScenes(Math.min(500, Math.max(1, parseInt(e.target.value, 10) || 1)))}
+                      className="bg-transparent w-10 text-[10px] font-mono focus:outline-none font-bold text-center"
                       style={{ color: theme.textColorCode }}
                     />
                     <button
                       type="button"
                       onClick={() => setShowShotsCalculator(!showShotsCalculator)}
-                      className="glass-button p-1 rounded hover:opacity-85 text-xs transition-all flex items-center justify-center cursor-pointer"
+                      className="glass-button px-1.5 py-1 rounded hover:opacity-85 text-[10px] font-bold transition-all flex items-center gap-1 cursor-pointer"
                       style={{
                         color: showShotsCalculator ? "#ffffff" : theme.textColorCode,
                         backgroundColor: showShotsCalculator ? theme.accentColor : "transparent"
@@ -3884,6 +3924,7 @@ export default function App() {
                       title="Open Shots Calculator (duration-based)"
                     >
                       <Calculator className="h-3 w-3" />
+                      <span className="hidden sm:inline">Calc</span>
                     </button>
                   </div>
 
@@ -3922,109 +3963,169 @@ export default function App() {
 
                 <div className="flex-1 relative flex flex-col">
                   {/* Shots Calculator Panel */}
-                  <AnimatePresence>
-                    {showShotsCalculator && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: "auto", opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        className="border-b p-4 space-y-3 font-mono overflow-hidden z-30"
+                  {showShotsCalculator && (() => {
+                    const parsedMins = Math.max(0, parseInt(calcMinsInput, 10) || 0);
+                    const parsedSecs = Math.min(59, Math.max(0, parseInt(calcSecsInput, 10) || 0));
+                    const parsedShot = Math.max(1, parseInt(calcShotSecInput, 10) || 1);
+                    const { totalSeconds, totalShots } = computeCalculatedShots(parsedMins, parsedSecs, parsedShot);
+                    const cappedShots = Math.min(500, totalShots);
+
+                    return (
+                      <div
+                        className="border-b p-4 space-y-3 font-mono z-30 shrink-0"
                         style={{ backgroundColor: theme.cardBg, borderColor: `${theme.accentColor}40` }}
                       >
-                        <div className="flex items-center justify-between">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
                           <span className="text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5" style={{ color: theme.textColorCode }}>
-                            <Calculator className="h-3.5 w-3.5 animate-pulse" style={{ color: theme.accentColor }} /> duration-based shots calculator
+                            <Calculator className="h-3.5 w-3.5" style={{ color: theme.accentColor }} /> Duration-Based Shots Calculator
                           </span>
-                          <button
-                            type="button"
-                            onClick={() => setShowShotsCalculator(false)}
-                            className="text-[10px] font-bold px-2 py-0.5 rounded cursor-pointer transition-colors"
-                            style={{
-                              backgroundColor: "rgba(127, 29, 29, 0.2)",
-                              color: theme.textColorCode,
-                              border: "1px solid rgba(239, 68, 110, 0.4)"
-                            }}
-                          >
-                            CLOSE
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleShotsInputUpdate(String(videoDuration), "0", calcShotSecInput)}
+                              className="text-[10px] font-bold px-2 py-0.5 rounded border cursor-pointer transition-colors"
+                              style={{
+                                backgroundColor: `${theme.secondaryAccentColor}18`,
+                                color: theme.textColorCode,
+                                borderColor: `${theme.secondaryAccentColor}50`,
+                              }}
+                              title="Load Video Duration from left studio slider"
+                            >
+                              Sync Video ({videoDuration}m)
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setShowShotsCalculator(false)}
+                              className="text-[10px] font-bold px-2 py-0.5 rounded cursor-pointer transition-colors"
+                              style={{
+                                backgroundColor: "rgba(127, 29, 29, 0.25)",
+                                color: theme.textColorCode,
+                                border: "1px solid rgba(239, 68, 110, 0.45)"
+                              }}
+                            >
+                              CLOSE
+                            </button>
+                          </div>
                         </div>
 
                         {/* Calculator Inputs */}
                         <div className="grid grid-cols-3 gap-2.5">
                           <div>
-                            <label className="text-[8px] text-gray-400 block mb-1">VIDEO MINS</label>
+                            <label className="text-[9px] text-gray-400 block mb-1 font-bold">VIDEO MINS</label>
                             <input
                               type="number"
                               min="0"
-                              value={calcVideoMinutes}
-                              onChange={(e) => {
-                                const val = Math.max(0, parseInt(e.target.value) || 0);
-                                setCalcVideoMinutes(val);
-                                const totSec = (val * 60) + calcVideoSeconds;
-                                setNumScenes(Math.ceil(totSec / calcShotDuration) || 1);
+                              max="240"
+                              value={calcMinsInput}
+                              onChange={(e) => handleShotsInputUpdate(e.target.value, calcSecsInput, calcShotSecInput)}
+                              onBlur={() => {
+                                const clean = String(Math.max(0, parseInt(calcMinsInput, 10) || 0));
+                                setCalcMinsInput(clean);
                               }}
-                              className="w-full rounded px-2 py-1 text-xs font-bold font-mono focus:outline-none border"
-                              style={{ backgroundColor: theme.inputBg, borderColor: `${theme.accentColor}40`, color: theme.textColorCode }}
+                              className="w-full rounded-lg px-2.5 py-1.5 text-xs font-bold font-mono focus:outline-none border"
+                              style={{ backgroundColor: theme.inputBg, borderColor: `${theme.accentColor}45`, color: theme.textColorCode }}
                             />
                           </div>
                           <div>
-                            <label className="text-[8px] text-gray-400 block mb-1">VIDEO SECS</label>
+                            <label className="text-[9px] text-gray-400 block mb-1 font-bold">VIDEO SECS</label>
                             <input
                               type="number"
                               min="0"
                               max="59"
-                              value={calcVideoSeconds}
-                              onChange={(e) => {
-                                const val = Math.max(0, Math.min(59, parseInt(e.target.value) || 0));
-                                setCalcVideoSeconds(val);
-                                const totSec = (calcVideoMinutes * 60) + val;
-                                setNumScenes(Math.ceil(totSec / calcShotDuration) || 1);
+                              value={calcSecsInput}
+                              onChange={(e) => handleShotsInputUpdate(calcMinsInput, e.target.value, calcShotSecInput)}
+                              onBlur={() => {
+                                const clean = String(Math.min(59, Math.max(0, parseInt(calcSecsInput, 10) || 0)));
+                                setCalcSecsInput(clean);
                               }}
-                              className="w-full rounded px-2 py-1 text-xs font-bold font-mono focus:outline-none border"
-                              style={{ backgroundColor: theme.inputBg, borderColor: `${theme.accentColor}40`, color: theme.textColorCode }}
+                              className="w-full rounded-lg px-2.5 py-1.5 text-xs font-bold font-mono focus:outline-none border"
+                              style={{ backgroundColor: theme.inputBg, borderColor: `${theme.accentColor}45`, color: theme.textColorCode }}
                             />
                           </div>
                           <div>
-                            <label className="text-[8px] text-gray-400 block mb-1">SHOT TIME (SEC)</label>
+                            <label className="text-[9px] text-gray-400 block mb-1 font-bold">SHOT TIME (SEC)</label>
                             <input
                               type="number"
                               min="1"
-                              value={calcShotDuration}
-                              onChange={(e) => {
-                                const val = Math.max(1, parseInt(e.target.value) || 1);
-                                setCalcShotDuration(val);
-                                const totSec = (calcVideoMinutes * 60) + calcVideoSeconds;
-                                setNumScenes(Math.ceil(totSec / val) || 1);
+                              max="120"
+                              value={calcShotSecInput}
+                              onChange={(e) => handleShotsInputUpdate(calcMinsInput, calcSecsInput, e.target.value)}
+                              onBlur={() => {
+                                const clean = String(Math.max(1, parseInt(calcShotSecInput, 10) || 1));
+                                setCalcShotSecInput(clean);
                               }}
-                              className="w-full rounded px-2 py-1 text-xs font-bold font-mono focus:outline-none border"
-                              style={{ backgroundColor: theme.inputBg, borderColor: `${theme.accentColor}40`, color: theme.textColorCode }}
+                              className="w-full rounded-lg px-2.5 py-1.5 text-xs font-bold font-mono focus:outline-none border"
+                              style={{ backgroundColor: theme.inputBg, borderColor: `${theme.accentColor}45`, color: theme.textColorCode }}
                             />
                           </div>
                         </div>
 
-                        {/* Output format requested by the user */}
-                        <div className="p-3 rounded-xl border space-y-1.5 text-[10px] md:text-xs" style={{ backgroundColor: `${theme.accentColor}06`, borderColor: `${theme.accentColor}25` }}>
-                          <p className="font-bold uppercase tracking-wider text-[8px] opacity-75" style={{ color: theme.textColorCode }}>Output Details:</p>
+                        {/* Quick Shot Duration Presets */}
+                        <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
+                          <span className="opacity-70 mr-1" style={{ color: theme.textColorCode }}>Presets:</span>
+                          {[4, 5, 6, 8, 10, 12].map((secPreset) => (
+                            <button
+                              key={secPreset}
+                              type="button"
+                              onClick={() => handleShotsInputUpdate(calcMinsInput, calcSecsInput, String(secPreset))}
+                              className="px-2 py-0.5 rounded-lg border font-bold cursor-pointer transition-colors"
+                              style={{
+                                backgroundColor: parsedShot === secPreset ? theme.accentColor : theme.inputBg,
+                                borderColor: parsedShot === secPreset ? theme.accentColor : `${theme.accentColor}30`,
+                                color: parsedShot === secPreset ? "#ffffff" : theme.textColorCode,
+                              }}
+                            >
+                              {secPreset}s
+                            </button>
+                          ))}
+                        </div>
+
+                        {/* Live Calculation Breakdown & Explicit Apply Button */}
+                        <div className="p-3 rounded-xl border space-y-2 text-[11px]" style={{ backgroundColor: `${theme.accentColor}08`, borderColor: `${theme.accentColor}30` }}>
                           <div className="space-y-1 font-bold" style={{ color: theme.textColorCode }}>
                             <div className="flex justify-between border-b py-1" style={{ borderColor: `${theme.accentColor}15` }}>
                               <span>Video Duration:</span>
-                              <span style={{ color: theme.textColorCode }}>
-                                {calcVideoMinutes} minute{calcVideoMinutes !== 1 ? 's' : ''} {calcVideoSeconds > 0 ? `${calcVideoSeconds} second${calcVideoSeconds !== 1 ? 's' : ''}` : ''}
+                              <span>
+                                {parsedMins}m {parsedSecs}s ({totalSeconds} total sec)
                               </span>
                             </div>
                             <div className="flex justify-between border-b py-1" style={{ borderColor: `${theme.accentColor}15` }}>
                               <span>Shot Duration:</span>
-                              <span style={{ color: theme.textColorCode }}>{calcShotDuration} seconds</span>
+                              <span>{parsedShot} seconds / shot</span>
                             </div>
-                            <div className="flex justify-between pt-1">
+                            <div className="flex justify-between pt-1 items-center">
                               <span>Total Shots Required:</span>
-                              <span style={{ color: theme.textColorCode }} className="text-xs font-black">{Math.ceil(((calcVideoMinutes * 60) + calcVideoSeconds) / calcShotDuration) || 1}</span>
+                              <span className="text-sm font-black" style={{ color: theme.accentColor }}>
+                                {totalShots} {totalShots === 1 ? "shot" : "shots"}
+                                {totalSeconds > 0 ? ` (${totalSeconds}s ÷ ${parsedShot}s)` : ""}
+                              </span>
                             </div>
                           </div>
+
+                          <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                            <button
+                              type="button"
+                              disabled={totalShots <= 0}
+                              onClick={() => {
+                                const applied = Math.max(1, cappedShots);
+                                setNumScenes(applied);
+                                setShotsAppliedFeedback(`Applied ${applied} scenes to SCENES input`);
+                              }}
+                              className="px-3 py-1.5 rounded-xl font-bold text-[11px] text-white cursor-pointer disabled:opacity-45 transition-all"
+                              style={{ backgroundColor: theme.secondaryAccentColor }}
+                            >
+                              Apply {cappedShots > 0 ? cappedShots : 0} Shots to Scenes
+                            </button>
+                            {shotsAppliedFeedback && (
+                              <span className="text-[10px] font-bold" style={{ color: theme.secondaryAccentColor }}>
+                                ✓ {shotsAppliedFeedback}
+                              </span>
+                            )}
+                          </div>
                         </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                      </div>
+                    );
+                  })()}
 
                   <textarea
                     value={transcriptInput}
@@ -5034,7 +5135,9 @@ export default function App() {
                       title="THUMBNAIL ART"
                       stages={[
                         `Designing ${thumbnailEngine === "flux1" ? "Flux 1" : "Nano Banana 2"} composition...`,
-                        `Applying ${topicNiche} visual hooks & ${thumbnailFormat}...`,
+                        topicNiche && topicNiche !== "None (Auto by Topic)"
+                          ? `Applying ${topicNiche} visual hooks & ${thumbnailFormat}...`
+                          : `Auto-detecting topic visual hooks & ${thumbnailFormat}...`,
                         "Generating headline, tagline & lighting prompt...",
                       ]}
                     />

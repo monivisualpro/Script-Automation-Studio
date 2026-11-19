@@ -13,4 +13,4 @@ local-engine/models/*
 !local-engine/models/.gitkeep
 local-engine/config.json
 local-engine/chat-workspace.json
-
+.aistudio/

@@ -17,13 +17,16 @@ import {
   Moon,
   BookOpen,
   Clapperboard,
-  MessageSquare
+  MessageSquare,
+  Trash2
 } from "lucide-react";
 
 export const UserHeader: React.FC = () => {
   const { 
+    user,
     profile, 
-    logout, 
+    logout,
+    removeApiKey,
     setIsAuthModalOpen, 
     setIsApiKeyModalOpen, 
     setIsSettingsModalOpen, 
@@ -44,7 +47,18 @@ export const UserHeader: React.FC = () => {
   const theme = getThemeConfig(currentTheme, currentBrand);
 
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
+  const [removingKey, setRemovingKey] = useState<boolean>(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const displayEmail = profile?.email || user?.email || "";
+  const displayName =
+    profile?.name ||
+    user?.displayName ||
+    (displayEmail ? displayEmail.split("@")[0] : "Creator Account");
+  const displayPhoto =
+    profile?.profilePhoto ||
+    user?.photoURL ||
+    `https://api.dicebear.com/7.x/bottts/svg?seed=${profile?.userId || user?.uid || "user"}`;
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -59,7 +73,7 @@ export const UserHeader: React.FC = () => {
 
   return (
     <header
-      className={`w-full border-b px-4 py-2.5 sm:px-6 sticky top-0 z-40 flex items-center justify-between gap-4 select-none transition-colors duration-200 ${
+      className={`w-full border-b px-4 py-2.5 sm:px-6 sticky top-0 z-40 flex flex-wrap items-center justify-between gap-2 sm:gap-4 select-none transition-colors duration-200 ${
         theme.isLight 
           ? "bg-[#F7F7F7] border-[#E5E5E5] text-[#000000]" 
           : "bg-[#111111] border-[#2A2A2A] text-white"
@@ -127,7 +141,7 @@ export const UserHeader: React.FC = () => {
       </nav>
 
       {/* Right User Navigation & Controls */}
-      <div className="flex items-center gap-2 sm:gap-3 relative">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 relative">
         {/* Brand Color Switcher (Red / Blue) */}
         <div className={`flex items-center p-0.5 rounded-2xl border ${
           theme.isLight ? "bg-[#FFFFFF] border-[#E5E5E5]" : "bg-[#1A1A1A] border-[#2A2A2A]"
@@ -262,7 +276,7 @@ export const UserHeader: React.FC = () => {
               </button>
             );
           })()
-        ) : !systemModeChecked ? null : !profile ? (
+        ) : !systemModeChecked ? null : !(profile || user) ? (
           /* Unauthenticated online state: Show prominent Login / Sign Up button */
           <button
             onClick={() => setIsAuthModalOpen(true)}
@@ -273,10 +287,10 @@ export const UserHeader: React.FC = () => {
             <span>Login / Sign Up</span>
           </button>
         ) : (
-          /* Authenticated online state: Show Admin, API Status & User Profile Dropdown */
+          /* Authenticated online state: Show Admin, API Status, Gmail Profile Dropdown & Direct Logout */
           <>
             {/* Admin Dashboard Trigger */}
-            {(profile.isAdmin || profile.role === "admin") && (
+            {profile && (profile.isAdmin || profile.role === "admin") && (
               <button
                 onClick={() => setIsAdminModalOpen(true)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-2xl border transition-all cursor-pointer text-[11px] font-mono font-bold ${
@@ -291,25 +305,25 @@ export const UserHeader: React.FC = () => {
             )}
 
             {/* API / Multi-Provider Status Badge */}
-            {profile.hasApiKey || isStandalone ? (
+            {profile?.hasApiKey || isStandalone ? (
               <button
                 onClick={() => setIsApiKeyModalOpen(true)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-2xl border transition-all cursor-pointer text-[11px] font-mono ${
                   theme.isLight ? "bg-[#FFFFFF]" : "bg-[#1A1A1A]"
                 }`}
                 style={{ color: theme.textColorCode, borderColor: `${theme.secondaryAccentColor}99` }}
-                title="Click to configure AI Provider & API Key"
+                title="Click to configure or remove your API Key"
               >
                 <CheckCircle2 className="h-3.5 w-3.5" style={{ color: theme.secondaryAccentColor }} />
                 <span className="font-bold hidden md:inline">
-                  {profile.activeProvider
+                  {profile?.activeProvider
                     ? `${profile.activeProvider.toUpperCase()} Active`
                     : activeProviderConfig.provider
                     ? `${activeProviderConfig.provider.toUpperCase()} Active`
                     : "AI Active"}
                 </span>
                 <span className={`text-[10px] ${theme.isLight ? "text-[#444444]" : "text-[#BDBDBD]"}`}>
-                  ({profile.apiKeyMasked || (isStandalone ? "Local Standalone" : "Active Key")})
+                  ({profile?.apiKeyMasked || (isStandalone ? "Local Standalone" : "Active Key")})
                 </span>
               </button>
             ) : (
@@ -324,41 +338,42 @@ export const UserHeader: React.FC = () => {
               </button>
             )}
 
-            {/* User Profile Box & Dropdown Menu */}
+            {/* User Profile Box & Dropdown Menu (Always shows Gmail clearly) */}
             <div className="relative" ref={dropdownRef}>
               <button
                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                 className={`flex items-center gap-2 pl-2 pr-2.5 py-1 rounded-2xl border transition-all cursor-pointer group ${
                   theme.isLight ? "bg-[#FFFFFF] border-[#E5E5E5]" : "bg-[#1A1A1A] border-[#2A2A2A]"
                 }`}
+                title={displayEmail ? `Signed in as ${displayEmail}` : "Account menu"}
               >
                 <img
-                  src={profile.profilePhoto}
-                  alt={profile.name}
+                  src={displayPhoto}
+                  alt={displayName}
                   referrerPolicy="no-referrer"
-                  className={`w-7 h-7 rounded-xl object-cover border ${
+                  className={`w-7 h-7 rounded-xl object-cover border shrink-0 ${
                     theme.isLight ? "border-[#E5E5E5]" : "border-[#2A2A2A]"
                   }`}
                 />
-                <div className="flex flex-col text-left hidden sm:flex leading-tight">
-                  <span className={`text-xs font-bold truncate max-w-[110px] ${
+                <div className="flex flex-col text-left leading-tight min-w-0">
+                  <span className={`text-xs font-bold truncate max-w-[120px] hidden sm:block ${
                     theme.isLight ? "text-[#000000]" : "text-white"
                   }`}>
-                    {profile.name}
+                    {displayName}
                   </span>
-                  <span className={`text-[9px] font-mono truncate max-w-[110px] ${
+                  <span className={`text-[10px] font-mono truncate max-w-[150px] sm:max-w-[180px] ${
                     theme.isLight ? "text-[#444444]" : "text-[#BDBDBD]"
                   }`}>
-                    {profile.email}
+                    {displayEmail || "Signed In"}
                   </span>
                 </div>
-                <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${isDropdownOpen ? "rotate-180" : ""}`} style={{ color: theme.secondaryAccentColor }} />
+                <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform duration-200 ${isDropdownOpen ? "rotate-180" : ""}`} style={{ color: theme.secondaryAccentColor }} />
               </button>
 
               {/* Profile Dropdown Menu */}
               {isDropdownOpen && (
                 <div
-                  className={`absolute right-0 mt-3 w-60 rounded-2xl shadow-2xl py-2 z-50 font-mono text-xs border ${
+                  className={`absolute right-0 mt-3 w-64 rounded-2xl shadow-2xl py-2 z-50 font-mono text-xs border ${
                     theme.isLight 
                       ? "border-[#E5E5E5] bg-[#FFFFFF] text-[#000000]" 
                       : "border-[#2A2A2A] bg-[#1A1A1A] text-white"
@@ -367,10 +382,10 @@ export const UserHeader: React.FC = () => {
                   <div className={`px-4 py-2.5 border-b mb-1 ${
                     theme.isLight ? "border-[#E5E5E5]" : "border-[#2A2A2A]"
                   }`}>
-                    <p className="font-bold truncate" style={{ color: theme.textColorCode }}>{profile.name}</p>
-                    <p className={`text-[10px] truncate ${
+                    <p className="font-bold truncate" style={{ color: theme.textColorCode }}>{displayName}</p>
+                    <p className={`text-[10px] break-all ${
                       theme.isLight ? "text-[#444444]" : "text-[#BDBDBD]"
-                    }`}>{profile.email}</p>
+                    }`}>{displayEmail || "No email on profile"}</p>
                   </div>
 
                   <button
@@ -378,12 +393,12 @@ export const UserHeader: React.FC = () => {
                       setIsDropdownOpen(false);
                       setIsSettingsModalOpen(true);
                     }}
-                    className={`w-full px-4 py-2.5 text-left flex items-center gap-2.5 transition-colors cursor-pointer ${
+                    className={`w-full px-4 py-2.5 text-left flex items-center gap-2.5 transition-colors cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 ${
                       theme.isLight ? "text-[#000000]" : "text-white"
                     }`}
                   >
                     <UserIcon className="h-4 w-4" style={{ color: theme.secondaryAccentColor }} />
-                    <span>My Profile</span>
+                    <span>My Profile &amp; Account</span>
                   </button>
 
                   <button
@@ -391,20 +406,37 @@ export const UserHeader: React.FC = () => {
                       setIsDropdownOpen(false);
                       setIsApiKeyModalOpen(true);
                     }}
-                    className={`w-full px-4 py-2.5 text-left flex items-center gap-2.5 transition-colors cursor-pointer ${
+                    className={`w-full px-4 py-2.5 text-left flex items-center gap-2.5 transition-colors cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 ${
                       theme.isLight ? "text-[#000000]" : "text-white"
                     }`}
                   >
                     <Key className="h-4 w-4" style={{ color: theme.secondaryAccentColor }} />
-                    <span>API Key Settings</span>
+                    <span>Manage / Change API Key</span>
                   </button>
+
+                  {profile?.hasApiKey && (
+                    <button
+                      disabled={removingKey}
+                      onClick={async () => {
+                        setRemovingKey(true);
+                        await removeApiKey();
+                        setRemovingKey(false);
+                        setIsDropdownOpen(false);
+                      }}
+                      className="w-full px-4 py-2.5 text-left flex items-center gap-2.5 transition-colors cursor-pointer hover:bg-red-500/10 disabled:opacity-50"
+                      style={{ color: theme.accentColor }}
+                    >
+                      <Trash2 className="h-4 w-4 shrink-0" />
+                      <span>{removingKey ? "Removing Key..." : "Remove Saved API Key"}</span>
+                    </button>
+                  )}
 
                   <button
                     onClick={() => {
                       setIsDropdownOpen(false);
                       setIsSettingsModalOpen(true);
                     }}
-                    className={`w-full px-4 py-2.5 text-left flex items-center gap-2.5 transition-colors cursor-pointer ${
+                    className={`w-full px-4 py-2.5 text-left flex items-center gap-2.5 transition-colors cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 ${
                       theme.isLight ? "text-[#000000]" : "text-white"
                     }`}
                   >
@@ -417,17 +449,31 @@ export const UserHeader: React.FC = () => {
                   <button
                     onClick={() => {
                       setIsDropdownOpen(false);
-                      logout();
+                      void logout();
                     }}
-                    className="w-full px-4 py-2.5 text-left flex items-center gap-2.5 transition-colors cursor-pointer"
-                    style={{ color: theme.textColorCode }}
+                    className="w-full px-4 py-2.5 text-left flex items-center gap-2.5 transition-colors cursor-pointer hover:bg-red-500/10 font-bold"
+                    style={{ color: theme.accentColor }}
                   >
-                    <LogOut className="h-4 w-4" style={{ color: theme.accentColor }} />
+                    <LogOut className="h-4 w-4" />
                     <span>Log Out</span>
                   </button>
                 </div>
               )}
             </div>
+
+            {/* Direct 1-Click Logout Button */}
+            <button
+              type="button"
+              onClick={() => void logout()}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-2xl border transition-all cursor-pointer text-[11px] font-mono font-bold ${
+                theme.isLight ? "bg-[#FFFFFF] hover:bg-red-50" : "bg-[#1A1A1A] hover:bg-red-950/40"
+              }`}
+              style={{ color: theme.accentColor, borderColor: `${theme.accentColor}55` }}
+              title={displayEmail ? `Log out (${displayEmail})` : "Log out"}
+            >
+              <LogOut className="h-3.5 w-3.5" />
+              <span>Log Out</span>
+            </button>
           </>
         )}
       </div>

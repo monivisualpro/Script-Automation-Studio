@@ -20,6 +20,10 @@ import {
   RefreshCw,
   Link2,
   Unlink,
+  Eye,
+  EyeOff,
+  Copy,
+  Search,
 } from "lucide-react";
 
 interface SkillsAgentsModalProps {
@@ -64,6 +68,9 @@ export const SkillsAgentsModal: React.FC<SkillsAgentsModalProps> = ({
   const isLight = theme.isLight;
 
   const [tab, setTab] = useState<"installed" | "folders" | "catalog" | "custom">("installed");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const [folderPathInput, setFolderPathInput] = useState("");
   const [localFolderError, setLocalFolderError] = useState<string | null>(null);
   const [customName, setCustomName] = useState("");
@@ -81,9 +88,28 @@ export const SkillsAgentsModal: React.FC<SkillsAgentsModalProps> = ({
   const primaryText = isLight ? "#0D0D0D" : "#ECECEC";
   const mutedText = isLight ? "#52525B" : "#A1A1AA";
 
-  const installedItems = items.filter((it) => it.installed);
-  const catalogItems = items.filter((it) => !it.installed);
-  const linkedSkillCount = installedItems.filter((it) => it.sourceType === "linked-folder").length;
+  const q = searchQuery.trim().toLowerCase();
+  const matchesQuery = (it: AgentSkillItem) =>
+    !q ||
+    it.name.toLowerCase().includes(q) ||
+    it.summary.toLowerCase().includes(q) ||
+    it.kind.toLowerCase().includes(q);
+
+  const installedItems = items.filter((it) => it.installed && matchesQuery(it));
+  const catalogItems = items.filter((it) => !it.installed && matchesQuery(it));
+  const linkedSkillCount = items.filter((it) => it.installed && it.sourceType === "linked-folder").length;
+
+  const handleDownloadSkillMd = (item: AgentSkillItem) => {
+    const slug = item.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "skill";
+    const mdContent = `---\nname: ${slug}\ndescription: ${item.summary}\nversion: 1.0.0\n---\n\n${item.instructions}\n`;
+    const blob = new Blob([mdContent], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${slug}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const handleLinkFolderSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -260,92 +286,184 @@ export const SkillsAgentsModal: React.FC<SkillsAgentsModalProps> = ({
 
         {/* Body */}
         <div className="p-6 overflow-y-auto space-y-4 flex-1">
+          {(tab === "installed" || tab === "catalog") && (
+            <div
+              className="flex items-center gap-2 px-3 py-2 rounded-xl border text-xs"
+              style={{ backgroundColor: subtleSurface, borderColor: borderCol }}
+            >
+              <Search className="h-3.5 w-3.5 shrink-0" style={{ color: mutedText }} />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search skills, VFX generators, script agents..."
+                className="w-full bg-transparent focus:outline-none text-xs"
+                style={{ color: primaryText }}
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="cursor-pointer opacity-70 hover:opacity-100"
+                  style={{ color: mutedText }}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+          )}
+
           {tab === "installed" && (
             <div className="space-y-3">
               {installedItems.map((item) => {
                 const isActiveAgent = item.kind === "agent" && activeAgentId === item.id;
                 const isActiveSkill = item.kind === "skill" && item.enabled;
                 const highlighted = isActiveAgent || isActiveSkill;
+                const isExpanded = expandedId === item.id;
 
                 return (
                   <div
                     key={item.id}
-                    className="p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                    className="p-4 rounded-2xl border space-y-3"
                     style={{
                       backgroundColor: subtleSurface,
                       borderColor: highlighted ? theme.secondaryAccentColor : borderCol,
                     }}
                   >
-                    <div className="space-y-1 min-w-0 flex-1">
-                      <div className="flex items-center gap-2 text-xs flex-wrap">
-                        {item.kind === "agent" ? (
-                          <Bot className="h-3.5 w-3.5 shrink-0" style={{ color: theme.accentColor }} />
-                        ) : (
-                          <Sparkles className="h-3.5 w-3.5 shrink-0" style={{ color: theme.secondaryAccentColor }} />
-                        )}
-                        <span className="font-bold text-sm truncate">{item.name}</span>
-                        <span className="text-[11px] font-mono" style={{ color: mutedText }}>
-                          · {item.kind === "agent" ? "Agent" : "Modular Skill"}
-                        </span>
-                        {item.sourceType === "linked-folder" && (
-                          <span
-                            className="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded border"
-                            style={{ borderColor: borderCol, color: theme.secondaryAccentColor }}
-                            title={item.sourceFilePath || item.sourceFolder}
-                          >
-                            <FolderOpen className="h-2.5 w-2.5" />
-                            {item.fileName || "Linked Folder"}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="space-y-1 min-w-0 flex-1">
+                        <div className="flex items-center gap-2 text-xs flex-wrap">
+                          {item.kind === "agent" ? (
+                            <Bot className="h-3.5 w-3.5 shrink-0" style={{ color: theme.accentColor }} />
+                          ) : (
+                            <Sparkles className="h-3.5 w-3.5 shrink-0" style={{ color: theme.secondaryAccentColor }} />
+                          )}
+                          <span className="font-bold text-sm truncate">{item.name}</span>
+                          <span className="text-[11px] font-mono" style={{ color: mutedText }}>
+                            · {item.kind === "agent" ? "Agent" : "Modular Skill"}
                           </span>
+                          {item.sourceType === "linked-folder" && (
+                            <span
+                              className="inline-flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded border"
+                              style={{ borderColor: borderCol, color: theme.secondaryAccentColor }}
+                              title={item.sourceFilePath || item.sourceFolder}
+                            >
+                              <FolderOpen className="h-2.5 w-2.5" />
+                              {item.fileName || "Linked Folder"}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs leading-relaxed" style={{ color: mutedText }}>
+                          {item.summary}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setExpandedId(isExpanded ? null : item.id)}
+                          className="p-1.5 rounded-xl border cursor-pointer hover:opacity-80"
+                          style={{ borderColor: borderCol, color: isExpanded ? theme.secondaryAccentColor : mutedText }}
+                          title={isExpanded ? "Hide skill instructions" : "View full skill instructions"}
+                        >
+                          {isExpanded ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                        </button>
+
+                        {item.kind === "agent" ? (
+                          <button
+                            type="button"
+                            onClick={() => onSelectAgent(isActiveAgent ? null : item.id)}
+                            className="px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer border flex items-center gap-1.5"
+                            style={{
+                              backgroundColor: isActiveAgent ? theme.secondaryAccentColor : "transparent",
+                              borderColor: isActiveAgent ? theme.secondaryAccentColor : borderCol,
+                              color: isActiveAgent ? "#FFFFFF" : primaryText,
+                            }}
+                          >
+                            {isActiveAgent ? <Check className="h-3.5 w-3.5" /> : <Power className="h-3.5 w-3.5" />}
+                            <span>{isActiveAgent ? "Active Agent" : "Use Agent"}</span>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => onToggleSkill(item.id)}
+                            className="px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer border flex items-center gap-1.5"
+                            style={{
+                              backgroundColor: isActiveSkill ? theme.secondaryAccentColor : "transparent",
+                              borderColor: isActiveSkill ? theme.secondaryAccentColor : borderCol,
+                              color: isActiveSkill ? "#FFFFFF" : primaryText,
+                            }}
+                          >
+                            {isActiveSkill ? <Check className="h-3.5 w-3.5" /> : <Power className="h-3.5 w-3.5" />}
+                            <span>{isActiveSkill ? "Skill Enabled" : "Enable Skill"}</span>
+                          </button>
+                        )}
+
+                        {!item.builtIn && item.sourceType !== "linked-folder" && (
+                          <button
+                            type="button"
+                            onClick={() => onUninstallItem(item.id)}
+                            className="p-1.5 rounded-xl border cursor-pointer hover:opacity-80"
+                            style={{ borderColor: borderCol, color: mutedText }}
+                            title="Uninstall"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
                         )}
                       </div>
-                      <p className="text-xs leading-relaxed" style={{ color: mutedText }}>
-                        {item.summary}
-                      </p>
                     </div>
 
-                    <div className="flex items-center gap-2 shrink-0">
-                      {item.kind === "agent" ? (
-                        <button
-                          type="button"
-                          onClick={() => onSelectAgent(isActiveAgent ? null : item.id)}
-                          className="px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer border flex items-center gap-1.5"
-                          style={{
-                            backgroundColor: isActiveAgent ? theme.secondaryAccentColor : "transparent",
-                            borderColor: isActiveAgent ? theme.secondaryAccentColor : borderCol,
-                            color: isActiveAgent ? "#FFFFFF" : primaryText,
-                          }}
+                    {isExpanded && (
+                      <div
+                        className="rounded-xl border p-3 space-y-2"
+                        style={{ backgroundColor: bgSurface, borderColor: borderCol }}
+                      >
+                        <div className="flex items-center justify-between gap-2 text-[11px]">
+                          <span className="font-mono font-semibold" style={{ color: mutedText }}>
+                            Full Prompt Instructions ({item.instructions.length.toLocaleString()} chars)
+                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(item.instructions);
+                                setCopiedId(item.id);
+                                setTimeout(() => setCopiedId(null), 1500);
+                              }}
+                              className="px-2 py-1 rounded-lg border font-semibold flex items-center gap-1 cursor-pointer"
+                              style={{ borderColor: borderCol, color: primaryText }}
+                            >
+                              {copiedId === item.id ? (
+                                <>
+                                  <Check className="h-3 w-3" style={{ color: theme.secondaryAccentColor }} />
+                                  <span>Copied</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="h-3 w-3" />
+                                  <span>Copy</span>
+                                </>
+                              )}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDownloadSkillMd(item)}
+                              className="px-2 py-1 rounded-lg border font-semibold flex items-center gap-1 cursor-pointer"
+                              style={{ borderColor: borderCol, color: primaryText }}
+                            >
+                              <Download className="h-3 w-3" />
+                              <span>.md</span>
+                            </button>
+                          </div>
+                        </div>
+                        <pre
+                          className="max-h-56 overflow-y-auto whitespace-pre-wrap font-mono text-[11px] leading-relaxed"
+                          style={{ color: mutedText }}
                         >
-                          {isActiveAgent ? <Check className="h-3.5 w-3.5" /> : <Power className="h-3.5 w-3.5" />}
-                          <span>{isActiveAgent ? "Active Agent" : "Use Agent"}</span>
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => onToggleSkill(item.id)}
-                          className="px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer border flex items-center gap-1.5"
-                          style={{
-                            backgroundColor: isActiveSkill ? theme.secondaryAccentColor : "transparent",
-                            borderColor: isActiveSkill ? theme.secondaryAccentColor : borderCol,
-                            color: isActiveSkill ? "#FFFFFF" : primaryText,
-                          }}
-                        >
-                          {isActiveSkill ? <Check className="h-3.5 w-3.5" /> : <Power className="h-3.5 w-3.5" />}
-                          <span>{isActiveSkill ? "Skill Enabled" : "Enable Skill"}</span>
-                        </button>
-                      )}
-
-                      {!item.builtIn && item.sourceType !== "linked-folder" && (
-                        <button
-                          type="button"
-                          onClick={() => onUninstallItem(item.id)}
-                          className="p-1.5 rounded-xl border cursor-pointer hover:opacity-80"
-                          style={{ borderColor: borderCol, color: mutedText }}
-                          title="Uninstall"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      )}
-                    </div>
+                          {item.instructions}
+                        </pre>
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -553,46 +671,73 @@ export const SkillsAgentsModal: React.FC<SkillsAgentsModalProps> = ({
                   className="p-6 rounded-2xl border border-dashed text-center text-xs"
                   style={{ borderColor: borderCol, color: mutedText }}
                 >
-                  All catalog Skills &amp; Agents are installed! Use <strong>Install Custom Skill / Agent</strong> to add or import your own.
+                  {searchQuery.trim()
+                    ? "No matching Skills or Agents in Catalog."
+                    : "All catalog Skills & Agents are installed! Use Custom / File Import to add or import your own."}
                 </div>
               ) : (
-                catalogItems.map((item) => (
-                  <div
-                    key={item.id}
-                    className="p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-                    style={{ backgroundColor: subtleSurface, borderColor: borderCol }}
-                  >
-                    <div className="space-y-1 min-w-0 flex-1">
-                      <div className="flex items-center gap-2 text-xs">
-                        {item.kind === "agent" ? (
-                          <Bot className="h-3.5 w-3.5 shrink-0" style={{ color: theme.accentColor }} />
-                        ) : (
-                          <Sparkles className="h-3.5 w-3.5 shrink-0" style={{ color: theme.secondaryAccentColor }} />
-                        )}
-                        <span className="font-bold text-sm truncate">{item.name}</span>
-                        <span className="text-[11px] font-mono" style={{ color: mutedText }}>
-                          · {item.kind === "agent" ? "Agent" : "Modular Skill"}
-                        </span>
-                      </div>
-                      <p className="text-xs leading-relaxed" style={{ color: mutedText }}>
-                        {item.summary}
-                      </p>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onInstallItem(item.id);
-                        if (item.kind === "agent") onSelectAgent(item.id);
-                      }}
-                      className="px-3.5 py-2 rounded-xl text-xs font-bold text-white flex items-center gap-1.5 cursor-pointer shrink-0"
-                      style={{ backgroundColor: theme.secondaryAccentColor }}
+                catalogItems.map((item) => {
+                  const isExpanded = expandedId === item.id;
+                  return (
+                    <div
+                      key={item.id}
+                      className="p-4 rounded-2xl border space-y-3"
+                      style={{ backgroundColor: subtleSurface, borderColor: borderCol }}
                     >
-                      <Download className="h-3.5 w-3.5" />
-                      <span>Install</span>
-                    </button>
-                  </div>
-                ))
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="space-y-1 min-w-0 flex-1">
+                          <div className="flex items-center gap-2 text-xs">
+                            {item.kind === "agent" ? (
+                              <Bot className="h-3.5 w-3.5 shrink-0" style={{ color: theme.accentColor }} />
+                            ) : (
+                              <Sparkles className="h-3.5 w-3.5 shrink-0" style={{ color: theme.secondaryAccentColor }} />
+                            )}
+                            <span className="font-bold text-sm truncate">{item.name}</span>
+                            <span className="text-[11px] font-mono" style={{ color: mutedText }}>
+                              · {item.kind === "agent" ? "Agent" : "Modular Skill"}
+                            </span>
+                          </div>
+                          <p className="text-xs leading-relaxed" style={{ color: mutedText }}>
+                            {item.summary}
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => setExpandedId(isExpanded ? null : item.id)}
+                            className="p-1.5 rounded-xl border cursor-pointer hover:opacity-80"
+                            style={{ borderColor: borderCol, color: isExpanded ? theme.secondaryAccentColor : mutedText }}
+                            title={isExpanded ? "Hide skill instructions" : "Preview instructions"}
+                          >
+                            {isExpanded ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onInstallItem(item.id);
+                              if (item.kind === "agent") onSelectAgent(item.id);
+                            }}
+                            className="px-3.5 py-2 rounded-xl text-xs font-bold text-white flex items-center gap-1.5 cursor-pointer shrink-0"
+                            style={{ backgroundColor: theme.secondaryAccentColor }}
+                          >
+                            <Download className="h-3.5 w-3.5" />
+                            <span>Install</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {isExpanded && (
+                        <pre
+                          className="max-h-44 overflow-y-auto whitespace-pre-wrap font-mono text-[11px] leading-relaxed p-3 rounded-xl border"
+                          style={{ backgroundColor: bgSurface, borderColor: borderCol, color: mutedText }}
+                        >
+                          {item.instructions}
+                        </pre>
+                      )}
+                    </div>
+                  );
+                })
               )}
             </div>
           )}

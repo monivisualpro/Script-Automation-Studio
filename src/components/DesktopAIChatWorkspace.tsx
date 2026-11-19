@@ -41,13 +41,24 @@ import {
   Lock,
   Link2,
   AlertTriangle,
+  LogOut,
+  Languages,
+  Volume2,
+  VolumeX,
+  Square,
+  FastForward,
+  Film,
+  Code2,
+  BookOpen,
 } from "lucide-react";
 import {
   AgentSkillItem,
   LinkedFolderInfo,
   DetectedFolderPreset,
   INITIAL_SKILLS_AND_AGENTS,
+  DEFAULT_WORKSPACE_SYSTEM_INSTRUCTION,
   PROMPT_OPTIMIZER_SYSTEM_INSTRUCTION,
+  mergeWithBuiltInSkills,
 } from "../lib/agentSkills";
 import { SkillsAgentsModal } from "./SkillsAgentsModal";
 import {
@@ -66,12 +77,17 @@ interface ChatMessageItem {
   role: "user" | "assistant";
   content: string;
   imageDataUrl?: string;
+  imageDataUrls?: string[];
   driveFileId?: string;
+  driveFileIds?: string[];
   driveImageUrl?: string;
+  driveImageUrls?: string[];
   driveSource?: "public-link";
   attachmentName?: string;
   modelUsed?: string;
   providerUsed?: string;
+  truncated?: boolean;
+  isStreaming?: boolean;
   createdAt: number;
 }
 
@@ -126,14 +142,18 @@ const FormattedMessageBody: React.FC<{
   isLight: boolean;
   accentColor: string;
   secondaryColor: string;
-}> = ({ content, isLight, accentColor, secondaryColor }) => {
+  isStreaming?: boolean;
+}> = ({ content, isLight, accentColor, secondaryColor, isStreaming }) => {
   const [copiedCodeIdx, setCopiedCodeIdx] = useState<number | null>(null);
 
   const safeContent = typeof content === "string" ? content : String(content || "");
+  const borderCol = isLight ? "#E2E2E6" : "#2F2F2F";
+  const subtleBg = isLight ? "#F8F8FA" : "#161616";
+  const mutedText = isLight ? "#52525B" : "#A1A1AA";
 
   const segments = useMemo(() => {
-    const parts: Array<{ type: "text" | "code"; content: string; lang?: string }> = [];
-    const regex = /```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g;
+    const parts: Array<{ type: "text" | "code"; content: string; lang?: string; unclosed?: boolean }> = [];
+    const regex = /```([a-zA-Z0-9_+#.-]*)\r?\n([\s\S]*?)```/g;
     let lastIndex = 0;
     let match: RegExpExecArray | null;
     while ((match = regex.exec(safeContent)) !== null) {
@@ -143,20 +163,49 @@ const FormattedMessageBody: React.FC<{
       parts.push({ type: "code", lang: match[1] || "text", content: match[2].trimEnd() });
       lastIndex = regex.lastIndex;
     }
-    if (lastIndex < safeContent.length) {
-      parts.push({ type: "text", content: safeContent.slice(lastIndex) });
+    const tail = safeContent.slice(lastIndex);
+    if (tail) {
+      const openFenceMatch = tail.match(/^([\s\S]*?)```([a-zA-Z0-9_+#.-]*)\r?\n([\s\S]*)$/);
+      if (openFenceMatch) {
+        if (openFenceMatch[1]) {
+          parts.push({ type: "text", content: openFenceMatch[1] });
+        }
+        parts.push({
+          type: "code",
+          lang: openFenceMatch[2] || "text",
+          content: openFenceMatch[3],
+          unclosed: true,
+        });
+      } else {
+        parts.push({ type: "text", content: tail });
+      }
     }
     return parts;
   }, [safeContent]);
 
-  const renderInline = (line: string) => {
-    const tokens = line.split(/(\*\*[^*]+\*\*|`[^`]+`)/g);
+  const renderInline = (line: string): React.ReactNode => {
+    const tokens = line.split(/(\*\*\*[^*]+\*\*\*|\*\*[^*]+\*\*|~~[^~]+~~|`[^`]+`|\[[^\]]+\]\(https?:\/\/[^)\s]+\)|\*[^*\s][^*]*\*)/g);
     return tokens.map((tok, i) => {
+      if (!tok) return null;
+      if (tok.startsWith("***") && tok.endsWith("***") && tok.length > 6) {
+        return (
+          <strong key={i} className="font-bold italic">
+            {tok.slice(3, -3)}
+          </strong>
+        );
+      }
       if (tok.startsWith("**") && tok.endsWith("**") && tok.length > 4) {
         return (
           <strong key={i} className="font-bold">
             {tok.slice(2, -2)}
           </strong>
+        );
+      }
+      if (tok.startsWith("~~") && tok.endsWith("~~") && tok.length > 4) {
+        return (
+          <del key={i} className="opacity-70">
+            {tok.slice(2, -2)}
+          </del>
         );
       }
       if (tok.startsWith("`") && tok.endsWith("`") && tok.length > 2) {
@@ -173,31 +222,261 @@ const FormattedMessageBody: React.FC<{
           </code>
         );
       }
+      const linkMatch = tok.match(/^\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)$/);
+      if (linkMatch) {
+        return (
+          <a
+            key={i}
+            href={linkMatch[2]}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline font-medium hover:opacity-80"
+            style={{ color: secondaryColor }}
+          >
+            {linkMatch[1]}
+          </a>
+        );
+      }
+      if (tok.startsWith("*") && tok.endsWith("*") && tok.length > 2) {
+        return (
+          <em key={i} className="italic">
+            {tok.slice(1, -1)}
+          </em>
+        );
+      }
       return <React.Fragment key={i}>{tok}</React.Fragment>;
     });
   };
 
+  const splitTableCells = (row: string): string[] => {
+    const trimmed = row.trim().replace(/^\|/, "").replace(/\|$/, "");
+    return trimmed.split("|").map((c) => c.trim());
+  };
+
+  const isTableSeparator = (row: string): boolean => {
+    const trimmed = row.trim();
+    return /^\|?(\s*:?-{2,}:?\s*\|)+\s*:?-{2,}:?\s*\|?$/.test(trimmed) || /^\|?\s*:?-{2,}:?\s*\|$/.test(trimmed);
+  };
+
+  const renderTextBlocks = (text: string, segIdx: number) => {
+    const lines = text.split(/\r?\n/);
+    const blocks: React.ReactNode[] = [];
+    let i = 0;
+
+    while (i < lines.length) {
+      const line = lines[i];
+      const trimmed = line.trim();
+
+      if (!trimmed) {
+        blocks.push(<div key={`sp-${segIdx}-${i}`} className="h-1" />);
+        i++;
+        continue;
+      }
+
+      // Markdown Table
+      if (
+        trimmed.includes("|") &&
+        i + 1 < lines.length &&
+        isTableSeparator(lines[i + 1])
+      ) {
+        const headers = splitTableCells(trimmed);
+        i += 2;
+        const rows: string[][] = [];
+        while (i < lines.length && lines[i].trim().includes("|") && lines[i].trim() !== "") {
+          rows.push(splitTableCells(lines[i]));
+          i++;
+        }
+        blocks.push(
+          <div
+            key={`tbl-${segIdx}-${i}`}
+            className="overflow-x-auto rounded-xl border my-2.5"
+            style={{ borderColor: borderCol, backgroundColor: subtleBg }}
+          >
+            <table className="w-full text-left border-collapse text-[13px]">
+              <thead>
+                <tr
+                  className="border-b"
+                  style={{
+                    borderColor: borderCol,
+                    backgroundColor: isLight ? "#EFEFF3" : "#1E1E22",
+                  }}
+                >
+                  {headers.map((h, hIdx) => (
+                    <th key={hIdx} className="px-3 py-2 font-bold whitespace-nowrap">
+                      {renderInline(h)}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r, rIdx) => (
+                  <tr
+                    key={rIdx}
+                    className={rIdx < rows.length - 1 ? "border-b" : ""}
+                    style={{ borderColor: borderCol }}
+                  >
+                    {headers.map((_, cIdx) => (
+                      <td key={cIdx} className="px-3 py-2 align-top">
+                        {renderInline(r[cIdx] || "")}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+        continue;
+      }
+
+      // Horizontal Rule
+      if (/^([-*_]){3,}$/.test(trimmed)) {
+        blocks.push(
+          <hr
+            key={`hr-${segIdx}-${i}`}
+            className="my-3 border-0 border-t"
+            style={{ borderColor: borderCol }}
+          />
+        );
+        i++;
+        continue;
+      }
+
+      // Blockquote (grouped cleanly without thick left accent bar)
+      if (trimmed.startsWith(">")) {
+        const quoteLines: string[] = [];
+        while (i < lines.length && lines[i].trim().startsWith(">")) {
+          quoteLines.push(lines[i].trim().replace(/^>\s?/, ""));
+          i++;
+        }
+        blocks.push(
+          <blockquote
+            key={`bq-${segIdx}-${i}`}
+            className="rounded-xl border px-3.5 py-2.5 my-2 text-[14px] space-y-1"
+            style={{
+              borderColor: borderCol,
+              backgroundColor: subtleBg,
+              color: mutedText,
+            }}
+          >
+            {quoteLines.map((ql, qIdx) => (
+              <p key={qIdx}>{renderInline(ql)}</p>
+            ))}
+          </blockquote>
+        );
+        continue;
+      }
+
+      // Headings
+      if (trimmed.startsWith("#### ")) {
+        blocks.push(
+          <h5 key={`h4-${segIdx}-${i}`} className="font-bold text-[14.5px] pt-1.5">
+            {renderInline(trimmed.slice(5))}
+          </h5>
+        );
+        i++;
+        continue;
+      }
+      if (trimmed.startsWith("### ")) {
+        blocks.push(
+          <h4 key={`h3-${segIdx}-${i}`} className="font-bold text-[15.5px] pt-2">
+            {renderInline(trimmed.slice(4))}
+          </h4>
+        );
+        i++;
+        continue;
+      }
+      if (trimmed.startsWith("## ")) {
+        blocks.push(
+          <h3 key={`h2-${segIdx}-${i}`} className="font-extrabold text-[17px] pt-2.5 pb-0.5">
+            {renderInline(trimmed.slice(3))}
+          </h3>
+        );
+        i++;
+        continue;
+      }
+      if (trimmed.startsWith("# ")) {
+        blocks.push(
+          <h2 key={`h1-${segIdx}-${i}`} className="font-extrabold text-[19.5px] pt-3 pb-0.5">
+            {renderInline(trimmed.slice(2))}
+          </h2>
+        );
+        i++;
+        continue;
+      }
+
+      // Bullet list item (with indentation awareness)
+      const bulletMatch = line.match(/^(\s*)[-*+]\s+(.*)$/);
+      if (bulletMatch) {
+        const indentPx = Math.min(32, Math.floor((bulletMatch[1]?.length || 0) / 2) * 14);
+        blocks.push(
+          <div
+            key={`ul-${segIdx}-${i}`}
+            className="flex items-start gap-2"
+            style={{ paddingLeft: `${4 + indentPx}px` }}
+          >
+            <span
+              className="mt-2 h-1.5 w-1.5 rounded-full shrink-0"
+              style={{ backgroundColor: indentPx > 0 ? secondaryColor : accentColor }}
+            />
+            <span className="flex-1">{renderInline(bulletMatch[2])}</span>
+          </div>
+        );
+        i++;
+        continue;
+      }
+
+      // Numbered list item
+      const numMatch = line.match(/^(\s*)(\d+\.)\s+(.*)$/);
+      if (numMatch) {
+        const indentPx = Math.min(32, Math.floor((numMatch[1]?.length || 0) / 2) * 14);
+        blocks.push(
+          <div
+            key={`ol-${segIdx}-${i}`}
+            className="flex items-start gap-2"
+            style={{ paddingLeft: `${4 + indentPx}px` }}
+          >
+            <span
+              className="font-mono font-bold text-xs mt-1 shrink-0 tabular-nums"
+              style={{ color: secondaryColor }}
+            >
+              {numMatch[2]}
+            </span>
+            <span className="flex-1">{renderInline(numMatch[3])}</span>
+          </div>
+        );
+        i++;
+        continue;
+      }
+
+      blocks.push(<p key={`p-${segIdx}-${i}`}>{renderInline(line)}</p>);
+      i++;
+    }
+
+    return blocks;
+  };
+
   return (
-    <div className="space-y-2.5 text-[15px] leading-[1.7] break-words">
+    <div className="space-y-2 text-[15px] leading-[1.7] break-words">
       {segments.map((seg, idx) => {
         if (seg.type === "code") {
           return (
             <div
               key={idx}
-              className="rounded-xl border overflow-hidden my-2"
+              className="rounded-xl border overflow-hidden my-2.5"
               style={{
                 backgroundColor: isLight ? "#F8F8F9" : "#0D0D0D",
-                borderColor: isLight ? "#E2E2E6" : "#2F2F2F",
+                borderColor: borderCol,
               }}
             >
               <div
                 className="flex items-center justify-between px-3 py-1.5 border-b text-[11px] font-mono"
                 style={{
-                  borderColor: isLight ? "#E2E2E6" : "#2F2F2F",
+                  borderColor: borderCol,
                   color: isLight ? "#555555" : "#A1A1AA",
                 }}
               >
-                <span>{seg.lang || "code"}</span>
+                <span>{seg.lang || "code"}{seg.unclosed ? " · streaming..." : ""}</span>
                 <button
                   type="button"
                   onClick={() => {
@@ -227,59 +506,18 @@ const FormattedMessageBody: React.FC<{
           );
         }
 
-        const lines = seg.content.split("\n");
         return (
           <div key={idx} className="space-y-1.5">
-            {lines.map((line, lIdx) => {
-              const trimmed = line.trim();
-              if (!trimmed) return <div key={lIdx} className="h-1" />;
-              if (trimmed.startsWith("### ")) {
-                return (
-                  <h4 key={lIdx} className="font-bold text-[15.5px] pt-1.5">
-                    {renderInline(trimmed.slice(4))}
-                  </h4>
-                );
-              }
-              if (trimmed.startsWith("## ")) {
-                return (
-                  <h3 key={lIdx} className="font-extrabold text-[17px] pt-2">
-                    {renderInline(trimmed.slice(3))}
-                  </h3>
-                );
-              }
-              if (trimmed.startsWith("# ")) {
-                return (
-                  <h2 key={lIdx} className="font-extrabold text-[19px] pt-2">
-                    {renderInline(trimmed.slice(2))}
-                  </h2>
-                );
-              }
-              if (/^[-*]\s+/.test(trimmed)) {
-                return (
-                  <div key={lIdx} className="flex items-start gap-2 pl-1">
-                    <span className="mt-2 h-1.5 w-1.5 rounded-full shrink-0" style={{ backgroundColor: accentColor }} />
-                    <span className="flex-1">{renderInline(trimmed.replace(/^[-*]\s+/, ""))}</span>
-                  </div>
-                );
-              }
-              if (/^\d+\.\s+/.test(trimmed)) {
-                const numMatch = trimmed.match(/^(\d+\.)\s+(.*)$/);
-                if (numMatch) {
-                  return (
-                    <div key={lIdx} className="flex items-start gap-2 pl-1">
-                      <span className="font-mono font-bold text-xs mt-1 shrink-0 tabular-nums" style={{ color: secondaryColor }}>
-                        {numMatch[1]}
-                      </span>
-                      <span className="flex-1">{renderInline(numMatch[2])}</span>
-                    </div>
-                  );
-                }
-              }
-              return <p key={lIdx}>{renderInline(line)}</p>;
-            })}
+            {renderTextBlocks(seg.content, idx)}
           </div>
         );
       })}
+      {isStreaming && (
+        <span
+          className="inline-block w-2 h-4 align-middle ml-1 animate-pulse rounded-xs"
+          style={{ backgroundColor: secondaryColor }}
+        />
+      )}
     </div>
   );
 };
@@ -302,6 +540,8 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
     setIsApiKeyModalOpen,
     setIsSettingsModalOpen,
     setActiveWorkspace,
+    logout,
+    removeApiKey,
     currentTheme,
     currentBrand,
   } = useAuth();
@@ -372,7 +612,7 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
       const sanitizedSessions = !isStandalone
         ? sessions.slice(0, 12).map((s) => ({
             ...s,
-            messages: (s.messages || []).slice(-25).map(({ imageDataUrl: _omit, ...rest }) => rest),
+            messages: (s.messages || []).slice(-25).map(({ imageDataUrl: _omit, imageDataUrls: _omitArr, ...rest }) => rest),
           }))
         : sessions.slice(0, 40);
       localStorage.setItem(STORAGE_SESSIONS_KEY, JSON.stringify(sanitizedSessions));
@@ -381,14 +621,16 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
 
   // Composer & Generation State
   const [promptInput, setPromptInput] = useState<string>("");
-  const [attachedImage, setAttachedImage] = useState<{ dataUrl: string; name: string } | null>(null);
-  const [attachedDriveImage, setAttachedDriveImage] = useState<{
-    fileId: string;
-    name: string;
-    source: "public-link";
-    previewUrl: string;
-    driveUrl?: string;
-  } | null>(null);
+  const [attachedImages, setAttachedImages] = useState<Array<{ dataUrl: string; name: string }>>([]);
+  const [attachedDriveImages, setAttachedDriveImages] = useState<
+    Array<{
+      fileId: string;
+      name: string;
+      source: "public-link";
+      previewUrl: string;
+      driveUrl?: string;
+    }>
+  >([]);
   const [showDriveLinkInput, setShowDriveLinkInput] = useState<boolean>(false);
   const [driveLinkInput, setDriveLinkInput] = useState<string>("");
   const [limitModalOpen, setLimitModalOpen] = useState<boolean>(false);
@@ -396,6 +638,7 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
   const [isSending, setIsSending] = useState<boolean>(false);
   const [chatError, setChatError] = useState<string | null>(null);
   const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
+  const streamAbortRef = useRef<AbortController | null>(null);
 
   // Chat Options Popover
   const [showPromptOptions, setShowPromptOptions] = useState<boolean>(false);
@@ -412,13 +655,7 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
       const saved = localStorage.getItem(STORAGE_SKILLS_AGENTS_KEY);
       if (saved) {
         const parsed: AgentSkillItem[] = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const existingIds = new Set(parsed.map((item) => item.id));
-          const missingBuiltIns = INITIAL_SKILLS_AND_AGENTS.filter(
-            (item) => !existingIds.has(item.id)
-          );
-          return [...parsed, ...missingBuiltIns];
-        }
+        return mergeWithBuiltInSkills(parsed);
       }
     } catch {}
     return INITIAL_SKILLS_AND_AGENTS;
@@ -428,7 +665,7 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
       const saved = localStorage.getItem(STORAGE_ACTIVE_AGENT_KEY);
       if (saved !== null) return saved || null;
     } catch {}
-    return "agent-prompt-architect";
+    return "agent-flagship-assistant";
   });
   const [isSkillsModalOpen, setIsSkillsModalOpen] = useState<boolean>(false);
   const [isOptimizing, setIsOptimizing] = useState<boolean>(false);
@@ -516,7 +753,7 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
                   map.set(it.id, it);
                 }
               }
-              return Array.from(map.values());
+              return mergeWithBuiltInSkills(Array.from(map.values()));
             });
           }
           if (data.activeAgentId !== undefined) {
@@ -702,9 +939,32 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
     void fetchAvailableModels();
   }, []);
 
-  // Voice Dictation
+  // Gemini Live Voice (gemini-3.5-transcribe-live & gemini-3.5-live-translate-preview)
   const [isListening, setIsListening] = useState<boolean>(false);
-  const recognitionRef = useRef<any>(null);
+  const [voiceConnecting, setVoiceConnecting] = useState<boolean>(false);
+  const [voiceMode, setVoiceMode] = useState<"transcribe" | "translate">("transcribe");
+  const [voiceTargetLang, setVoiceTargetLang] = useState<string>("en");
+  const [voiceSpeakerEnabled, setVoiceSpeakerEnabled] = useState<boolean>(true);
+  const [liveInterimText, setLiveInterimText] = useState<string>("");
+
+  const isListeningRef = useRef<boolean>(false);
+  const voiceModeRef = useRef<"transcribe" | "translate">("transcribe");
+  const voiceSpeakerRef = useRef<boolean>(true);
+  const voiceWsRef = useRef<WebSocket | null>(null);
+  const inputAudioCtxRef = useRef<AudioContext | null>(null);
+  const outputAudioCtxRef = useRef<AudioContext | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const processorRef = useRef<ScriptProcessorNode | null>(null);
+  const nextStartTimeRef = useRef<number>(0);
+
+  useEffect(() => {
+    voiceModeRef.current = voiceMode;
+  }, [voiceMode]);
+
+  useEffect(() => {
+    voiceSpeakerRef.current = voiceSpeakerEnabled;
+  }, [voiceSpeakerEnabled]);
+
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const modelMenuRef = useRef<HTMLDivElement | null>(null);
@@ -912,35 +1172,245 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
     setIsCreatingProject(false);
   };
 
-  const handleToggleVoice = () => {
-    if (isListening) {
-      try {
-        recognitionRef.current?.stop();
-      } catch {}
-      setIsListening(false);
-      return;
+  const float32ToPcm16Base64 = (float32: Float32Array): string => {
+    const pcm16 = new Int16Array(float32.length);
+    for (let i = 0; i < float32.length; i++) {
+      const clamped = Math.max(-1, Math.min(1, float32[i]));
+      pcm16[i] = clamped < 0 ? clamped * 0x8000 : clamped * 0x7fff;
     }
-    const SpeechRecognition =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      setChatError("Voice dictation is not supported in this browser. Please use Chrome or Edge.");
-      return;
+    const bytes = new Uint8Array(pcm16.buffer);
+    let binary = "";
+    const chunkSize = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
     }
-    const recognition = new SpeechRecognition();
-    recognition.lang = "en-US";
-    recognition.interimResults = false;
-    recognition.onresult = (event: any) => {
-      const transcript = event.results?.[0]?.[0]?.transcript;
-      if (transcript) {
-        setPromptInput((prev) => (prev ? `${prev} ${transcript}` : transcript));
+    return btoa(binary);
+  };
+
+  const playPcm24kChunk = (base64Audio: string) => {
+    try {
+      if (!outputAudioCtxRef.current || outputAudioCtxRef.current.state === "closed") {
+        outputAudioCtxRef.current = new AudioContext({ sampleRate: 24000 });
+        nextStartTimeRef.current = 0;
       }
-      setIsListening(false);
+      const ctx = outputAudioCtxRef.current;
+      if (ctx.state === "suspended") {
+        void ctx.resume();
+      }
+      const binary = atob(base64Audio);
+      const byteLen = binary.length;
+      const bytes = new Uint8Array(byteLen);
+      for (let i = 0; i < byteLen; i++) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      const pcm16 = new Int16Array(bytes.buffer);
+      const float32 = new Float32Array(pcm16.length);
+      for (let i = 0; i < pcm16.length; i++) {
+        float32[i] = pcm16[i] / 32768;
+      }
+      const buffer = ctx.createBuffer(1, float32.length, 24000);
+      buffer.copyToChannel(float32, 0);
+
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(ctx.destination);
+
+      const now = ctx.currentTime;
+      const startAt = Math.max(now, nextStartTimeRef.current);
+      source.start(startAt);
+      nextStartTimeRef.current = startAt + buffer.duration;
+    } catch {
+      // Ignore malformed audio chunk
+    }
+  };
+
+  const stopLiveVoice = () => {
+    isListeningRef.current = false;
+    setIsListening(false);
+    setVoiceConnecting(false);
+    setLiveInterimText("");
+
+    try {
+      processorRef.current?.disconnect();
+    } catch {}
+    processorRef.current = null;
+
+    try {
+      mediaStreamRef.current?.getTracks().forEach((t) => t.stop());
+    } catch {}
+    mediaStreamRef.current = null;
+
+    try {
+      if (inputAudioCtxRef.current && inputAudioCtxRef.current.state !== "closed") {
+        void inputAudioCtxRef.current.close();
+      }
+    } catch {}
+    inputAudioCtxRef.current = null;
+
+    try {
+      if (outputAudioCtxRef.current && outputAudioCtxRef.current.state !== "closed") {
+        void outputAudioCtxRef.current.close();
+      }
+    } catch {}
+    outputAudioCtxRef.current = null;
+    nextStartTimeRef.current = 0;
+
+    try {
+      if (voiceWsRef.current) {
+        if (voiceWsRef.current.readyState === WebSocket.OPEN) {
+          voiceWsRef.current.send(JSON.stringify({ type: "stop" }));
+        }
+        voiceWsRef.current.close();
+      }
+    } catch {}
+    voiceWsRef.current = null;
+  };
+
+  useEffect(() => {
+    return () => {
+      stopLiveVoice();
     };
-    recognition.onerror = () => setIsListening(false);
-    recognition.onend = () => setIsListening(false);
-    recognitionRef.current = recognition;
-    recognition.start();
-    setIsListening(true);
+  }, []);
+
+  const handleToggleVoice = async () => {
+    if (isListening || voiceConnecting) {
+      stopLiveVoice();
+      return;
+    }
+
+    setChatError(null);
+
+    if (!isStandalone && !user) {
+      setChatError("Please sign in and save your Gemini API key to use Gemini Live Voice.");
+      setIsAuthModalOpen(true);
+      return;
+    }
+
+    if (!isStandalone && !profile?.hasApiKey) {
+      setChatError("Please save your Gemini API key first to use Gemini Live Voice.");
+      setIsApiKeyModalOpen(true);
+      return;
+    }
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setChatError("Microphone access is not available in this browser context.");
+      return;
+    }
+
+    setVoiceConnecting(true);
+    setLiveInterimText("");
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaStreamRef.current = stream;
+
+      const proto = window.location.protocol === "https:" ? "wss" : "ws";
+      const wsUrl = `${proto}://${window.location.host}/api/voice-live?mode=${voiceMode}&targetLang=${encodeURIComponent(
+        voiceTargetLang
+      )}`;
+      const ws = new WebSocket(wsUrl);
+      voiceWsRef.current = ws;
+
+      ws.onopen = () => {
+        ws.send(
+          JSON.stringify({
+            type: "auth",
+            token: idToken || "",
+            apiKey: activeProviderConfig.apiKey || "",
+          })
+        );
+      };
+
+      ws.onmessage = (event) => {
+        let msg: any;
+        try {
+          msg = JSON.parse(event.data);
+        } catch {
+          return;
+        }
+
+        if (msg.type === "ready") {
+          setVoiceConnecting(false);
+          setIsListening(true);
+          isListeningRef.current = true;
+
+          const inputCtx = new AudioContext({ sampleRate: 16000 });
+          inputAudioCtxRef.current = inputCtx;
+          const source = inputCtx.createMediaStreamSource(stream);
+          const processor = inputCtx.createScriptProcessor(4096, 1, 1);
+          processorRef.current = processor;
+
+          source.connect(processor);
+          processor.connect(inputCtx.destination);
+
+          processor.onaudioprocess = (e) => {
+            if (!isListeningRef.current || ws.readyState !== WebSocket.OPEN) return;
+            const channel = e.inputBuffer.getChannelData(0);
+            const base64 = float32ToPcm16Base64(channel);
+            ws.send(JSON.stringify({ type: "audio", data: base64 }));
+          };
+          return;
+        }
+
+        if (msg.type === "interimTranscript" && msg.text) {
+          setLiveInterimText(String(msg.text));
+          return;
+        }
+
+        if (msg.type === "inputTranscript" && msg.text) {
+          const clean = String(msg.text).trim();
+          if (!clean) return;
+          if (voiceModeRef.current === "transcribe") {
+            setPromptInput((prev) => (prev ? `${prev.trimEnd()} ${clean}` : clean));
+            setLiveInterimText("");
+          } else {
+            setLiveInterimText(`Heard: ${clean}`);
+          }
+          return;
+        }
+
+        if (msg.type === "outputTranscript" && msg.text) {
+          const clean = String(msg.text).trim();
+          if (!clean) return;
+          setPromptInput((prev) => (prev ? `${prev.trimEnd()} ${clean}` : clean));
+          setLiveInterimText("");
+          return;
+        }
+
+        if (msg.type === "audio" && msg.data) {
+          if (voiceModeRef.current === "translate" && voiceSpeakerRef.current) {
+            playPcm24kChunk(String(msg.data));
+          }
+          return;
+        }
+
+        if (msg.type === "error") {
+          setChatError(msg.error || "Gemini Live Voice encountered an error.");
+          stopLiveVoice();
+          return;
+        }
+
+        if (msg.type === "closed") {
+          stopLiveVoice();
+        }
+      };
+
+      ws.onerror = () => {
+        setChatError("Could not connect to Gemini Live Voice stream.");
+        stopLiveVoice();
+      };
+
+      ws.onclose = () => {
+        if (isListeningRef.current) {
+          stopLiveVoice();
+        } else {
+          setVoiceConnecting(false);
+        }
+      };
+    } catch (err: any) {
+      setChatError(err?.message || "Microphone permission denied or unavailable.");
+      stopLiveVoice();
+    }
   };
 
   const handleAttachFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -966,7 +1436,7 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
       const reader = new FileReader();
       reader.onload = () => {
         if (typeof reader.result === "string") {
-          setAttachedImage({ dataUrl: reader.result, name: file.name });
+          setAttachedImages((prev) => [...prev.slice(0, 5), { dataUrl: reader.result as string, name: file.name }]);
         }
       };
       reader.readAsDataURL(file);
@@ -975,7 +1445,7 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
 
     if (file.name.toLowerCase().endsWith(".txt") || file.name.toLowerCase().endsWith(".md")) {
       const text = await file.text();
-      setAttachedFileText({ name: file.name, content: text.slice(0, isStandalone ? 45000 : 18000) });
+      setAttachedFileText({ name: file.name, content: text.slice(0, isStandalone ? 120000 : 80000) });
       return;
     }
 
@@ -999,7 +1469,7 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
           });
           const data = await res.json();
           if (!res.ok) throw new Error(data.error || "Could not extract PDF text.");
-          setAttachedFileText({ name: file.name, content: (data.rawScript || data.text || "").slice(0, 45000) });
+          setAttachedFileText({ name: file.name, content: (data.rawScript || data.text || "").slice(0, 80000) });
         } catch (err: any) {
           setChatError(err.message || "Failed to read PDF attachment.");
         }
@@ -1049,6 +1519,8 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
     const parts: string[] = [];
     if (activeAgent?.instructions?.trim()) {
       parts.push(`[ACTIVE AGENT: ${activeAgent.name}]\n${activeAgent.instructions.trim()}`);
+    } else {
+      parts.push(DEFAULT_WORKSPACE_SYSTEM_INSTRUCTION);
     }
     for (const sk of enabledSkills) {
       if (sk.instructions.trim()) {
@@ -1063,11 +1535,11 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
     }
     if (outputFocus === "transcript") {
       parts.push(
-        "Format your output as a crisp voiceover transcript with natural pacing, clear hooks, and zero meta-commentary unless requested."
+        "Format your output as a complete, unabridged voiceover transcript with natural pacing, clear hooks, and zero meta-commentary unless requested."
       );
     } else if (outputFocus === "scene_prompts") {
       parts.push(
-        "Output clean, numbered chronological visual scene prompts rich in camera angle, lighting, environment, and action details for AI image/video generators."
+        "Output complete, numbered chronological visual scene prompts rich in camera angle, lighting, environment, continuity, and action details for AI image/video generators."
       );
     } else if (outputFocus === "thumbnail_ctr") {
       parts.push(
@@ -1199,9 +1671,52 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
     }
   };
 
+  const handleStopGenerating = () => {
+    if (streamAbortRef.current) {
+      streamAbortRef.current.abort();
+      streamAbortRef.current = null;
+    }
+  };
+
   const sendChatTurn = async (messagesForRequest: ChatMessageItem[], sessionIdToUpdate: string) => {
     setIsSending(true);
     setChatError(null);
+
+    const abortController = new AbortController();
+    streamAbortRef.current = abortController;
+
+    const streamingMsgId = `msg-${Date.now()}-ai`;
+    const initialAiMsg: ChatMessageItem = {
+      id: streamingMsgId,
+      role: "assistant",
+      content: "",
+      modelUsed: selectedChoice.modelId,
+      providerUsed: selectedChoice.provider,
+      isStreaming: true,
+      createdAt: Date.now(),
+    };
+
+    setSessions((prev) =>
+      prev.map((s) =>
+        s.id === sessionIdToUpdate
+          ? { ...s, messages: [...messagesForRequest, initialAiMsg], updatedAt: Date.now() }
+          : s
+      )
+    );
+
+    const updateStreamingMessage = (updater: (m: ChatMessageItem) => ChatMessageItem) => {
+      setSessions((prev) =>
+        prev.map((s) =>
+          s.id === sessionIdToUpdate
+            ? {
+                ...s,
+                messages: s.messages.map((m) => (m.id === streamingMsgId ? updater(m) : m)),
+                updatedAt: Date.now(),
+              }
+            : s
+        )
+      );
+    };
 
     try {
       const headers: Record<string, string> = {
@@ -1224,60 +1739,174 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
         headers.Authorization = `Bearer ${idToken}`;
       }
 
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
+      const payloadBody = JSON.stringify({
+        model: selectedChoice.modelId,
+        systemInstruction: buildEffectiveSystemInstruction(),
+        temperature,
+        providerConfig: {
+          provider: selectedChoice.provider,
           model: selectedChoice.modelId,
-          systemInstruction: buildEffectiveSystemInstruction(),
-          temperature,
-          providerConfig: {
-            provider: selectedChoice.provider,
-            model: selectedChoice.modelId,
-            baseUrl: selectedChoice.baseUrl || activeProviderConfig.baseUrl,
-            apiKey:
-              activeProviderConfig.provider === selectedChoice.provider
-                ? activeProviderConfig.apiKey
-                : "",
-          },
-          messages: messagesForRequest.map((m) => ({
-            role: m.role,
-            content: m.content,
-            ...(isStandalone && m.imageDataUrl ? { imageDataUrl: m.imageDataUrl } : {}),
-            ...(m.driveFileId ? { driveFileId: m.driveFileId } : {}),
-            ...(m.driveImageUrl ? { driveImageUrl: m.driveImageUrl } : {}),
-            ...(m.driveSource ? { driveSource: m.driveSource } : {}),
-          })),
-        }),
+          baseUrl: selectedChoice.baseUrl || activeProviderConfig.baseUrl,
+          apiKey:
+            activeProviderConfig.provider === selectedChoice.provider
+              ? activeProviderConfig.apiKey
+              : "",
+        },
+        messages: messagesForRequest.map((m) => ({
+          role: m.role,
+          content: m.content,
+          ...(isStandalone && m.imageDataUrl ? { imageDataUrl: m.imageDataUrl } : {}),
+          ...(isStandalone && Array.isArray(m.imageDataUrls) && m.imageDataUrls.length > 0
+            ? { imageDataUrls: m.imageDataUrls }
+            : {}),
+          ...(m.driveFileId ? { driveFileId: m.driveFileId } : {}),
+          ...(Array.isArray(m.driveFileIds) && m.driveFileIds.length > 0
+            ? { driveFileIds: m.driveFileIds }
+            : {}),
+          ...(m.driveImageUrl ? { driveImageUrl: m.driveImageUrl } : {}),
+          ...(Array.isArray(m.driveImageUrls) && m.driveImageUrls.length > 0
+            ? { driveImageUrls: m.driveImageUrls }
+            : {}),
+          ...(m.driveSource ? { driveSource: m.driveSource } : {}),
+        })),
       });
 
-      const data = await res.json();
+      const res = await fetch("/api/chat/stream", {
+        method: "POST",
+        headers,
+        body: payloadBody,
+        signal: abortController.signal,
+      });
+
+      const contentType = (res.headers.get("content-type") || "").toLowerCase();
       if (!res.ok) {
-        throw new Error(data.error || "Failed to generate AI response.");
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "Failed to generate AI response.");
       }
 
-      const assistantMsg: ChatMessageItem = {
-        id: `msg-${Date.now()}-ai`,
-        role: "assistant",
-        content: data.reply || "",
-        modelUsed: data.modelUsed || selectedChoice.modelId,
-        providerUsed: data.providerUsed || selectedChoice.provider,
-        createdAt: Date.now(),
-      };
+      if (!contentType.includes("text/event-stream") || !res.body) {
+        const data = await res.json();
+        updateStreamingMessage((m) => ({
+          ...m,
+          content: data.reply || "",
+          modelUsed: data.modelUsed || selectedChoice.modelId,
+          providerUsed: data.providerUsed || selectedChoice.provider,
+          truncated: Boolean(data.truncated),
+          isStreaming: false,
+        }));
+        return;
+      }
 
-      const nextMessages = [...messagesForRequest, assistantMsg];
-      setSessions((prev) =>
-        prev.map((s) =>
-          s.id === sessionIdToUpdate
-            ? { ...s, messages: nextMessages, updatedAt: Date.now() }
-            : s
-        )
-      );
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let accumulated = "";
+      let finalMeta: { modelUsed?: string; providerUsed?: string; truncated?: boolean } = {};
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const events = buffer.split("\n\n");
+        buffer = events.pop() || "";
+
+        for (const ev of events) {
+          const dataLines = ev
+            .split("\n")
+            .map((l) => l.trim())
+            .filter((l) => l.startsWith("data:"));
+          for (const dl of dataLines) {
+            const rawJson = dl.slice(5).trim();
+            if (!rawJson) continue;
+            let parsed: any;
+            try {
+              parsed = JSON.parse(rawJson);
+            } catch {
+              continue;
+            }
+            if (parsed.type === "delta" && typeof parsed.text === "string") {
+              accumulated += parsed.text;
+              const currentText = accumulated;
+              updateStreamingMessage((m) => ({
+                ...m,
+                content: currentText,
+              }));
+            } else if (parsed.type === "done") {
+              finalMeta = {
+                modelUsed: parsed.modelUsed,
+                providerUsed: parsed.providerUsed,
+                truncated: Boolean(parsed.truncated),
+              };
+              if (typeof parsed.reply === "string" && parsed.reply.length > accumulated.length) {
+                accumulated = parsed.reply;
+              }
+            } else if (parsed.type === "error") {
+              throw new Error(parsed.error || "Streaming response interrupted.");
+            }
+          }
+        }
+      }
+
+      updateStreamingMessage((m) => ({
+        ...m,
+        content: accumulated.trim(),
+        modelUsed: finalMeta.modelUsed || m.modelUsed,
+        providerUsed: finalMeta.providerUsed || m.providerUsed,
+        truncated: Boolean(finalMeta.truncated),
+        isStreaming: false,
+      }));
     } catch (err: any) {
-      setChatError(err.message || "Error generating AI response.");
+      if (err?.name === "AbortError") {
+        updateStreamingMessage((m) => ({
+          ...m,
+          isStreaming: false,
+          truncated: true,
+        }));
+      } else {
+        setSessions((prev) =>
+          prev.map((s) =>
+            s.id === sessionIdToUpdate
+              ? {
+                  ...s,
+                  messages: s.messages.filter((m) => !(m.id === streamingMsgId && !m.content.trim())).map((m) =>
+                    m.id === streamingMsgId ? { ...m, isStreaming: false } : m
+                  ),
+                }
+              : s
+          )
+        );
+        setChatError(err.message || "Error generating AI response.");
+      }
     } finally {
+      if (streamAbortRef.current === abortController) {
+        streamAbortRef.current = null;
+      }
       setIsSending(false);
     }
+  };
+
+  const handleContinueGeneration = async () => {
+    if (!activeSession || isSending) return;
+    if (!ensureChatAccess()) return;
+    if (!isStandalone && activeSession.messages.length >= 40) {
+      setLimitModalOpen(true);
+      return;
+    }
+
+    const continueMsg: ChatMessageItem = {
+      id: `msg-${Date.now()}-cont`,
+      role: "user",
+      content:
+        "Continue seamlessly from exactly where you left off without repeating any completed sections or scene numbers. If generating scenes or numbered batches, resume immediately with the exact next scene number and keep full detail.",
+      createdAt: Date.now(),
+    };
+    const nextMessages = [...activeSession.messages, continueMsg];
+    setSessions((prev) =>
+      prev.map((s) =>
+        s.id === activeSession.id ? { ...s, messages: nextMessages, updatedAt: Date.now() } : s
+      )
+    );
+    await sendChatTurn(nextMessages, activeSession.id);
   };
 
   const handleAttachDriveLink = () => {
@@ -1286,12 +1915,18 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
       setChatError("Please paste a valid Google Drive share link (e.g. https://drive.google.com/file/d/...).");
       return;
     }
-    setAttachedDriveImage({
-      fileId,
-      name: "Shared Google Drive Image",
-      source: "public-link",
-      previewUrl: getPublicDriveThumbnailUrl(fileId),
-      driveUrl: driveLinkInput.trim(),
+    setAttachedDriveImages((prev) => {
+      if (prev.some((p) => p.fileId === fileId)) return prev;
+      return [
+        ...prev.slice(0, 5),
+        {
+          fileId,
+          name: `Drive Reference ${prev.length + 1}`,
+          source: "public-link" as const,
+          previewUrl: getPublicDriveThumbnailUrl(fileId),
+          driveUrl: driveLinkInput.trim(),
+        },
+      ];
     });
     setDriveLinkInput("");
     setShowDriveLinkInput(false);
@@ -1313,21 +1948,21 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
 
     if (hasImageItem) {
       e.preventDefault();
-      setAttachedImage(null);
+      setAttachedImages([]);
       setShowDriveLinkInput(true);
       setChatError(
-        "Direct image pasting is disabled on the free Firebase Spark plan. Paste a public Google Drive image link ('Anyone with the link') instead."
+        "Direct image pasting is disabled on the free Firebase Spark plan. Paste public Google Drive image links ('Anyone with the link') instead."
       );
       return;
     }
 
     const pastedText = clipboard.getData("text/plain") || "";
-    if (pastedText.length > 20000) {
+    if (pastedText.length > 100000) {
       e.preventDefault();
-      const allowed = pastedText.slice(0, 20000);
-      setPromptInput((prev) => `${prev}${allowed}`.slice(0, 22000));
+      const allowed = pastedText.slice(0, 100000);
+      setPromptInput((prev) => `${prev}${allowed}`.slice(0, 115000));
       setChatError(
-        "Large text paste was trimmed to 20,000 characters to stay within Firebase Spark free tier limits."
+        "Very large paste trimmed to 100,000 characters."
       );
     }
   };
@@ -1337,11 +1972,18 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
     if (isSending) return;
     if (!ensureChatAccess()) return;
     const rawText = promptInput.trim();
-    if (!rawText && !(isStandalone && attachedImage) && !attachedDriveImage && !attachedFileText) return;
+    if (
+      !rawText &&
+      !(isStandalone && attachedImages.length > 0) &&
+      attachedDriveImages.length === 0 &&
+      !attachedFileText
+    ) {
+      return;
+    }
 
-    if (!isStandalone && attachedImage) {
-      setAttachedImage(null);
-      setChatError("Direct image storage in Firebase is disabled. Paste a public Google Drive image link instead.");
+    if (!isStandalone && attachedImages.length > 0) {
+      setAttachedImages([]);
+      setChatError("Direct image storage in Firebase is disabled. Paste public Google Drive image links instead.");
       return;
     }
 
@@ -1358,27 +2000,27 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
       ? `${rawText ? rawText + "\n\n" : ""}--- Attached File: ${attachedFileText.name} ---\n${attachedFileText.content}`
       : rawText;
 
-    if (!isStandalone && fullUserText.length > 24000) {
+    if (!isStandalone && fullUserText.length > 120000) {
       setChatError(
-        "Prompt is too large for the online Firebase Spark free plan (max 24,000 characters). Please shorten your text."
+        "Prompt exceeds 120,000 characters. Please split very large scripts into sections."
       );
       return;
     }
 
-    // Auto-detect if user pasted a standalone Google Drive image URL directly in text
-    let inlineDriveAttachment = attachedDriveImage;
-    if (!isStandalone && !inlineDriveAttachment) {
-      const urlMatch = rawText.match(/https?:\/\/(?:drive|docs)\.google\.com\/[^\s]+/i);
-      if (urlMatch?.[0]) {
-        const detectedId = extractGoogleDriveFileId(urlMatch[0]);
-        if (detectedId) {
-          inlineDriveAttachment = {
+    // Auto-detect Google Drive image URLs pasted directly in text (supports multiple reference images)
+    const finalDriveAttachments = [...attachedDriveImages];
+    if (!isStandalone) {
+      const urlMatches = rawText.match(/https?:\/\/(?:drive|docs)\.google\.com\/[^\s]+/gi) || [];
+      for (const u of urlMatches) {
+        const detectedId = extractGoogleDriveFileId(u);
+        if (detectedId && !finalDriveAttachments.some((d) => d.fileId === detectedId) && finalDriveAttachments.length < 6) {
+          finalDriveAttachments.push({
             fileId: detectedId,
-            name: "Shared Google Drive Image",
+            name: `Drive Reference ${finalDriveAttachments.length + 1}`,
             source: "public-link",
             previewUrl: getPublicDriveThumbnailUrl(detectedId),
-            driveUrl: urlMatch[0],
-          };
+            driveUrl: u,
+          });
         }
       }
     }
@@ -1386,20 +2028,35 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
     const userMsg: ChatMessageItem = {
       id: `msg-${Date.now()}-usr`,
       role: "user",
-      content: fullUserText || (inlineDriveAttachment ? "Analyze this Google Drive image." : ""),
-      ...(isStandalone && attachedImage ? { imageDataUrl: attachedImage.dataUrl } : {}),
-      ...(inlineDriveAttachment
+      content: fullUserText || (finalDriveAttachments.length > 0 ? "Analyze the attached Google Drive reference image(s)." : ""),
+      ...(isStandalone && attachedImages.length > 0
         ? {
-            driveFileId: inlineDriveAttachment.fileId,
-            driveSource: inlineDriveAttachment.source,
-            ...(inlineDriveAttachment.driveUrl ? { driveImageUrl: inlineDriveAttachment.driveUrl } : {}),
-            attachmentName: inlineDriveAttachment.name,
+            imageDataUrl: attachedImages[0].dataUrl,
+            imageDataUrls: attachedImages.map((img) => img.dataUrl),
+          }
+        : {}),
+      ...(finalDriveAttachments.length > 0
+        ? {
+            driveFileId: finalDriveAttachments[0].fileId,
+            driveFileIds: finalDriveAttachments.map((d) => d.fileId),
+            driveSource: "public-link" as const,
+            driveImageUrl: finalDriveAttachments[0].driveUrl,
+            driveImageUrls: finalDriveAttachments.map((d) => d.driveUrl).filter(Boolean) as string[],
+            attachmentName:
+              finalDriveAttachments.length === 1
+                ? finalDriveAttachments[0].name
+                : `${finalDriveAttachments.length} Drive References`,
           }
         : {}),
       ...(attachedFileText
         ? { attachmentName: attachedFileText.name }
-        : isStandalone && attachedImage
-        ? { attachmentName: attachedImage.name }
+        : isStandalone && attachedImages.length > 0
+        ? {
+            attachmentName:
+              attachedImages.length === 1
+                ? attachedImages[0].name
+                : `${attachedImages.length} Reference Images`,
+          }
         : {}),
       createdAt: Date.now(),
     };
@@ -1412,8 +2069,8 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
       const cleanTitle = (
         rawText ||
         attachedFileText?.name ||
-        inlineDriveAttachment?.name ||
-        attachedImage?.name ||
+        finalDriveAttachments[0]?.name ||
+        attachedImages[0]?.name ||
         "New Chat"
       )
         .replace(/\s+/g, " ")
@@ -1440,8 +2097,8 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
     }
 
     setPromptInput("");
-    setAttachedImage(null);
-    setAttachedDriveImage(null);
+    setAttachedImages([]);
+    setAttachedDriveImages([]);
     setAttachedFileText(null);
     await sendChatTurn(nextMessages, targetSessionId);
   };
@@ -1798,8 +2455,48 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
             </div>
           </div>
 
-          {/* Sidebar Bottom Settings & Provider Trigger */}
+          {/* Sidebar Bottom Settings, Account Gmail, Remove Key & Provider Trigger */}
           <div className="p-2.5 border-t space-y-1" style={{ borderColor: borderCol }}>
+            {!isStandalone && (user || profile) && (
+              <div
+                className="px-2.5 py-2 rounded-xl border space-y-1.5 mb-1"
+                style={{
+                  borderColor: borderCol,
+                  backgroundColor: isLight ? "#FFFFFF" : "#212121",
+                }}
+              >
+                <div className="text-[10px] font-mono truncate" style={{ color: mutedText }} title={profile?.email || user?.email || ""}>
+                  <span className="font-bold block truncate" style={{ color: primaryText }}>
+                    {profile?.email || user?.email || "Signed In"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  {profile?.hasApiKey && (
+                    <button
+                      type="button"
+                      onClick={() => void removeApiKey()}
+                      className="flex-1 px-2 py-1 rounded-lg border text-[10px] font-bold flex items-center justify-center gap-1 cursor-pointer hover:bg-red-500/10"
+                      style={{ borderColor: `${theme.accentColor}45`, color: theme.accentColor }}
+                      title="Remove your saved API key"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                      <span>Remove Key</span>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => void logout()}
+                    className="flex-1 px-2 py-1 rounded-lg border text-[10px] font-bold flex items-center justify-center gap-1 cursor-pointer hover:bg-red-500/10"
+                    style={{ borderColor: `${theme.accentColor}45`, color: theme.accentColor }}
+                    title="Log out of your account"
+                  >
+                    <LogOut className="h-3 w-3" />
+                    <span>Log Out</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
             <button
               type="button"
               onClick={() => setIsApiKeyModalOpen(true)}
@@ -1807,7 +2504,7 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
               style={{ color: primaryText }}
             >
               <Key className="h-3.5 w-3.5" style={{ color: theme.secondaryAccentColor }} />
-              <span>Providers &amp; Local Engine</span>
+              <span>{isStandalone ? "Providers & Local Engine" : "Manage / Remove API Key"}</span>
             </button>
             <button
               type="button"
@@ -1868,6 +2565,47 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            <div
+              className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-xl border text-[11px]"
+              style={{
+                borderColor: borderCol,
+                backgroundColor: isLight ? "#F8FAFC" : "#1B1B1B",
+                color: primaryText,
+              }}
+              title="Switch active specialized Agent or Skill profile"
+            >
+              <Bot className="h-3.5 w-3.5 shrink-0" style={{ color: theme.secondaryAccentColor }} />
+              <select
+                value={activeAgentId || ""}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === "__manage__") {
+                    setIsSkillsModalOpen(true);
+                    return;
+                  }
+                  setActiveAgentId(val || null);
+                }}
+                className="bg-transparent font-semibold focus:outline-none cursor-pointer max-w-[200px] truncate"
+                style={{ colorScheme: isLight ? "light" : "dark", color: primaryText }}
+              >
+                <option value="" style={{ backgroundColor: composerBg, color: primaryText }}>
+                  Default Chat (Flagship Depth)
+                </option>
+                {installedAgents.map((agent) => (
+                  <option
+                    key={agent.id}
+                    value={agent.id}
+                    style={{ backgroundColor: composerBg, color: primaryText }}
+                  >
+                    {agent.name}
+                  </option>
+                ))}
+                <option value="__manage__" style={{ backgroundColor: composerBg, color: primaryText }}>
+                  + Install / Manage Skills...
+                </option>
+              </select>
+            </div>
+
             {hasMessages && (
               <button
                 type="button"
@@ -1960,12 +2698,120 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
                     </button>
                   )}
                 </div>
+
+                {/* Flagship Workflow Starter Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2">
+                  {[
+                    {
+                      id: "vfx-scene",
+                      title: "Universal Cinematic & VFX Scenes",
+                      desc: "Continuity Bibles + SCENE 001..N prompts with camera, lens & VFX.",
+                      icon: Film,
+                      agentId: "agent-universal-cinematic-vfx",
+                      focus: "scene_prompts" as const,
+                      starter:
+                        "Generate 15 ultra-detailed cinematic VFX scenes (with full Character, Location, Lighting & Color Continuity Bibles first).\nMode: Both Image & Video Prompts\nVisual Style: Photorealistic Hollywood Epic\nTopic / Script:\n",
+                    },
+                    {
+                      id: "script-vo",
+                      title: "Full Script & Voiceover Architect",
+                      desc: "Unlimited long-form documentaries, stories & retention-paced VO.",
+                      icon: BookOpen,
+                      agentId: "agent-script-transcript",
+                      focus: "transcript" as const,
+                      starter:
+                        "Write a complete, deeply researched, unabridged voiceover script with strong hook, chapter flow, and zero placeholders.\nTopic: ",
+                    },
+                    {
+                      id: "flagship-research",
+                      title: "Deep Research, Tables & Strategy",
+                      desc: "ChatGPT, Claude & Gemini depth with structured Markdown tables.",
+                      icon: Sparkles,
+                      agentId: "agent-flagship-assistant",
+                      focus: "general" as const,
+                      starter:
+                        "Give me a comprehensive, structured breakdown with comparison tables, step-by-step analysis, and actionable examples on:\n",
+                    },
+                    {
+                      id: "code-arch",
+                      title: "Full-Stack Code & Architecture",
+                      desc: "Complete production-ready modules, APIs & TypeScript codebases.",
+                      icon: Code2,
+                      agentId: "agent-code-architect",
+                      focus: "general" as const,
+                      starter:
+                        "Design and write complete, production-ready code (no stubs or ellipses) for:\n",
+                    },
+                  ].map((card) => {
+                    const CardIcon = card.icon;
+                    const isSelectedAgent = activeAgentId === card.agentId;
+                    return (
+                      <button
+                        key={card.id}
+                        type="button"
+                        onClick={() => {
+                          setActiveAgentId(card.agentId);
+                          setOutputFocus(card.focus);
+                          setPromptInput(card.starter);
+                        }}
+                        className="p-3 rounded-2xl border text-left transition-colors hover:opacity-95 cursor-pointer flex items-start gap-2.5"
+                        style={{
+                          borderColor: isSelectedAgent ? theme.secondaryAccentColor : borderCol,
+                          backgroundColor: isLight ? "#FAFAFB" : "#1B1B1B",
+                        }}
+                      >
+                        <div
+                          className="p-2 rounded-xl border shrink-0"
+                          style={{
+                            borderColor: borderCol,
+                            backgroundColor: composerBg,
+                          }}
+                        >
+                          <CardIcon
+                            className="h-4 w-4"
+                            style={{
+                              color: isSelectedAgent
+                                ? theme.secondaryAccentColor
+                                : theme.accentColor,
+                            }}
+                          />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-xs font-bold truncate" style={{ color: primaryText }}>
+                            {card.title}
+                          </div>
+                          <div className="text-[11px] leading-snug mt-0.5 line-clamp-2" style={{ color: mutedText }}>
+                            {card.desc}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </div>
           ) : (
             <div className="max-w-3xl mx-auto space-y-6 pb-4">
-              {activeSession.messages.map((msg) => {
+              {activeSession.messages.map((msg, msgIndex) => {
                 const isUser = msg.role === "user";
+                const isLatestAssistant =
+                  !isUser && msgIndex === activeSession.messages.length - 1;
+                const localImgs =
+                  Array.isArray(msg.imageDataUrls) && msg.imageDataUrls.length > 0
+                    ? msg.imageDataUrls
+                    : msg.imageDataUrl
+                    ? [msg.imageDataUrl]
+                    : [];
+                const driveIds =
+                  Array.isArray(msg.driveFileIds) && msg.driveFileIds.length > 0
+                    ? msg.driveFileIds
+                    : msg.driveFileId
+                    ? [msg.driveFileId]
+                    : [];
+                const needsContinueHighlight =
+                  Boolean(msg.truncated) ||
+                  /\b(batch|next scene|continue|scene\s+\d+|part\s+\d+)\b/i.test(msg.content);
+
                 return (
                   <div
                     key={msg.id}
@@ -1980,23 +2826,33 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
                           color: primaryText,
                         }}
                       >
-                        {msg.imageDataUrl && (
-                          <img
-                            src={msg.imageDataUrl}
-                            alt={msg.attachmentName || "Attached visual"}
-                            className="max-h-52 rounded-xl mb-2 object-contain border"
-                            style={{ borderColor: borderCol }}
-                          />
+                        {localImgs.length > 0 && (
+                          <div className="flex flex-wrap gap-2 mb-2">
+                            {localImgs.map((src, idx) => (
+                              <img
+                                key={`${msg.id}-img-${idx}`}
+                                src={src}
+                                alt={`${msg.attachmentName || "Attached visual"} ${idx + 1}`}
+                                className="max-h-52 rounded-xl object-contain border"
+                                style={{ borderColor: borderCol }}
+                              />
+                            ))}
+                          </div>
                         )}
-                        {!msg.imageDataUrl && msg.driveFileId && (
-                          <img
-                            src={getPublicDriveThumbnailUrl(msg.driveFileId)}
-                            alt={msg.attachmentName || "Google Drive visual"}
-                            className="max-h-52 rounded-xl mb-2 object-contain border"
-                            style={{ borderColor: borderCol }}
-                          />
+                        {localImgs.length === 0 && driveIds.length > 0 && (
+                          <div className="flex flex-wrap gap-2 mb-2">
+                            {driveIds.map((fid, idx) => (
+                              <img
+                                key={`${msg.id}-drv-${fid}-${idx}`}
+                                src={getPublicDriveThumbnailUrl(fid)}
+                                alt={`Google Drive reference ${idx + 1}`}
+                                className="max-h-52 rounded-xl object-contain border"
+                                style={{ borderColor: borderCol }}
+                              />
+                            ))}
+                          </div>
                         )}
-                        {msg.attachmentName && !msg.imageDataUrl && !msg.driveFileId && (
+                        {msg.attachmentName && localImgs.length === 0 && driveIds.length === 0 && (
                           <div
                             className="text-[11px] font-mono mb-1.5 flex items-center gap-1.5"
                             style={{ color: theme.secondaryAccentColor }}
@@ -2023,112 +2879,160 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
                           <span aria-hidden="true">·</span>
                           <span className="tabular-nums">{countWords(msg.content)} words</span>
                           <span aria-hidden="true">·</span>
-                          <span className="tabular-nums">{formatRelativeDay(msg.createdAt)}</span>
+                          <span className="tabular-nums">
+                            {msg.isStreaming ? "Streaming live..." : formatRelativeDay(msg.createdAt)}
+                          </span>
                         </div>
 
                         <div className="py-1" style={{ color: primaryText }}>
-                          <FormattedMessageBody
-                            content={msg.content}
-                            isLight={isLight}
-                            accentColor={theme.accentColor}
-                            secondaryColor={theme.secondaryAccentColor}
-                          />
+                          {msg.isStreaming && !msg.content.trim() ? (
+                            <div className="text-xs font-mono opacity-75 flex items-center gap-2">
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" style={{ color: theme.secondaryAccentColor }} />
+                              <span>Connecting to {msg.modelUsed || activeChoiceDisplay.label}...</span>
+                            </div>
+                          ) : (
+                            <FormattedMessageBody
+                              content={msg.content}
+                              isLight={isLight}
+                              accentColor={theme.accentColor}
+                              secondaryColor={theme.secondaryAccentColor}
+                              isStreaming={msg.isStreaming}
+                            />
+                          )}
                         </div>
 
-                        {/* Response Utilities + One-Click Transfer to Automation Studio */}
-                        <div className="flex flex-wrap items-center gap-1.5 pt-0.5 text-[11px]">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              navigator.clipboard.writeText(msg.content);
-                              setCopiedMsgId(msg.id);
-                              setTimeout(() => setCopiedMsgId(null), 1500);
-                            }}
-                            className="px-2.5 py-1 rounded-lg border flex items-center gap-1 cursor-pointer hover:opacity-85"
-                            style={{ borderColor: borderCol, color: mutedText }}
-                          >
-                            {copiedMsgId === msg.id ? (
-                              <Check className="h-3 w-3" style={{ color: theme.secondaryAccentColor }} />
-                            ) : (
-                              <Copy className="h-3 w-3" />
+                        {/* Response Utilities + Continue + One-Click Transfer to Automation Studio */}
+                        {!msg.isStreaming && msg.content.trim() && (
+                          <div className="flex flex-wrap items-center gap-1.5 pt-0.5 text-[11px]">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(msg.content);
+                                setCopiedMsgId(msg.id);
+                                setTimeout(() => setCopiedMsgId(null), 1500);
+                              }}
+                              className="px-2.5 py-1 rounded-lg border flex items-center gap-1 cursor-pointer hover:opacity-85"
+                              style={{ borderColor: borderCol, color: mutedText }}
+                            >
+                              {copiedMsgId === msg.id ? (
+                                <Check className="h-3 w-3" style={{ color: theme.secondaryAccentColor }} />
+                              ) : (
+                                <Copy className="h-3 w-3" />
+                              )}
+                              <span>{copiedMsgId === msg.id ? "Copied" : "Copy"}</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const blob = new Blob([msg.content], { type: "text/plain;charset=utf-8" });
+                                const url = URL.createObjectURL(blob);
+                                const a = document.createElement("a");
+                                a.href = url;
+                                a.download = `AI_Output_${Date.now()}.txt`;
+                                a.click();
+                                URL.revokeObjectURL(url);
+                              }}
+                              className="px-2.5 py-1 rounded-lg border flex items-center gap-1 cursor-pointer hover:opacity-85"
+                              style={{ borderColor: borderCol, color: mutedText }}
+                            >
+                              <Download className="h-3 w-3" />
+                              <span>Save .txt</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const blob = new Blob([msg.content], { type: "text/markdown;charset=utf-8" });
+                                const url = URL.createObjectURL(blob);
+                                const a = document.createElement("a");
+                                a.href = url;
+                                a.download = `AI_Output_${Date.now()}.md`;
+                                a.click();
+                                URL.revokeObjectURL(url);
+                              }}
+                              className="px-2.5 py-1 rounded-lg border flex items-center gap-1 cursor-pointer hover:opacity-85"
+                              style={{ borderColor: borderCol, color: mutedText }}
+                            >
+                              <Download className="h-3 w-3" />
+                              <span>Save .md</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              disabled={isSending}
+                              onClick={handleRegenerateLast}
+                              className="px-2.5 py-1 rounded-lg border flex items-center gap-1 cursor-pointer hover:opacity-85 disabled:opacity-45"
+                              style={{ borderColor: borderCol, color: mutedText }}
+                            >
+                              <RefreshCw className="h-3 w-3" />
+                              <span>Regenerate</span>
+                            </button>
+
+                            {isLatestAssistant && (
+                              <button
+                                type="button"
+                                disabled={isSending}
+                                onClick={() => void handleContinueGeneration()}
+                                className="px-2.5 py-1 rounded-lg border flex items-center gap-1 font-semibold cursor-pointer hover:opacity-90 disabled:opacity-45"
+                                style={{
+                                  borderColor: needsContinueHighlight ? theme.accentColor : borderCol,
+                                  backgroundColor: needsContinueHighlight ? `${theme.accentColor}12` : "transparent",
+                                  color: needsContinueHighlight ? theme.accentColor : primaryText,
+                                }}
+                                title="Continue seamlessly from where this response stopped (ideal for long scripts & 50+ scene batches)"
+                              >
+                                <FastForward className="h-3 w-3" />
+                                <span>Continue</span>
+                              </button>
                             )}
-                            <span>{copiedMsgId === msg.id ? "Copied" : "Copy"}</span>
-                          </button>
 
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const blob = new Blob([msg.content], { type: "text/plain;charset=utf-8" });
-                              const url = URL.createObjectURL(blob);
-                              const a = document.createElement("a");
-                              a.href = url;
-                              a.download = `AI_Output_${Date.now()}.txt`;
-                              a.click();
-                              URL.revokeObjectURL(url);
-                            }}
-                            className="px-2.5 py-1 rounded-lg border flex items-center gap-1 cursor-pointer hover:opacity-85"
-                            style={{ borderColor: borderCol, color: mutedText }}
-                          >
-                            <Download className="h-3 w-3" />
-                            <span>Save .txt</span>
-                          </button>
+                            <span className="mx-1 opacity-40" style={{ color: mutedText }}>
+                              |
+                            </span>
 
-                          <button
-                            type="button"
-                            disabled={isSending}
-                            onClick={handleRegenerateLast}
-                            className="px-2.5 py-1 rounded-lg border flex items-center gap-1 cursor-pointer hover:opacity-85 disabled:opacity-45"
-                            style={{ borderColor: borderCol, color: mutedText }}
-                          >
-                            <RefreshCw className="h-3 w-3" />
-                            <span>Regenerate</span>
-                          </button>
-
-                          <span className="mx-1 opacity-40" style={{ color: mutedText }}>
-                            |
-                          </span>
-
-                          <button
-                            type="button"
-                            onClick={() => onSendToStudio("script", msg.content)}
-                            className="px-2.5 py-1 rounded-lg border flex items-center gap-1 font-semibold cursor-pointer"
-                            style={{ borderColor: borderCol, color: primaryText }}
-                            title="Load into Source Script Input & switch to Automation Studio"
-                          >
-                            <PenLine className="h-3 w-3" style={{ color: theme.accentColor }} />
-                            <span>Use in Script</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => onSendToStudio("scenes", msg.content)}
-                            className="px-2.5 py-1 rounded-lg border flex items-center gap-1 font-semibold cursor-pointer"
-                            style={{ borderColor: borderCol, color: primaryText }}
-                            title="Load into Scene Script Input & switch to Automation Studio"
-                          >
-                            <Clapperboard className="h-3 w-3" style={{ color: theme.secondaryAccentColor }} />
-                            <span>Use in Scenes</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => onSendToStudio("ctr", msg.content)}
-                            className="px-2.5 py-1 rounded-lg border flex items-center gap-1 font-semibold cursor-pointer"
-                            style={{ borderColor: borderCol, color: primaryText }}
-                            title="Load into Video Script Input for CTR & SEO metadata"
-                          >
-                            <TrendingUp className="h-3 w-3" style={{ color: theme.accentColor }} />
-                            <span>Use in CTR</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => onSendToStudio("thumbnail", msg.content)}
-                            className="px-2.5 py-1 rounded-lg border flex items-center gap-1 font-semibold cursor-pointer"
-                            style={{ borderColor: borderCol, color: primaryText }}
-                            title="Load into Thumbnail Brief Input"
-                          >
-                            <ImageIcon className="h-3 w-3" style={{ color: theme.secondaryAccentColor }} />
-                            <span>Thumbnail</span>
-                          </button>
-                        </div>
+                            <button
+                              type="button"
+                              onClick={() => onSendToStudio("script", msg.content)}
+                              className="px-2.5 py-1 rounded-lg border flex items-center gap-1 font-semibold cursor-pointer"
+                              style={{ borderColor: borderCol, color: primaryText }}
+                              title="Load into Source Script Input & switch to Automation Studio"
+                            >
+                              <PenLine className="h-3 w-3" style={{ color: theme.accentColor }} />
+                              <span>Use in Script</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => onSendToStudio("scenes", msg.content)}
+                              className="px-2.5 py-1 rounded-lg border flex items-center gap-1 font-semibold cursor-pointer"
+                              style={{ borderColor: borderCol, color: primaryText }}
+                              title="Load into Scene Script Input & switch to Automation Studio"
+                            >
+                              <Clapperboard className="h-3 w-3" style={{ color: theme.secondaryAccentColor }} />
+                              <span>Use in Scenes</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => onSendToStudio("ctr", msg.content)}
+                              className="px-2.5 py-1 rounded-lg border flex items-center gap-1 font-semibold cursor-pointer"
+                              style={{ borderColor: borderCol, color: primaryText }}
+                              title="Load into Video Script Input for CTR & SEO metadata"
+                            >
+                              <TrendingUp className="h-3 w-3" style={{ color: theme.accentColor }} />
+                              <span>Use in CTR</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => onSendToStudio("thumbnail", msg.content)}
+                              className="px-2.5 py-1 rounded-lg border flex items-center gap-1 font-semibold cursor-pointer"
+                              style={{ borderColor: borderCol, color: primaryText }}
+                              title="Load into Thumbnail Brief Input"
+                            >
+                              <ImageIcon className="h-3 w-3" style={{ color: theme.secondaryAccentColor }} />
+                              <span>Thumbnail</span>
+                            </button>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -2137,8 +3041,11 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
 
               <div className="pt-1">
                 <RenderingProgressBar
-                  active={isSending}
-                  title="GENERATING"
+                  active={
+                    isSending &&
+                    !activeSession.messages[activeSession.messages.length - 1]?.content?.trim()
+                  }
+                  title="CONNECTING"
                   accentColor={theme.accentColor}
                   secondaryAccentColor={theme.secondaryAccentColor}
                   textColor={primaryText}
@@ -2146,9 +3053,9 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
                   stages={[
                     `Connecting to ${activeChoiceDisplay.label}...`,
                     selectedChoice.provider === "local"
-                      ? "Running local inference..."
-                      : "Generating cloud response...",
-                    "Formatting reply...",
+                      ? "Preparing local GGUF context..."
+                      : "Opening real-time token stream...",
+                    "Starting flagship response...",
                   ]}
                 />
               </div>
@@ -2339,49 +3246,51 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
           </div>
         )}
 
-        {(attachedImage || attachedDriveImage || attachedFileText) && (
+        {(attachedImages.length > 0 || attachedDriveImages.length > 0 || attachedFileText) && (
           <div className="px-4 pt-3 flex flex-wrap gap-2">
-            {attachedImage && (
+            {attachedImages.map((img, idx) => (
               <div
+                key={`local-ref-${idx}-${img.name}`}
                 className="inline-flex items-center gap-2 px-2.5 py-1 rounded-xl border text-xs"
                 style={{ borderColor: borderCol, backgroundColor: sidebarBg }}
               >
                 <img
-                  src={attachedImage.dataUrl}
-                  alt={attachedImage.name}
+                  src={img.dataUrl}
+                  alt={img.name}
                   className="h-5 w-5 rounded object-cover"
                 />
-                <span className="truncate max-w-[160px]">{attachedImage.name}</span>
+                <span className="truncate max-w-[160px]">{img.name}</span>
                 <button
                   type="button"
-                  onClick={() => setAttachedImage(null)}
+                  onClick={() => setAttachedImages((prev) => prev.filter((_, i) => i !== idx))}
                   className="cursor-pointer opacity-75 hover:opacity-100"
                 >
                   <X className="h-3 w-3" />
                 </button>
               </div>
-            )}
-            {attachedDriveImage && (
+            ))}
+            {attachedDriveImages.map((drv, idx) => (
               <div
+                key={`drv-ref-${drv.fileId}-${idx}`}
                 className="inline-flex items-center gap-2 px-2.5 py-1 rounded-xl border text-xs"
                 style={{ borderColor: borderCol, backgroundColor: sidebarBg }}
               >
                 <img
-                  src={attachedDriveImage.previewUrl}
-                  alt={attachedDriveImage.name}
+                  src={drv.previewUrl}
+                  alt={drv.name}
                   className="h-5 w-5 rounded object-cover"
                 />
                 <Link2 className="h-3 w-3 shrink-0" style={{ color: theme.secondaryAccentColor }} />
-                <span className="truncate max-w-[160px]">{attachedDriveImage.name}</span>
+                <span className="truncate max-w-[160px]">{drv.name}</span>
                 <button
                   type="button"
-                  onClick={() => setAttachedDriveImage(null)}
+                  onClick={() => setAttachedDriveImages((prev) => prev.filter((_, i) => i !== idx))}
                   className="cursor-pointer opacity-75 hover:opacity-100"
                 >
                   <X className="h-3 w-3" />
                 </button>
               </div>
-            )}
+            ))}
             {attachedFileText && (
               <div
                 className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl border text-xs font-mono"
@@ -2398,6 +3307,41 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
                 </button>
               </div>
             )}
+          </div>
+        )}
+
+        {(isListening || voiceConnecting) && (
+          <div
+            className="mx-3.5 mt-3 px-3 py-2 rounded-xl border text-xs font-mono flex items-center justify-between gap-2"
+            style={{
+              borderColor: theme.secondaryAccentColor,
+              backgroundColor: `${theme.secondaryAccentColor}15`,
+              color: primaryText,
+            }}
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <span
+                className="h-2 w-2 rounded-full animate-pulse shrink-0"
+                style={{ backgroundColor: voiceConnecting ? theme.accentColor : theme.secondaryAccentColor }}
+              />
+              <span className="font-bold shrink-0">
+                {voiceConnecting
+                  ? "Connecting Gemini Live..."
+                  : voiceMode === "translate"
+                  ? `Live Translate (${voiceTargetLang.toUpperCase()})`
+                  : "Transcribe Live"}
+              </span>
+              {liveInterimText && (
+                <span className="truncate opacity-85 italic">{liveInterimText}</span>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={stopLiveVoice}
+              className="px-2 py-0.5 rounded-lg bg-red-600 text-white text-[10px] font-bold cursor-pointer shrink-0"
+            >
+              Stop
+            </button>
           </div>
         )}
 
@@ -2439,13 +3383,17 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
                 onClick={() => setShowDriveLinkInput((v) => !v)}
                 className="h-8 px-2.5 rounded-full border flex items-center gap-1 text-xs cursor-pointer transition-colors hover:opacity-90"
                 style={{
-                  borderColor: showDriveLinkInput ? theme.secondaryAccentColor : borderCol,
+                  borderColor: showDriveLinkInput || attachedDriveImages.length > 0 ? theme.secondaryAccentColor : borderCol,
                   color: primaryText,
                 }}
-                title="Attach a public Google Drive image link (0 KB Firebase storage)"
+                title="Attach up to 6 public Google Drive reference image links (0 KB Firebase storage)"
               >
                 <Link2 className="h-3.5 w-3.5" style={{ color: theme.secondaryAccentColor }} />
-                <span className="hidden sm:inline font-medium">Drive Image</span>
+                <span className="hidden sm:inline font-medium">
+                  {attachedDriveImages.length > 0
+                    ? `Drive Ref (${attachedDriveImages.length}/6)`
+                    : "Drive Ref"}
+                </span>
               </button>
             )}
 
@@ -2675,11 +3623,11 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
                             color: primaryText,
                           }}
                         >
-                          <option value="auto">Auto</option>
-                          <option value="100">~100 words</option>
+                          <option value="auto">Auto (Full Depth)</option>
                           <option value="300">~300 words</option>
-                          <option value="600">~600 words</option>
-                          <option value="1200">~1200 words</option>
+                          <option value="800">~800 words</option>
+                          <option value="1500">~1500 words</option>
+                          <option value="3000+">~3000+ words (Long-Form)</option>
                         </select>
                       </div>
 
@@ -2831,31 +3779,124 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
               )}
             </div>
 
-            <button
-              type="button"
-              onClick={handleToggleVoice}
-              className="h-8 w-8 rounded-full border flex items-center justify-center cursor-pointer transition-colors"
+            {/* Gemini Live Voice Controls: Transcribe Live & Live Translate */}
+            <div
+              className="flex items-center gap-1 rounded-full border px-1.5 py-0.5"
               style={{
                 borderColor: isListening ? theme.accentColor : borderCol,
-                color: isListening ? theme.accentColor : mutedText,
+                backgroundColor: isLight ? "#F8FAFC" : "#212121",
               }}
-              title={isListening ? "Stop voice input" : "Voice dictation"}
             >
-              {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-            </button>
+              <select
+                value={voiceMode}
+                disabled={isListening || voiceConnecting}
+                onChange={(e) => setVoiceMode(e.target.value as "transcribe" | "translate")}
+                className="bg-transparent text-[11px] font-medium focus:outline-none cursor-pointer px-1 disabled:opacity-60"
+                style={{
+                  colorScheme: isLight ? "light" : "dark",
+                  color: primaryText,
+                }}
+                title="Choose Gemini 3.5 Live Voice Model"
+              >
+                <option value="transcribe" style={{ backgroundColor: composerBg, color: primaryText }}>
+                  Transcribe Live
+                </option>
+                <option value="translate" style={{ backgroundColor: composerBg, color: primaryText }}>
+                  Live Translate
+                </option>
+              </select>
 
-            <button
-              type="submit"
-              disabled={
-                isSending ||
-                (!promptInput.trim() && !attachedImage && !attachedDriveImage && !attachedFileText)
-              }
-              className="h-8 w-8 rounded-full flex items-center justify-center text-white cursor-pointer disabled:opacity-40 transition-transform active:scale-95"
-              style={{ backgroundColor: theme.secondaryAccentColor }}
-              title="Send message"
-            >
-              <ArrowUp className="h-4 w-4" />
-            </button>
+              {voiceMode === "translate" && (
+                <>
+                  <Languages className="h-3 w-3 shrink-0 opacity-75" style={{ color: theme.secondaryAccentColor }} />
+                  <select
+                    value={voiceTargetLang}
+                    disabled={isListening || voiceConnecting}
+                    onChange={(e) => setVoiceTargetLang(e.target.value)}
+                    className="bg-transparent text-[11px] font-medium focus:outline-none cursor-pointer pr-1 disabled:opacity-60"
+                    style={{
+                      colorScheme: isLight ? "light" : "dark",
+                      color: primaryText,
+                    }}
+                    title="Target Translation Language"
+                  >
+                    <option value="en" style={{ backgroundColor: composerBg, color: primaryText }}>EN</option>
+                    <option value="ur" style={{ backgroundColor: composerBg, color: primaryText }}>UR</option>
+                    <option value="hi" style={{ backgroundColor: composerBg, color: primaryText }}>HI</option>
+                    <option value="ar" style={{ backgroundColor: composerBg, color: primaryText }}>AR</option>
+                    <option value="es" style={{ backgroundColor: composerBg, color: primaryText }}>ES</option>
+                    <option value="fr" style={{ backgroundColor: composerBg, color: primaryText }}>FR</option>
+                    <option value="de" style={{ backgroundColor: composerBg, color: primaryText }}>DE</option>
+                    <option value="tr" style={{ backgroundColor: composerBg, color: primaryText }}>TR</option>
+                    <option value="pt" style={{ backgroundColor: composerBg, color: primaryText }}>PT</option>
+                    <option value="zh" style={{ backgroundColor: composerBg, color: primaryText }}>ZH</option>
+                    <option value="ja" style={{ backgroundColor: composerBg, color: primaryText }}>JA</option>
+                    <option value="ko" style={{ backgroundColor: composerBg, color: primaryText }}>KO</option>
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => setVoiceSpeakerEnabled((v) => !v)}
+                    className="p-1 rounded-full cursor-pointer opacity-80 hover:opacity-100"
+                    style={{ color: voiceSpeakerEnabled ? theme.secondaryAccentColor : mutedText }}
+                    title={voiceSpeakerEnabled ? "Translated audio playback ON" : "Translated audio playback muted (text only)"}
+                  >
+                    {voiceSpeakerEnabled ? <Volume2 className="h-3 w-3" /> : <VolumeX className="h-3 w-3" />}
+                  </button>
+                </>
+              )}
+
+              <button
+                type="button"
+                onClick={() => void handleToggleVoice()}
+                className="h-7 w-7 rounded-full flex items-center justify-center cursor-pointer transition-colors"
+                style={{
+                  backgroundColor: isListening ? theme.accentColor : "transparent",
+                  color: isListening ? "#FFFFFF" : voiceConnecting ? theme.accentColor : mutedText,
+                }}
+                title={
+                  isListening
+                    ? "Stop Gemini Live Voice"
+                    : voiceMode === "translate"
+                    ? "Start Gemini 3.5 Live Translate"
+                    : "Start Gemini 3.5 Transcribe Live"
+                }
+              >
+                {voiceConnecting ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : isListening ? (
+                  <MicOff className="h-3.5 w-3.5" />
+                ) : (
+                  <Mic className="h-3.5 w-3.5" />
+                )}
+              </button>
+            </div>
+
+            {isSending ? (
+              <button
+                type="button"
+                onClick={handleStopGenerating}
+                className="h-8 w-8 rounded-full flex items-center justify-center text-white cursor-pointer transition-transform active:scale-95"
+                style={{ backgroundColor: theme.accentColor }}
+                title="Stop generating"
+              >
+                <Square className="h-3.5 w-3.5 fill-current" />
+              </button>
+            ) : (
+              <button
+                type="submit"
+                disabled={
+                  !promptInput.trim() &&
+                  attachedImages.length === 0 &&
+                  attachedDriveImages.length === 0 &&
+                  !attachedFileText
+                }
+                className="h-8 w-8 rounded-full flex items-center justify-center text-white cursor-pointer disabled:opacity-40 transition-transform active:scale-95"
+                style={{ backgroundColor: theme.secondaryAccentColor }}
+                title="Send message"
+              >
+                <ArrowUp className="h-4 w-4" />
+              </button>
+            )}
           </div>
         </div>
       </form>

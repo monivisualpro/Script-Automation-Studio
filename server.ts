@@ -1,7 +1,8 @@
 import express from "express";
 import fs from "fs";
 import path from "path";
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type, Modality, LiveServerMessage } from "@google/genai";
+import { WebSocketServer, WebSocket as WsWebSocket } from "ws";
 import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
 import { loadFirebaseServerConfig } from "./server/firebaseConfig.js";
@@ -18,11 +19,13 @@ import { validateSafeExternalUrl } from "./server/urlValidator.js";
 import {
   executeMultiProviderGeneration,
   executeMultiProviderChat,
+  executeMultiProviderChatStream,
   ChatTurnMessage,
   AIProviderConfig,
   AIProviderType,
   formatProviderErrorMessage,
   sanitizeApiKey,
+  createGeminiSdkClient,
   extractJsonObject,
 } from "./server/multiProvider.js";
 import {
@@ -167,6 +170,93 @@ function invalidateUserAuthCache(uid: string): void {
   userAuthKeyCache.delete(uid);
 }
 
+// Resilient server-side encrypted key vault (supplements Firestore so personal encrypted API keys
+// remain reliable even when Firestore rules or Firestore API are not yet enabled on the Cloud project).
+const USER_KEYS_VAULT_FILE = path.resolve(process.cwd(), ".aistudio", "user-keys-vault.json");
+
+interface VaultKeyRecord {
+  uid: string;
+  activeProvider: AIProviderType;
+  activeModel: string;
+  baseUrl: string;
+  encryptedApiKey: string | null;
+  apiKeyMasked: string | null;
+  hasApiKey: boolean;
+  modelSettings?: Record<string, any>;
+  updatedAt: string;
+}
+
+const userKeysVault = new Map<string, VaultKeyRecord>();
+
+function loadUserKeysVault(): void {
+  try {
+    if (fs.existsSync(USER_KEYS_VAULT_FILE)) {
+      const raw = fs.readFileSync(USER_KEYS_VAULT_FILE, "utf8");
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        for (const [uid, entry] of Object.entries(parsed)) {
+          if (entry && typeof entry === "object") {
+            userKeysVault.set(uid, entry as VaultKeyRecord);
+          }
+        }
+      }
+    }
+  } catch {
+    // ignore vault load errors
+  }
+}
+
+function saveUserKeysVault(): void {
+  try {
+    const dir = path.dirname(USER_KEYS_VAULT_FILE);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    const obj: Record<string, VaultKeyRecord> = {};
+    for (const [uid, rec] of userKeysVault.entries()) {
+      obj[uid] = rec;
+    }
+    fs.writeFileSync(USER_KEYS_VAULT_FILE, JSON.stringify(obj, null, 2), {
+      encoding: "utf8",
+      mode: 0o600,
+    });
+  } catch {
+    // ignore vault write errors
+  }
+}
+
+loadUserKeysVault();
+
+function getUserKeyVaultRecord(uid: string): VaultKeyRecord | undefined {
+  return userKeysVault.get(uid);
+}
+
+function upsertUserKeyVaultRecord(uid: string, partial: Partial<VaultKeyRecord>): VaultKeyRecord {
+  const existing = userKeysVault.get(uid);
+  const merged: VaultKeyRecord = {
+    uid,
+    activeProvider: partial.activeProvider ?? existing?.activeProvider ?? "gemini",
+    activeModel: partial.activeModel ?? existing?.activeModel ?? "",
+    baseUrl: partial.baseUrl ?? existing?.baseUrl ?? "",
+    encryptedApiKey:
+      partial.encryptedApiKey !== undefined ? partial.encryptedApiKey : existing?.encryptedApiKey ?? null,
+    apiKeyMasked:
+      partial.apiKeyMasked !== undefined ? partial.apiKeyMasked : existing?.apiKeyMasked ?? null,
+    hasApiKey: partial.hasApiKey ?? existing?.hasApiKey ?? false,
+    modelSettings: partial.modelSettings ?? existing?.modelSettings,
+    updatedAt: partial.updatedAt ?? new Date().toISOString(),
+  };
+  userKeysVault.set(uid, merged);
+  saveUserKeysVault();
+  return merged;
+}
+
+function deleteUserKeyVaultRecord(uid: string): void {
+  if (userKeysVault.delete(uid)) {
+    saveUserKeysVault();
+  }
+}
+
 // Periodic cleanup of expired rate-limit buckets and cache entries every 5 minutes
 setInterval(() => {
   const now = Date.now();
@@ -262,6 +352,28 @@ export function resolveRequestProviderConfig(req: express.Request, fallbackKey?:
     provider: "gemini",
     apiKey: cleanFallback || "",
     allowEnvFallback: isStandaloneMode,
+  };
+}
+
+function resolveNicheDirective(rawNiche?: string): {
+  isAuto: boolean;
+  label: string;
+  promptText: string;
+} {
+  const clean = typeof rawNiche === "string" ? rawNiche.trim() : "";
+  const lower = clean.toLowerCase();
+  if (!clean || lower === "none" || lower.startsWith("none (auto")) {
+    return {
+      isAuto: true,
+      label: "Auto-Detect by Topic",
+      promptText:
+        "Auto-detect directly from the user's topic or source script (adapt vocabulary, tone, domain context, and visual aesthetics automatically to match the core subject)",
+    };
+  }
+  return {
+    isAuto: false,
+    label: clean.slice(0, 100),
+    promptText: clean.slice(0, 100),
   };
 }
 
@@ -376,24 +488,36 @@ async function verifyUserAuth(req: AuthenticatedRequest, res: express.Response, 
     const userInfo = await verifyAuthToken(token);
     req.userAuth = userInfo;
 
-    // Retrieve user document from Firestore to get encrypted API key
-    const userDocSnap = await getFirestoreDoc("users", userInfo.uid, token);
-
-    if (!userDocSnap.exists || !userDocSnap.data) {
-      return res.status(403).json({ error: "User account profile not found. Please log in again." });
+    // Retrieve user document from Firestore (with resilient fallback to server encrypted vault)
+    let userData: Record<string, any> | null = null;
+    try {
+      const userDocSnap = await getFirestoreDoc("users", userInfo.uid, token);
+      if (userDocSnap.exists && userDocSnap.data) {
+        userData = userDocSnap.data;
+      }
+    } catch (fsReadErr) {
+      logSafeError("Firestore profile read skipped (checking encrypted vault):", fsReadErr);
     }
 
-    const userData = userDocSnap.data;
+    const vaultRecord = getUserKeyVaultRecord(userInfo.uid);
+    const mergedUserData: Record<string, any> = {
+      ...(vaultRecord || {}),
+      ...(userData || {}),
+      encryptedApiKey: userData?.encryptedApiKey || vaultRecord?.encryptedApiKey || null,
+      apiKeyMasked: userData?.apiKeyMasked || vaultRecord?.apiKeyMasked || null,
+      activeProvider: userData?.activeProvider || vaultRecord?.activeProvider || "gemini",
+    };
+
     upsertDirectoryUser(userInfo.uid, {
-      name: userData.name || userInfo.name || "User",
-      email: userData.email || userInfo.email || "No email",
-      provider: userData.provider || "password",
-      hasApiKey: Boolean(userData.encryptedApiKey || userData.apiKeyMasked),
-      apiKeyMasked: userData.apiKeyMasked || null,
-      createdAt: userData.createdAt || null,
-      updatedAt: userData.updatedAt || null,
+      name: mergedUserData.name || userInfo.name || "User",
+      email: mergedUserData.email || userInfo.email || "No email",
+      provider: mergedUserData.provider || "password",
+      hasApiKey: Boolean(mergedUserData.encryptedApiKey || mergedUserData.apiKeyMasked),
+      apiKeyMasked: mergedUserData.apiKeyMasked || null,
+      createdAt: mergedUserData.createdAt || null,
+      updatedAt: mergedUserData.updatedAt || null,
     });
-    const encryptedKey = userData.encryptedApiKey;
+    const encryptedKey = mergedUserData.encryptedApiKey;
 
     if (!encryptedKey) {
       return res.status(403).json({
@@ -410,10 +534,11 @@ async function verifyUserAuth(req: AuthenticatedRequest, res: express.Response, 
       });
     }
 
-    // Auto-migrate legacy record: re-encrypt using ENCRYPTION_SECRET and update Firestore
+    // Auto-migrate legacy record: re-encrypt using ENCRYPTION_SECRET and update Firestore + vault
     if (isLegacy) {
       try {
         const reEncryptedKey = encryptApiKey(plainKey);
+        upsertUserKeyVaultRecord(userInfo.uid, { encryptedApiKey: reEncryptedKey });
         await updateFirestoreDoc("users", userInfo.uid, {
           encryptedApiKey: reEncryptedKey,
           updatedAt: new Date().toISOString(),
@@ -424,8 +549,8 @@ async function verifyUserAuth(req: AuthenticatedRequest, res: express.Response, 
     }
 
     const savedProvider: AIProviderType =
-      userData.activeProvider === "openai" || userData.activeProvider === "claude" || userData.activeProvider === "gemini"
-        ? userData.activeProvider
+      mergedUserData.activeProvider === "openai" || mergedUserData.activeProvider === "claude" || mergedUserData.activeProvider === "gemini"
+        ? mergedUserData.activeProvider
         : "gemini";
 
     // Store in 5-minute cache to protect Firebase Spark daily read quota
@@ -506,14 +631,32 @@ function formatGeminiErrorMessage(err: any): string {
 // Wrapper to call Gemini API with automatic retry and exponential backoff using user's AI client
 async function generateContentWithRetry(ai: GoogleGenAI, params: any, maxRetries = 3, delayMs = 1500) {
   let attempt = 0;
+  let activeAi = ai;
+  let triedVertexExpress = false;
   while (true) {
     try {
-      return await ai.models.generateContent(params);
+      return await activeAi.models.generateContent(params);
     } catch (error: any) {
+      const errStr = String(error?.message || error);
+      const rawKey = (activeAi as any)?.apiKey || "";
+      if (
+        !triedVertexExpress &&
+        typeof rawKey === "string" &&
+        rawKey.startsWith("AQ.") &&
+        (errStr.includes("API_KEY_INVALID") ||
+          errStr.includes("API key not valid") ||
+          errStr.includes("API keys are not supported") ||
+          errStr.includes("UNAUTHENTICATED") ||
+          errStr.includes("PERMISSION_DENIED"))
+      ) {
+        triedVertexExpress = true;
+        activeAi = createGeminiSdkClient(rawKey, true);
+        continue;
+      }
+
       attempt++;
       logSafeError(`Gemini API call failed (attempt ${attempt}/${maxRetries}):`, error);
 
-      const errStr = String(error?.message || error);
       // Fail fast on fatal auth / permission / restriction errors
       if (
         errStr.includes("API_KEY_SERVICE_BLOCKED") ||
@@ -721,7 +864,8 @@ app.post("/api/user/save-key", writeRateLimiter, async (req, res) => {
       : maskApiKey(trimmedKey);
 
     const nowIso = new Date().toISOString();
-    await updateFirestoreDoc("users", userInfo.uid, {
+
+    upsertUserKeyVaultRecord(userInfo.uid, {
       activeProvider: providerType,
       activeModel: trimmedModel,
       baseUrl: trimmedBaseUrl,
@@ -729,7 +873,21 @@ app.post("/api/user/save-key", writeRateLimiter, async (req, res) => {
       apiKeyMasked: masked,
       hasApiKey: true,
       updatedAt: nowIso,
-    }, token);
+    });
+
+    try {
+      await updateFirestoreDoc("users", userInfo.uid, {
+        activeProvider: providerType,
+        activeModel: trimmedModel,
+        baseUrl: trimmedBaseUrl,
+        encryptedApiKey: encrypted,
+        apiKeyMasked: masked,
+        hasApiKey: true,
+        updatedAt: nowIso,
+      }, token);
+    } catch (fsWriteErr) {
+      logSafeError("Firestore save-key sync notice (saved securely in server vault):", fsWriteErr);
+    }
 
     upsertDirectoryUser(userInfo.uid, {
       name: userInfo.name,
@@ -738,12 +896,70 @@ app.post("/api/user/save-key", writeRateLimiter, async (req, res) => {
       apiKeyMasked: masked,
       updatedAt: nowIso,
     });
-    invalidateUserAuthCache(userInfo.uid);
 
-    return res.json({ success: true, activeProvider: providerType, apiKeyMasked: masked });
+    userAuthKeyCache.set(userInfo.uid, {
+      uid: userInfo.uid,
+      email: userInfo.email,
+      name: userInfo.name,
+      emailVerified: userInfo.emailVerified,
+      plainApiKey: trimmedKey,
+      activeProvider: providerType,
+      tokenHash: token.slice(-32),
+      expiresAt: Date.now() + USER_AUTH_CACHE_TTL_MS,
+    });
+
+    return res.json({
+      success: true,
+      activeProvider: providerType,
+      activeModel: trimmedModel,
+      baseUrl: trimmedBaseUrl,
+      apiKeyMasked: masked,
+      hasApiKey: true,
+    });
   } catch (error: any) {
     logSafeError("Error saving API Key / Provider:", error);
-    return res.status(500).json({ error: "Failed to save API key / provider settings." });
+    return res.status(500).json({ error: error?.message || "Failed to save API key / provider settings." });
+  }
+});
+
+app.get("/api/user/profile-status", async (req, res) => {
+  try {
+    if (isStandaloneMode) {
+      return res.json({ standalone: true, hasApiKey: true });
+    }
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ error: "Authentication required." });
+    }
+    const token = authHeader.substring(7);
+    const userInfo = await verifyAuthToken(token);
+
+    let fsData: Record<string, any> | null = null;
+    try {
+      const snap = await getFirestoreDoc("users", userInfo.uid, token);
+      if (snap.exists && snap.data) fsData = snap.data;
+    } catch {
+      // ignore Firestore unavailable
+    }
+
+    const vault = getUserKeyVaultRecord(userInfo.uid);
+    const hasApiKey = Boolean(fsData?.encryptedApiKey || fsData?.apiKeyMasked || vault?.encryptedApiKey || vault?.apiKeyMasked);
+    const apiKeyMasked = fsData?.apiKeyMasked || vault?.apiKeyMasked || null;
+    const activeProvider = fsData?.activeProvider || vault?.activeProvider || "gemini";
+    const activeModel = fsData?.activeModel || vault?.activeModel || "";
+    const baseUrl = fsData?.baseUrl || vault?.baseUrl || "";
+    const modelSettings = fsData?.modelSettings || vault?.modelSettings || null;
+
+    return res.json({
+      hasApiKey,
+      apiKeyMasked,
+      activeProvider,
+      activeModel,
+      baseUrl,
+      modelSettings,
+    });
+  } catch {
+    return res.status(401).json({ error: "Invalid authentication." });
   }
 });
 
@@ -767,12 +983,23 @@ app.post("/api/user/remove-key", writeRateLimiter, async (req, res) => {
     const userInfo = await verifyAuthToken(token);
 
     const nowIso = new Date().toISOString();
-    await updateFirestoreDoc("users", userInfo.uid, {
+    upsertUserKeyVaultRecord(userInfo.uid, {
       encryptedApiKey: null,
       apiKeyMasked: null,
       hasApiKey: false,
       updatedAt: nowIso,
-    }, token);
+    });
+
+    try {
+      await updateFirestoreDoc("users", userInfo.uid, {
+        encryptedApiKey: null,
+        apiKeyMasked: null,
+        hasApiKey: false,
+        updatedAt: nowIso,
+      }, token);
+    } catch (fsErr) {
+      logSafeError("Firestore remove-key sync notice:", fsErr);
+    }
 
     upsertDirectoryUser(userInfo.uid, {
       name: userInfo.name,
@@ -786,7 +1013,7 @@ app.post("/api/user/remove-key", writeRateLimiter, async (req, res) => {
     return res.json({ success: true });
   } catch (error: any) {
     logSafeError("Error removing API Key:", error);
-    return res.status(500).json({ error: "Failed to remove API Key." });
+    return res.status(500).json({ error: "Failed to remove API key." });
   }
 });
 
@@ -1134,10 +1361,20 @@ app.post("/api/user/model-settings", writeRateLimiter, async (req, res) => {
       return res.status(400).json({ error: "Model settings required." });
     }
 
-    await updateFirestoreDoc("users", userInfo.uid, {
+    const nowIso = new Date().toISOString();
+    upsertUserKeyVaultRecord(userInfo.uid, {
       modelSettings,
-      updatedAt: new Date().toISOString(),
-    }, token);
+      updatedAt: nowIso,
+    });
+
+    try {
+      await updateFirestoreDoc("users", userInfo.uid, {
+        modelSettings,
+        updatedAt: nowIso,
+      }, token);
+    } catch (fsErr) {
+      logSafeError("Firestore model-settings sync notice:", fsErr);
+    }
 
     return res.json({ success: true });
   } catch (error: any) {
@@ -1157,7 +1394,12 @@ app.post("/api/user/delete-account", writeRateLimiter, async (req, res) => {
 
     invalidateUserAuthCache(userInfo.uid);
     removeDirectoryUser(userInfo.uid);
-    await deleteFirestoreDoc("users", userInfo.uid, token);
+    deleteUserKeyVaultRecord(userInfo.uid);
+    try {
+      await deleteFirestoreDoc("users", userInfo.uid, token);
+    } catch (fsErr) {
+      logSafeError("Firestore delete-account sync notice:", fsErr);
+    }
 
     return res.json({ success: true });
   } catch (error: any) {
@@ -1694,7 +1936,7 @@ app.post("/api/generate", verifyUserAuth as express.RequestHandler, aiBurstLimit
      * If the selected transformation option is "english": "Friends, if you liked this video, please like it, and for more informative videos like this, be sure to subscribe to our channel and don't forget to press the bell icon."
      * For any other selected transformation option ("${transOpt}"): Translate and adapt that exact subscription call-to-action naturally into ${selectedLangMeta.name} (${selectedLangMeta.script}).`;
 
-      // System Instructions to guide the voice persona, plagiarism-free requirement, language, structure, etc.
+      const nicheDirective = resolveNicheDirective(topicNiche);
       const systemInstruction = `
 You are an elite, professional Script Automation Engineer and Creative Rephraser.
 Your goal is to completely transform the user's RAW input script into a pristine, high-engagement, 100% unique, plagiarism-free script for social media (YouTube, Facebook, etc.).
@@ -1716,9 +1958,9 @@ Strict rules for formatting and content:
    - Selected Audience Tier: "${getTargetAudienceDirective(targetAudience).label}" (ID: "${targetAudience || "all"}")
    - ${getTargetAudienceDirective(targetAudience).directive}
 5. Tone / Niche Theme:
-   - Topic Niche: "${topicNiche}"
+   - Topic Niche: "${nicheDirective.promptText}"
    - Tutorial & Literature Tone: "${tutorialTone}"
-   - Align the rhythm, vocabulary, and metaphors with this category.
+   - Align the rhythm, vocabulary, and metaphors with this ${nicheDirective.isAuto ? "topic's natural domain" : "category"}.
 6. EXACT TARGET WORD COUNT ENFORCEMENT (HARD LIMIT — CRITICAL):
    - Exact Target Word Count: ${targetWords} words (HARD ALLOWED RANGE: ${minWords} to ${maxWords} words TOTAL).
    - Every word in your entire response (greeting + hook + body + outro) counts toward this ${targetWords}-word total.
@@ -1761,7 +2003,7 @@ RAW SOURCE SCRIPT:
 ${rawScript}
 """
 
-Ensure the output is 100% plagiarism-free, customized for a ${voicePersona} speaker, written in the "${transOpt}" format, strictly tailored for the target audience "${getTargetAudienceDirective(targetAudience).label}", following the "${topicNiche}" niche and "${tutorialTone}" tone, respects the structure mode above, and hits the exact word count target of ${targetWords} words (${minWords}–${maxWords} words).
+Ensure the output is 100% plagiarism-free, customized for a ${voicePersona} speaker, written in the "${transOpt}" format, strictly tailored for the target audience "${getTargetAudienceDirective(targetAudience).label}", ${nicheDirective.isAuto ? "automatically aligned to the topic/subject of the source script" : `following the "${nicheDirective.label}" niche`} and "${tutorialTone}" tone, respects the structure mode above, and hits the exact word count target of ${targetWords} words (${minWords}–${maxWords} words).
 `;
 
       const genResult = await executeMultiProviderGeneration({
@@ -1871,10 +2113,11 @@ app.post("/api/generate-topic", verifyUserAuth as express.RequestHandler, aiBurs
     const modelToUse = req.body.model || "gemini-3.1-flash-lite";
     const providerConfig = req.providerConfig || resolveRequestProviderConfig(req, req.userApiKey);
 
+    const topicNicheInfo = resolveNicheDirective(topicNiche);
     const result = await executeMultiProviderGeneration({
       prompt: `Generate a detailed, high-quality script on the topic: "${topic.slice(0, 1000)}".
 STRICT WORD COUNT REQUIREMENT: Write EXACTLY ${targetWords} words (total output MUST be between ${minWords} and ${maxWords} words — do NOT exceed ${maxWords} words).
-Target Niche/Domain: "${(topicNiche || "General").slice(0, 100)}"
+Target Niche/Domain: "${topicNicheInfo.promptText}"
 Tone/Vibe: "${(tutorialTone || "Warm Friendly Conversational").slice(0, 100)}"
 ${audienceInfo.directive}
 Adapt the vocabulary, sentence pacing, examples, and tone specifically for "${audienceInfo.label}". Write directly as clean raw content ready for voiceover and script transformation. Return ONLY the script text itself with no preamble or word count note.`,
@@ -2099,7 +2342,8 @@ app.post("/api/generate-scenes", verifyUserAuth as express.RequestHandler, aiBur
       return res.status(400).json({ error: "Transcript exceeds the maximum length limit of 100,000 characters." });
     }
     const count = parseInt(numScenes) || 10;
-    const cat = category || "General";
+    const catInfo = resolveNicheDirective(category);
+    const cat = catInfo.promptText;
     const linesCount = Math.min(50, Math.max(3, parseInt(promptLineCount) || 15));
 
     const ai = req.userAiClient!;
@@ -2229,9 +2473,10 @@ app.post("/api/regenerate-scene", verifyUserAuth as express.RequestHandler, aiBu
 - Visual descriptions should reflect a respectful, peaceful, and clean Islamic environment (e.g., beautiful Islamic architectures, mosques, clean peaceful homes, or serene natural backgrounds).
 ` : "";
 
+    const sceneNicheInfo = resolveNicheDirective(category);
     const prompt = `
 You are an expert AI prompt engineer specializing in cinematic Text-to-Video models.
-Regenerate Scene ${sceneNumber} out of ${totalScenes} for a storyboard with content category "${category}".
+Regenerate Scene ${sceneNumber} out of ${totalScenes} for a storyboard with content category: "${sceneNicheInfo.promptText}".
 ${formatInstruction}
 ${islamicSceneInstruction}
 Ensure this scene has smooth visual and narrative continuity with preceding and succeeding scenes based on the overall transcript.
@@ -2602,7 +2847,7 @@ Design parameters to integrate:
 - Thumbnail Text Headline (Reference/Guideline): ${headline || "None specified"}
 - Small Tagline text: ${smallTagline || "None specified"}
 - Text Color overlays: ${textColor || "Neon green (#00FF01) and white"}
-- Niche Theme: ${niche || "General"}
+- Niche Theme: ${resolveNicheDirective(niche).promptText}
 - Selected Format: ${selectedFormat} (${formatLabel})
 
 ${formatGuidelines}
@@ -2730,7 +2975,7 @@ Design parameters to integrate:
 - Thumbnail Text Headline (Reference/Guideline): ${headline || "None specified"}
 - Small Tagline text: ${smallTagline || "None specified"}
 - Text Color overlays: ${textColor || "Neon green (#00FF01) and white"}
-- Niche Theme: ${niche || "General"}
+- Niche Theme: ${resolveNicheDirective(niche).promptText}
 
 ${formatGuidelines}
 ${universalRules}
@@ -2936,138 +3181,194 @@ Return the output in the "tags" array.`;
   }
 });
 
+const DEFAULT_CHAT_WORKSPACE_INSTRUCTION = `You are an advanced, flagship AI assistant combining the thoroughness, structured clarity, and intelligence of ChatGPT, Claude, and Gemini.
+- Deliver complete, substantive, well-organized answers — never artificially shorten, abbreviate, or withhold requested depth unless the user asks for a brief reply.
+- Use clean Markdown formatting naturally: headings (# / ## / ###), structured Markdown tables (| Col | Col |), bullet/numbered lists, bold key terms, blockquotes, and complete copyable code blocks.`;
+
+async function prepareChatWorkspacePayload(req: AuthenticatedRequest) {
+  const providerConfig = req.providerConfig || resolveRequestProviderConfig(req, req.userApiKey);
+  if (providerConfig.provider === "local" && !isStandaloneMode) {
+    throw Object.assign(
+      new Error("Local LLM execution is available only when running locally in Standalone Mode."),
+      { statusCode: 403 }
+    );
+  }
+
+  const rawMessages = Array.isArray(req.body?.messages) ? req.body.messages : [];
+
+  if (!isStandaloneMode && rawMessages.some((m: any) => m && (m.imageDataUrl || (Array.isArray(m.imageDataUrls) && m.imageDataUrls.length > 0)))) {
+    throw Object.assign(
+      new Error(
+        "Direct image uploads are disabled on the free Firebase Spark plan. Paste public Google Drive image links ('Anyone with the link') instead."
+      ),
+      { statusCode: 400 }
+    );
+  }
+
+  if (!isStandaloneMode) {
+    if (rawMessages.length > 40) {
+      throw Object.assign(
+        new Error(
+          "This chat reached the 40-message limit for free Firebase Spark storage. Please delete this chat or start a new chat."
+        ),
+        { statusCode: 400 }
+      );
+    }
+    const oversized = rawMessages.some(
+      (m: any) => typeof m?.content === "string" && m.content.length > 120000
+    );
+    if (oversized) {
+      throw Object.assign(
+        new Error("Message exceeds 120,000 characters. Please split very large screenplays into smaller parts."),
+        { statusCode: 400 }
+      );
+    }
+  }
+
+  const parseDriveId = (val: string): string | null => {
+    const trimmed = val.trim();
+    if (/^[a-zA-Z0-9_-]{10,80}$/.test(trimmed)) return trimmed;
+    try {
+      const parsed = new URL(trimmed);
+      const host = parsed.hostname.toLowerCase();
+      if (host === "drive.google.com" || host === "docs.google.com") {
+        const pathMatch = parsed.pathname.match(/\/d\/([a-zA-Z0-9_-]{10,80})/);
+        if (pathMatch?.[1]) return pathMatch[1];
+        const idParam = parsed.searchParams.get("id");
+        if (idParam && /^[a-zA-Z0-9_-]{10,80}$/.test(idParam)) return idParam;
+      }
+    } catch {
+      return null;
+    }
+    return null;
+  };
+
+  const resolveDriveFileIdsFromMessage = (m: any): string[] => {
+    const ids: string[] = [];
+    const addId = (raw?: any) => {
+      if (typeof raw !== "string" || !raw.trim()) return;
+      const fid = parseDriveId(raw);
+      if (fid && !ids.includes(fid)) ids.push(fid);
+    };
+    if (Array.isArray(m?.driveFileIds)) {
+      for (const item of m.driveFileIds) addId(item);
+    }
+    if (Array.isArray(m?.driveImageUrls)) {
+      for (const item of m.driveImageUrls) addId(item);
+    }
+    addId(m?.driveFileId);
+    addId(m?.driveImageUrl);
+    return ids;
+  };
+
+  const fetchGoogleDriveImageAsDataUrl = async (fileId: string): Promise<string> => {
+    if (!/^[a-zA-Z0-9_-]{10,80}$/.test(fileId)) {
+      throw new Error("Invalid Google Drive image file ID.");
+    }
+
+    const targetUrl = `https://drive.google.com/uc?export=download&id=${encodeURIComponent(fileId)}`;
+    const driveRes = await fetch(targetUrl, {
+      redirect: "follow",
+      signal: AbortSignal.timeout(10000),
+    });
+
+    if (!driveRes.ok) {
+      throw new Error(
+        "Could not fetch image from Google Drive link. Make sure sharing is set to 'Anyone with the link'."
+      );
+    }
+
+    const contentType = (driveRes.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
+    if (!contentType.startsWith("image/")) {
+      throw new Error(
+        "Google Drive link did not return an image (set sharing to 'Anyone with the link' on a PNG/JPG/WEBP file)."
+      );
+    }
+
+    const buf = Buffer.from(await driveRes.arrayBuffer());
+    if (buf.byteLength > 5 * 1024 * 1024) {
+      throw new Error("Google Drive image exceeds the 5MB maximum size.");
+    }
+    return `data:${contentType};base64,${buf.toString("base64")}`;
+  };
+
+  const filteredRaw = rawMessages.filter(
+    (m: any) =>
+      m &&
+      typeof m.content === "string" &&
+      (m.content.trim() ||
+        (isStandaloneMode && (m.imageDataUrl || (Array.isArray(m.imageDataUrls) && m.imageDataUrls.length > 0))) ||
+        resolveDriveFileIdsFromMessage(m).length > 0)
+  );
+
+  // Fetch up to the latest 6 public Google Drive reference images across the thread in memory for vision context
+  const driveIdsByMsgIndex = new Map<number, string[]>();
+  let remainingDriveBudget = 6;
+  for (let i = filteredRaw.length - 1; i >= 0 && remainingDriveBudget > 0; i--) {
+    const fids = resolveDriveFileIdsFromMessage(filteredRaw[i]);
+    if (fids.length > 0) {
+      const slice = fids.slice(0, remainingDriveBudget);
+      driveIdsByMsgIndex.set(i, slice);
+      remainingDriveBudget -= slice.length;
+    }
+  }
+
+  const messages: ChatTurnMessage[] = [];
+  for (let i = 0; i < filteredRaw.length; i++) {
+    const m = filteredRaw[i];
+    const resolvedImages: string[] = [];
+
+    if (isStandaloneMode) {
+      if (Array.isArray(m.imageDataUrls)) {
+        for (const img of m.imageDataUrls) {
+          if (typeof img === "string" && img.startsWith("data:image/") && !resolvedImages.includes(img)) {
+            resolvedImages.push(img);
+          }
+        }
+      }
+      if (typeof m.imageDataUrl === "string" && m.imageDataUrl.startsWith("data:image/") && !resolvedImages.includes(m.imageDataUrl)) {
+        resolvedImages.push(m.imageDataUrl);
+      }
+    }
+
+    const driveIds = driveIdsByMsgIndex.get(i);
+    if (driveIds && driveIds.length > 0) {
+      for (const fid of driveIds) {
+        const fetched = await fetchGoogleDriveImageAsDataUrl(fid);
+        if (!resolvedImages.includes(fetched)) {
+          resolvedImages.push(fetched);
+        }
+      }
+    }
+
+    messages.push({
+      role: m.role === "assistant" ? "assistant" : "user",
+      content: String(m.content || (resolvedImages.length > 0 ? "Analyze the attached reference image(s)." : "")),
+      ...(resolvedImages.length > 0 ? { imageDataUrl: resolvedImages[0], imageDataUrls: resolvedImages } : {}),
+    });
+  }
+
+  if (messages.length === 0) {
+    throw Object.assign(new Error("Please enter a message or prompt to send."), { statusCode: 400 });
+  }
+
+  const rawSystem =
+    typeof req.body?.systemInstruction === "string" ? req.body.systemInstruction.trim() : "";
+  const systemInstruction = rawSystem || DEFAULT_CHAT_WORKSPACE_INSTRUCTION;
+  const model = typeof req.body?.model === "string" ? req.body.model.trim() : "";
+  const temperature =
+    typeof req.body?.temperature === "number" && Number.isFinite(req.body.temperature)
+      ? Math.max(0, Math.min(1.5, req.body.temperature))
+      : 0.7;
+
+  return { providerConfig, messages, systemInstruction, model, temperature };
+}
+
 // Multi-turn AI Chat & Prompt Studio Endpoint (Supports Local GGUF, Gemini, OpenAI & Claude)
 app.post("/api/chat", aiBurstLimiter, verifyUserAuth as express.RequestHandler, async (req: AuthenticatedRequest, res) => {
   try {
-    const providerConfig = req.providerConfig || resolveRequestProviderConfig(req, req.userApiKey);
-    if (providerConfig.provider === "local" && !isStandaloneMode) {
-      return res.status(403).json({
-        error: "Local LLM execution is available only when running locally in Standalone Mode.",
-      });
-    }
-
-    const rawMessages = Array.isArray(req.body?.messages) ? req.body.messages : [];
-
-    if (!isStandaloneMode && rawMessages.some((m: any) => m && m.imageDataUrl)) {
-      return res.status(400).json({
-        error: "Direct image uploads are disabled on the free Firebase Spark plan. Paste a public Google Drive image link ('Anyone with the link') instead.",
-      });
-    }
-
-    if (!isStandaloneMode) {
-      if (rawMessages.length > 40) {
-        return res.status(400).json({
-          error: "This chat reached the 40-message limit for free Firebase Spark storage. Please delete this chat or start a new chat.",
-        });
-      }
-      const oversized = rawMessages.some(
-        (m: any) => typeof m?.content === "string" && m.content.length > 24000
-      );
-      if (oversized) {
-        return res.status(400).json({
-          error: "Message is too large (max 24,000 characters). Please shorten the text.",
-        });
-      }
-    }
-
-    const resolveDriveFileIdFromMessage = (m: any): string | null => {
-      if (typeof m?.driveFileId === "string" && /^[a-zA-Z0-9_-]{10,80}$/.test(m.driveFileId.trim())) {
-        return m.driveFileId.trim();
-      }
-      if (typeof m?.driveImageUrl === "string") {
-        try {
-          const parsed = new URL(m.driveImageUrl.trim());
-          const host = parsed.hostname.toLowerCase();
-          if (host === "drive.google.com" || host === "docs.google.com") {
-            const pathMatch = parsed.pathname.match(/\/d\/([a-zA-Z0-9_-]{10,80})/);
-            if (pathMatch?.[1]) return pathMatch[1];
-            const idParam = parsed.searchParams.get("id");
-            if (idParam && /^[a-zA-Z0-9_-]{10,80}$/.test(idParam)) return idParam;
-          }
-        } catch {
-          return null;
-        }
-      }
-      return null;
-    };
-
-    const fetchGoogleDriveImageAsDataUrl = async (fileId: string): Promise<string> => {
-      if (!/^[a-zA-Z0-9_-]{10,80}$/.test(fileId)) {
-        throw new Error("Invalid Google Drive image file ID.");
-      }
-
-      const targetUrl = `https://drive.google.com/uc?export=download&id=${encodeURIComponent(fileId)}`;
-      const driveRes = await fetch(targetUrl, {
-        redirect: "follow",
-        signal: AbortSignal.timeout(10000),
-      });
-
-      if (!driveRes.ok) {
-        throw new Error("Could not fetch image from Google Drive link. Make sure sharing is set to 'Anyone with the link'.");
-      }
-
-      const contentType = (driveRes.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
-      if (!contentType.startsWith("image/")) {
-        throw new Error("Google Drive link did not return an image (set sharing to 'Anyone with the link' on a PNG/JPG/WEBP file).");
-      }
-
-      const buf = Buffer.from(await driveRes.arrayBuffer());
-      if (buf.byteLength > 5 * 1024 * 1024) {
-        throw new Error("Google Drive image exceeds the 5MB maximum size.");
-      }
-      return `data:${contentType};base64,${buf.toString("base64")}`;
-    };
-
-    const messages: ChatTurnMessage[] = [];
-    const filteredRaw = rawMessages.filter(
-      (m: any) =>
-        m &&
-        typeof m.content === "string" &&
-        (m.content.trim() || (isStandaloneMode && m.imageDataUrl) || resolveDriveFileIdFromMessage(m))
-    );
-
-    // Fetch up to the latest 3 public Google Drive images in memory for vision context
-    const driveIndicesToFetch = new Set<number>();
-    let driveCount = 0;
-    for (let i = filteredRaw.length - 1; i >= 0 && driveCount < 3; i--) {
-      if (resolveDriveFileIdFromMessage(filteredRaw[i])) {
-        driveIndicesToFetch.add(i);
-        driveCount++;
-      }
-    }
-
-    for (let i = 0; i < filteredRaw.length; i++) {
-      const m = filteredRaw[i];
-      let resolvedImageDataUrl: string | undefined =
-        isStandaloneMode && typeof m.imageDataUrl === "string" && m.imageDataUrl.startsWith("data:image/")
-          ? m.imageDataUrl
-          : undefined;
-
-      if (!resolvedImageDataUrl && driveIndicesToFetch.has(i)) {
-        const fid = resolveDriveFileIdFromMessage(m);
-        if (fid) {
-          resolvedImageDataUrl = await fetchGoogleDriveImageAsDataUrl(fid);
-        }
-      }
-
-      messages.push({
-        role: m.role === "assistant" ? "assistant" : "user",
-        content: String(m.content || (resolvedImageDataUrl ? "Analyze this attached image." : "")),
-        ...(resolvedImageDataUrl ? { imageDataUrl: resolvedImageDataUrl } : {}),
-      });
-    }
-
-    if (messages.length === 0) {
-      return res.status(400).json({ error: "Please enter a message or prompt to send." });
-    }
-
-    const systemInstruction =
-      typeof req.body?.systemInstruction === "string" ? req.body.systemInstruction.trim() : "";
-    const model = typeof req.body?.model === "string" ? req.body.model.trim() : "";
-    const temperature =
-      typeof req.body?.temperature === "number" && Number.isFinite(req.body.temperature)
-        ? Math.max(0, Math.min(1.5, req.body.temperature))
-        : 0.7;
+    const { providerConfig, messages, systemInstruction, model, temperature } =
+      await prepareChatWorkspacePayload(req);
 
     const result = await executeMultiProviderChat({
       messages,
@@ -3083,11 +3384,89 @@ app.post("/api/chat", aiBurstLimiter, verifyUserAuth as express.RequestHandler, 
       reply: result.text,
       providerUsed: result.providerUsed,
       modelUsed: result.modelUsed,
+      finishReason: result.finishReason,
+      truncated: Boolean(result.truncated),
     });
   } catch (error: any) {
+    if (error?.statusCode) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
     logSafeError("Error in /api/chat:", error);
     const provider = req.providerConfig?.provider || "gemini";
     return res.status(500).json({ error: formatProviderErrorMessage(provider, error) });
+  }
+});
+
+// Streaming Multi-turn AI Chat Endpoint (SSE live token-by-token like ChatGPT / Claude / Gemini)
+app.post("/api/chat/stream", aiBurstLimiter, verifyUserAuth as express.RequestHandler, async (req: AuthenticatedRequest, res) => {
+  const abortController = new AbortController();
+  req.on("close", () => {
+    if (!res.writableEnded) {
+      abortController.abort();
+    }
+  });
+
+  try {
+    const { providerConfig, messages, systemInstruction, model, temperature } =
+      await prepareChatWorkspacePayload(req);
+
+    res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+    res.setHeader("Cache-Control", "no-cache, no-transform");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+    if (typeof res.flushHeaders === "function") {
+      res.flushHeaders();
+    }
+
+    const sendEvent = (payload: Record<string, any>) => {
+      if (res.writableEnded) return;
+      res.write(`data: ${JSON.stringify(payload)}\n\n`);
+    };
+
+    const result = await executeMultiProviderChatStream(
+      {
+        messages,
+        systemInstruction,
+        model,
+        temperature,
+        userAiClient: req.userAiClient,
+        providerConfig,
+        fallbackApiKey: req.userApiKey,
+        signal: abortController.signal,
+      },
+      {
+        onDelta: (deltaText) => {
+          sendEvent({ type: "delta", text: deltaText });
+        },
+      }
+    );
+
+    sendEvent({
+      type: "done",
+      reply: result.text,
+      providerUsed: result.providerUsed,
+      modelUsed: result.modelUsed,
+      finishReason: result.finishReason,
+      truncated: Boolean(result.truncated),
+    });
+    res.end();
+  } catch (error: any) {
+    if (abortController.signal.aborted) {
+      if (!res.writableEnded) res.end();
+      return;
+    }
+    const provider = req.providerConfig?.provider || "gemini";
+    const friendly = error?.statusCode
+      ? error.message
+      : formatProviderErrorMessage(provider, error);
+    if (!res.headersSent) {
+      return res.status(error?.statusCode || 500).json({ error: friendly });
+    }
+    logSafeError("Error in /api/chat/stream:", error);
+    if (!res.writableEnded) {
+      res.write(`data: ${JSON.stringify({ type: "error", error: friendly })}\n\n`);
+      res.end();
+    }
   }
 });
 
@@ -3379,6 +3758,298 @@ function autoOpenLocalBrowser(appUrl: string): void {
   }
 }
 
+// ============================================================================
+// Gemini Live API WebSocket Bridge (/api/voice-live)
+// Supports:
+//  - gemini-3.5-transcribe-live (Live speech-to-text transcription)
+//  - gemini-3.5-live-translate-preview (Live speech-to-speech & text translation)
+// ============================================================================
+async function resolveLiveVoiceGeminiKey(
+  token?: string,
+  clientApiKey?: string
+): Promise<{ apiKey: string } | { error: string }> {
+  if (isStandaloneMode) {
+    const key = sanitizeApiKey(clientApiKey) || sanitizeApiKey(process.env.GEMINI_API_KEY);
+    if (!key) {
+      return {
+        error: "No Gemini API key found. Please paste and save your Gemini API key in Providers & Local Engine.",
+      };
+    }
+    return { apiKey: key };
+  }
+
+  const cleanToken = typeof token === "string" ? token.trim() : "";
+  if (!cleanToken || cleanToken.startsWith("standalone_")) {
+    return { error: "Please sign in first to use Gemini Live Voice." };
+  }
+
+  try {
+    const tokenSignatureTail = cleanToken.slice(-32);
+    for (const cached of userAuthKeyCache.values()) {
+      if (cached.tokenHash === tokenSignatureTail && cached.expiresAt > Date.now() && cached.plainApiKey) {
+        if (cached.activeProvider && cached.activeProvider !== "gemini") {
+          return {
+            error: `Your active saved key is for ${cached.activeProvider.toUpperCase()}. Gemini Live Voice requires a Gemini API key saved in Configure Provider Key.`,
+          };
+        }
+        return { apiKey: cached.plainApiKey };
+      }
+    }
+
+    const userInfo = await verifyAuthToken(cleanToken);
+    let fsData: Record<string, any> | null = null;
+    try {
+      const userDocSnap = await getFirestoreDoc("users", userInfo.uid, cleanToken);
+      if (userDocSnap.exists && userDocSnap.data) {
+        fsData = userDocSnap.data;
+      }
+    } catch (fsErr) {
+      logSafeError("Live Voice Firestore lookup notice (checking encrypted vault):", fsErr);
+    }
+
+    const vault = getUserKeyVaultRecord(userInfo.uid);
+    const encryptedKey = fsData?.encryptedApiKey || vault?.encryptedApiKey || null;
+    const rawSavedProvider = fsData?.activeProvider || vault?.activeProvider || "gemini";
+
+    if (!encryptedKey) {
+      return {
+        error: "No personal Gemini API key saved for your account. Click 'Configure Provider Key' to add one.",
+      };
+    }
+
+    const savedProvider: AIProviderType =
+      rawSavedProvider === "openai" ||
+      rawSavedProvider === "claude" ||
+      rawSavedProvider === "gemini"
+        ? rawSavedProvider
+        : "gemini";
+
+    if (savedProvider !== "gemini") {
+      return {
+        error: `Your saved key is for ${savedProvider.toUpperCase()}. Gemini Live Voice requires a Gemini API key.`,
+      };
+    }
+
+    const { plainText: plainKey } = decryptApiKey(encryptedKey);
+    if (!plainKey || !plainKey.trim()) {
+      return { error: "Your saved API key could not be decrypted. Please re-save your Gemini API key." };
+    }
+
+    userAuthKeyCache.set(userInfo.uid, {
+      uid: userInfo.uid,
+      email: userInfo.email,
+      name: userInfo.name,
+      emailVerified: userInfo.emailVerified,
+      plainApiKey: plainKey,
+      activeProvider: "gemini",
+      tokenHash: tokenSignatureTail,
+      expiresAt: Date.now() + USER_AUTH_CACHE_TTL_MS,
+    });
+
+    return { apiKey: plainKey };
+  } catch (err: any) {
+    logSafeError("Live Voice auth failed:", err);
+    return { error: "Authentication failed. Please sign in again." };
+  }
+}
+
+function createLiveVoiceAiClient(apiKey: string): GoogleGenAI {
+  const trimmed = apiKey.trim();
+  if (trimmed.startsWith("ya29.")) {
+    return new GoogleGenAI({
+      apiKey: "",
+      httpOptions: {
+        headers: {
+          Authorization: `Bearer ${trimmed}`,
+          "User-Agent": "aistudio-build",
+        },
+      },
+    });
+  }
+  return new GoogleGenAI({
+    apiKey: trimmed,
+    httpOptions: {
+      headers: {
+        "User-Agent": "aistudio-build",
+      },
+    },
+  });
+}
+
+function attachLiveVoiceWebSocket(server: HttpServer): void {
+  const voiceWss = new WebSocketServer({ noServer: true });
+
+  server.on("upgrade", (req, socket, head) => {
+    const pathname = (req.url || "").split("?")[0];
+    if (pathname !== "/api/voice-live") {
+      return;
+    }
+    voiceWss.handleUpgrade(req, socket, head, (ws) => {
+      voiceWss.emit("connection", ws, req);
+    });
+  });
+
+  voiceWss.on("connection", (clientWs, req) => {
+    const parsedUrl = new URL(req.url || "/api/voice-live", "http://localhost");
+    const mode = parsedUrl.searchParams.get("mode") === "translate" ? "translate" : "transcribe";
+    const rawTargetLang = (parsedUrl.searchParams.get("targetLang") || "en").trim();
+    const targetLang = /^[a-zA-Z-]{2,12}$/.test(rawTargetLang) ? rawTargetLang : "en";
+
+    let liveSession: { sendRealtimeInput: (params: any) => void; close: () => void } | null = null;
+    let authenticated = false;
+    let connecting = false;
+    let closed = false;
+
+    const sendJson = (payload: Record<string, unknown>) => {
+      if (!closed && clientWs.readyState === WsWebSocket.OPEN) {
+        clientWs.send(JSON.stringify(payload));
+      }
+    };
+
+    const authTimeout = setTimeout(() => {
+      if (!authenticated && !connecting && !closed) {
+        sendJson({ type: "error", error: "Voice session authentication timed out." });
+        clientWs.close();
+      }
+    }, 6000);
+
+    clientWs.on("message", async (rawData) => {
+      if (closed) return;
+      let msg: any;
+      try {
+        msg = JSON.parse(rawData.toString());
+      } catch {
+        return;
+      }
+
+      if (msg?.type === "auth") {
+        if (authenticated || connecting) return;
+        connecting = true;
+        clearTimeout(authTimeout);
+
+        const resolved = await resolveLiveVoiceGeminiKey(msg.token, msg.apiKey);
+        if ("error" in resolved) {
+          sendJson({ type: "error", error: resolved.error });
+          clientWs.close();
+          return;
+        }
+
+        try {
+          const ai = createLiveVoiceAiClient(resolved.apiKey);
+          const modelId =
+            mode === "translate"
+              ? "gemini-3.5-live-translate-preview"
+              : "gemini-3.5-transcribe-live";
+
+          const session = await ai.live.connect({
+            model: modelId,
+            config:
+              mode === "translate"
+                ? {
+                    responseModalities: [Modality.AUDIO],
+                    inputAudioTranscription: {},
+                    outputAudioTranscription: {},
+                    translationConfig: {
+                      targetLanguageCode: targetLang,
+                      echoTargetLanguage: false,
+                    },
+                  }
+                : {
+                    responseModalities: [Modality.TEXT],
+                    inputAudioTranscription: {
+                      languageCodes: [],
+                    },
+                  },
+            callbacks: {
+              onmessage: (message: LiveServerMessage) => {
+                if (closed || clientWs.readyState !== WsWebSocket.OPEN) return;
+                const content = message.serverContent;
+                if (content?.interimInputTranscription?.text) {
+                  sendJson({
+                    type: "interimTranscript",
+                    text: content.interimInputTranscription.text,
+                  });
+                }
+                if (content?.inputTranscription?.text) {
+                  sendJson({
+                    type: "inputTranscript",
+                    text: content.inputTranscription.text,
+                  });
+                }
+                if (content?.outputTranscription?.text) {
+                  sendJson({
+                    type: "outputTranscript",
+                    text: content.outputTranscription.text,
+                  });
+                }
+                for (const part of content?.modelTurn?.parts ?? []) {
+                  if (part.inlineData?.data) {
+                    sendJson({ type: "audio", data: part.inlineData.data });
+                  }
+                }
+              },
+              onerror: (err: any) => {
+                logSafeError("Gemini Live Voice error:", err);
+                sendJson({ type: "error", error: formatGeminiErrorMessage(err) });
+              },
+              onclose: () => {
+                sendJson({ type: "closed" });
+              },
+            },
+          });
+
+          if (closed) {
+            try {
+              session.close();
+            } catch {}
+            return;
+          }
+
+          liveSession = session;
+          authenticated = true;
+          connecting = false;
+          sendJson({ type: "ready", mode, model: modelId, targetLang });
+        } catch (err: any) {
+          logSafeError("Failed to start Gemini Live Voice session:", err);
+          sendJson({ type: "error", error: formatGeminiErrorMessage(err) });
+          clientWs.close();
+        }
+        return;
+      }
+
+      if (msg?.type === "audio" && authenticated && liveSession && typeof msg.data === "string") {
+        try {
+          liveSession.sendRealtimeInput({
+            audio: { data: msg.data, mimeType: "audio/pcm;rate=16000" },
+          });
+        } catch (err: any) {
+          logSafeError("Live Voice sendRealtimeInput error:", err);
+        }
+        return;
+      }
+
+      if (msg?.type === "stop") {
+        closed = true;
+        clearTimeout(authTimeout);
+        try {
+          liveSession?.close();
+        } catch {}
+        liveSession = null;
+        clientWs.close();
+      }
+    });
+
+    clientWs.on("close", () => {
+      closed = true;
+      clearTimeout(authTimeout);
+      try {
+        liveSession?.close();
+      } catch {}
+      liveSession = null;
+    });
+  });
+}
+
 // Serve static assets or mount Vite dev middleware
 /**
  * Starts the local Express API used by both the web app and Electron.
@@ -3440,6 +4111,8 @@ export async function setupServer(): Promise<HttpServer> {
       server.once("error", onError);
       server.once("listening", onListening);
     });
+
+    attachLiveVoiceWebSocket(httpServer);
 
     return httpServer;
   })();

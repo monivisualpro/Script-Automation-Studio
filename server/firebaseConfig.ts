@@ -28,7 +28,14 @@ export function loadFirebaseServerConfig(): FirebaseAppletConfig {
     if (fs.existsSync(configPath)) {
       const parsed = JSON.parse(fs.readFileSync(configPath, "utf-8"));
       if (parsed && typeof parsed === "object" && parsed.apiKey && parsed.projectId) {
-        return { ...DEFAULT_FIREBASE_CONFIG, ...parsed };
+        return {
+          ...DEFAULT_FIREBASE_CONFIG,
+          ...parsed,
+          firestoreDatabaseId:
+            (typeof parsed.firestoreDatabaseId === "string" && parsed.firestoreDatabaseId.trim()) ||
+            (process.env.FIREBASE_DATABASE_ID ? process.env.FIREBASE_DATABASE_ID.trim() : "") ||
+            "(default)",
+        };
       }
     }
   } catch {

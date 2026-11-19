@@ -24,6 +24,8 @@ import {
   FolderOpen,
   Zap,
   Loader2,
+  LogOut,
+  Trash2,
 } from "lucide-react";
 
 interface ApiKeyModalProps {
@@ -112,6 +114,8 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose }) => 
     activeProviderConfig,
     updateProviderConfig,
     setIsAuthModalOpen,
+    logout,
+    removeApiKey,
   } = useAuth();
 
   const theme = getThemeConfig(currentTheme, currentBrand);
@@ -132,6 +136,9 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose }) => 
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<boolean>(false);
   const [copiedEnv, setCopiedEnv] = useState<boolean>(false);
+  const [confirmRemoveKey, setConfirmRemoveKey] = useState<boolean>(false);
+  const [removingKey, setRemovingKey] = useState<boolean>(false);
+  const [removedMessage, setRemovedMessage] = useState<string | null>(null);
 
   // Built-in local engine state (strictly used when isStandalone === true)
   const [localSubMode, setLocalSubMode] = useState<"builtin" | "external">("builtin");
@@ -200,6 +207,8 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose }) => 
     setSelectedProvider(safeProvider);
     setError(null);
     setSuccess(false);
+    setConfirmRemoveKey(false);
+    setRemovedMessage(null);
 
     if (safeProvider === "local" && isStandalone) {
       const existingUrl = profile?.baseUrl || activeProviderConfig.baseUrl || "http://127.0.0.1:1279/v1";
@@ -423,7 +432,13 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose }) => 
       return;
     }
 
-    const trimmedKey = apiKeyInput.trim();
+    let trimmedKey = apiKeyInput.trim();
+    if (
+      (trimmedKey.startsWith('"') && trimmedKey.endsWith('"')) ||
+      (trimmedKey.startsWith("'") && trimmedKey.endsWith("'"))
+    ) {
+      trimmedKey = trimmedKey.slice(1, -1).trim();
+    }
     let effectiveBaseUrl = baseUrlInput.trim();
     let effectiveModel = modelInput.trim();
 
@@ -470,8 +485,18 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose }) => 
         "Content-Type": "application/json",
         "x-standalone-mode": isStandalone ? "true" : "false",
       };
-      if (!isStandalone && idToken) {
-        reqHeaders.Authorization = `Bearer ${idToken}`;
+      if (!isStandalone) {
+        let liveToken = idToken;
+        if (user) {
+          try {
+            liveToken = await user.getIdToken(false);
+          } catch {
+            // fallback to state token
+          }
+        }
+        if (liveToken) {
+          reqHeaders.Authorization = `Bearer ${liveToken}`;
+        }
       }
 
       const response = await fetch("/api/user/save-key", {
@@ -607,6 +632,35 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose }) => 
             </p>
           </div>
         </div>
+
+        {/* Signed-in Account Gmail Banner + Quick Logout */}
+        {!isStandalone && (user || profile) && (
+          <div
+            className="mb-4 px-4 py-2.5 rounded-2xl border text-xs font-mono flex flex-wrap items-center justify-between gap-2 relative z-10"
+            style={{ backgroundColor: subtleBg, borderColor: borderCol }}
+          >
+            <div className="min-w-0">
+              <span className="text-[10px] block" style={{ color: mutedText }}>
+                Signed in account:
+              </span>
+              <span className="font-bold truncate block" style={{ color: theme.textColorCode }}>
+                {profile?.email || user?.email || "Authenticated Account"}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                void logout();
+                if (onClose) onClose();
+              }}
+              className="px-3 py-1.5 rounded-xl border text-[11px] font-bold flex items-center gap-1.5 cursor-pointer hover:bg-red-500/10 shrink-0"
+              style={{ borderColor: `${theme.accentColor}55`, color: theme.accentColor }}
+            >
+              <LogOut className="h-3.5 w-3.5" />
+              <span>Log Out</span>
+            </button>
+          </div>
+        )}
 
         {/* Provider Tabs (3 tabs Online, 4 tabs Local Standalone) */}
         <div className="mb-5 relative z-10">
@@ -806,16 +860,77 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose }) => 
           </div>
         )}
 
-        {/* Current Active Key/Endpoint */}
-        {!isStandalone && profile?.hasApiKey && profile.apiKeyMasked && (
+        {removedMessage && (
           <div
-            className="mb-4 px-4 py-2.5 rounded-2xl border text-xs font-mono flex items-center justify-between"
+            className="mb-4 p-3.5 rounded-2xl border text-xs font-mono flex items-center gap-2.5 animate-[fadeIn_0.2s_ease]"
+            style={{
+              borderColor: theme.secondaryAccentColor,
+              backgroundColor: `${theme.secondaryAccentColor}1A`,
+              color: theme.textColorCode,
+            }}
+          >
+            <CheckCircle2 className="h-4 w-4 shrink-0" style={{ color: theme.secondaryAccentColor }} />
+            <span className="font-bold">{removedMessage}</span>
+          </div>
+        )}
+
+        {/* Current Active Key/Endpoint with Direct Remove Key */}
+        {!isStandalone && profile?.hasApiKey && (
+          <div
+            className="mb-4 px-4 py-3 rounded-2xl border text-xs font-mono space-y-2.5"
             style={{ backgroundColor: subtleBg, borderColor: borderCol }}
           >
-            <span style={{ color: mutedText }}>Current Active Key/Endpoint:</span>
-            <span className="font-bold" style={{ color: theme.textColorCode }}>
-              {profile.apiKeyMasked}
-            </span>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <span style={{ color: mutedText }}>Current Active Key: </span>
+                <span className="font-bold" style={{ color: theme.textColorCode }}>
+                  {profile.apiKeyMasked || "Configured"}
+                </span>
+              </div>
+              {!confirmRemoveKey && (
+                <button
+                  type="button"
+                  onClick={() => setConfirmRemoveKey(true)}
+                  className="px-2.5 py-1 rounded-xl border text-[11px] font-bold flex items-center gap-1 cursor-pointer hover:bg-red-500/15"
+                  style={{ borderColor: `${theme.accentColor}65`, color: theme.accentColor }}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  <span>Remove Key</span>
+                </button>
+              )}
+            </div>
+            {confirmRemoveKey && (
+              <div className="p-2.5 rounded-xl border bg-red-950/80 border-red-700 text-white space-y-2">
+                <p className="text-[11px]">Remove your saved API key from your account?</p>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={removingKey}
+                    onClick={async () => {
+                      setRemovingKey(true);
+                      const ok = await removeApiKey();
+                      setRemovingKey(false);
+                      setConfirmRemoveKey(false);
+                      if (ok) {
+                        setRemovedMessage("Your saved API key has been removed.");
+                      } else {
+                        setError("Failed to remove your API key. Please try again.");
+                      }
+                    }}
+                    className="px-3 py-1 rounded-lg bg-red-600 text-white font-bold text-[11px] cursor-pointer disabled:opacity-50"
+                  >
+                    {removingKey ? "Removing..." : "Yes, Remove Key"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmRemoveKey(false)}
+                    className="px-3 py-1 rounded-lg bg-gray-800 text-gray-200 text-[11px] cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -826,16 +941,63 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose }) => 
               : selectedProvider === "openai"
               ? envKeyStatus?.openai
               : envKeyStatus?.claude;
-          if (!envEntry?.configured) return null;
+          if (!envEntry?.configured && !activeProviderConfig.apiKey) return null;
           return (
             <div
-              className="mb-4 px-4 py-2.5 rounded-2xl border text-xs font-mono flex items-center justify-between gap-2"
+              className="mb-4 px-4 py-3 rounded-2xl border text-xs font-mono space-y-2"
               style={{ backgroundColor: subtleBg, borderColor: `${theme.secondaryAccentColor}60` }}
             >
-              <span style={{ color: mutedText }}>Saved in local .env file:</span>
-              <span className="font-bold" style={{ color: theme.textColorCode }}>
-                {envEntry.masked}
-              </span>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <span style={{ color: mutedText }}>Saved Local Key: </span>
+                  <span className="font-bold" style={{ color: theme.textColorCode }}>
+                    {envEntry?.masked || "Browser Key"}
+                  </span>
+                </div>
+                {!confirmRemoveKey && (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmRemoveKey(true)}
+                    className="px-2.5 py-1 rounded-xl border text-[11px] font-bold flex items-center gap-1 cursor-pointer hover:bg-red-500/15"
+                    style={{ borderColor: `${theme.accentColor}65`, color: theme.accentColor }}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    <span>Clear Keys</span>
+                  </button>
+                )}
+              </div>
+              {confirmRemoveKey && (
+                <div className="p-2.5 rounded-xl border bg-red-950/80 border-red-700 text-white space-y-2">
+                  <p className="text-[11px]">Clear saved keys from local .env and browser storage?</p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={removingKey}
+                      onClick={async () => {
+                        setRemovingKey(true);
+                        const ok = await removeApiKey();
+                        setRemovingKey(false);
+                        setConfirmRemoveKey(false);
+                        if (ok) {
+                          setRemovedMessage("Local API keys cleared.");
+                        } else {
+                          setError("Failed to clear local API keys.");
+                        }
+                      }}
+                      className="px-3 py-1 rounded-lg bg-red-600 text-white font-bold text-[11px] cursor-pointer disabled:opacity-50"
+                    >
+                      {removingKey ? "Clearing..." : "Yes, Clear Keys"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmRemoveKey(false)}
+                      className="px-3 py-1 rounded-lg bg-gray-800 text-gray-200 text-[11px] cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           );
         })()}
