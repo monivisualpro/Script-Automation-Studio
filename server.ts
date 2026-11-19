@@ -495,8 +495,8 @@ async function verifyUserAuth(req: AuthenticatedRequest, res: express.Response, 
       if (userDocSnap.exists && userDocSnap.data) {
         userData = userDocSnap.data;
       }
-    } catch (fsReadErr) {
-      logSafeError("Firestore profile read skipped (checking encrypted vault):", fsReadErr);
+    } catch (fsReadErr: any) {
+      // Gracefully fallback to encrypted server vault without logging noisy 403 / permission errors
     }
 
     const vaultRecord = getUserKeyVaultRecord(userInfo.uid);
