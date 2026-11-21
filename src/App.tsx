@@ -17,6 +17,7 @@ import {
   Zap,
   CheckCircle,
   FileText,
+  Film,
   Sparkles,
   TrendingUp,
   Globe,
@@ -487,8 +488,6 @@ export default function App() {
   const [polishedScript, setPolishedScript] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [plagiarismCheck, setPlagiarismCheck] = useState<"idle" | "checking" | "verified">("idle");
-  const [plagiarismScore, setPlagiarismScore] = useState<number>(100);
 
   // Audio state
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
@@ -676,7 +675,6 @@ export default function App() {
     setLoading(true);
     setError(null);
     setPolishedScript("");
-    setPlagiarismCheck("checking");
 
     const activeTransformation = forcedTransformation || transformation;
     if (forcedTransformation) {
@@ -721,17 +719,8 @@ export default function App() {
       }
       const scriptsMap = data.polishedScripts || {};
       setPolishedScript(data.polishedScript || scriptsMap[activeTransformation] || Object.values(scriptsMap)[0] || "");
-      
-      // Plagiarism shield animation
-      setTimeout(() => {
-        setPlagiarismCheck("verified");
-        // Re-randomize safety score close to 100% to reflect anti-plagiarism guaranteed uniqueness
-        setPlagiarismScore(99.4 + Math.random() * 0.6);
-      }, 700);
-
     } catch (err: any) {
       setError(err.message || "An error occurred. Check your network or API keys.");
-      setPlagiarismCheck("idle");
     } finally {
       setLoading(false);
     }
@@ -1545,7 +1534,7 @@ export default function App() {
                 <span className="text-[28px] font-extrabold" style={{ fontSize: "28px", fontWeight: 800 }}>Script Automation Studio</span>
               </h1>
               <p className="text-xs text-gray-400 font-mono mt-0.5">
-                Elite Anti-plagiarism rephrasing · Dynamic unique output generator
+                Desktop Script Rephrasing, Storyboard Prompts &amp; Production Suite
               </p>
             </div>
           </div>
@@ -2290,7 +2279,7 @@ export default function App() {
                     <label className="text-xs font-mono uppercase tracking-widest block font-extrabold" style={{ color: theme.textColorCode }}>
                       Target Word Volume
                     </label>
-                    <span className="text-xs font-mono font-bold animate-pulse px-2 py-0.5 rounded-full glass-card border" style={{ borderColor: `${theme.accentColor}40`, color: theme.textColorCode }}>{wordCount} words</span>
+                    <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded-lg glass-card border" style={{ borderColor: `${theme.accentColor}40`, color: theme.textColorCode }}>{wordCount} words</span>
                   </div>
                   
                   {/* Pill buttons for presets */}
@@ -2350,7 +2339,7 @@ export default function App() {
                     <label className="text-xs font-mono uppercase tracking-widest block font-extrabold" style={{ color: theme.textColorCode }}>
                       Video Duration (Minutes)
                     </label>
-                    <span className="text-xs font-mono font-bold animate-pulse px-2 py-0.5 rounded-full glass-card border" style={{ borderColor: `${theme.accentColor}40`, color: theme.textColorCode }}>~{Math.round(videoDuration * 145)} words</span>
+                    <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded-lg glass-card border" style={{ borderColor: `${theme.accentColor}40`, color: theme.textColorCode }}>~{Math.round(videoDuration * 145)} words</span>
                   </div>
 
                   <div className="space-y-1">
@@ -3352,12 +3341,12 @@ export default function App() {
             <div className="glass-card p-4 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4 transition-all duration-300 border" style={{ backgroundColor: theme.cardBg, borderColor: theme.cardBorderCode, boxShadow: panelShadow }}>
               
               <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-xl flex items-center justify-center animate-pulse glass-card" style={{ backgroundColor: `${theme.accentColor}15`, color: theme.accentColor }}>
+                <div className="h-9 w-9 rounded-xl flex items-center justify-center glass-card" style={{ backgroundColor: `${theme.accentColor}15`, color: theme.accentColor }}>
                   <Sliders className="h-4.5 w-4.5" />
                 </div>
                 <div>
                   <span className="text-[10px] font-mono tracking-widest uppercase block font-extrabold" style={{ color: theme.textColorCode }}>Automation Command Console</span>
-                  <p className="text-xs opacity-75" style={{ color: theme.textColorCode }}>Set options & trigger plagiarism-free script transformation</p>
+                  <p className="text-xs opacity-75" style={{ color: theme.textColorCode }}>Set options &amp; generate your transformed voiceover script</p>
                 </div>
               </div>
 
@@ -3677,15 +3666,13 @@ export default function App() {
                 <div className="flex-1 overflow-y-auto p-5 relative font-sans text-xs md:text-sm leading-relaxed" style={{ color: theme.textColorCode }}>
                   {polishedScript && (
                     <div className="mb-3 flex items-center justify-between border-b pb-2.5" style={{ borderColor: `${theme.accentColor}30` }}>
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-mono font-bold border glass-card" style={{ backgroundColor: `${theme.accentColor}15`, borderColor: `${theme.accentColor}30`, color: theme.textColorCode }}>
-                        <Sparkles className="h-3 w-3 animate-pulse" style={{ color: theme.accentColor }} />
-                        Generated with {lastModelUsed || modelSettings.scriptGeneration}
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold border glass-card" style={{ backgroundColor: `${theme.accentColor}15`, borderColor: `${theme.accentColor}30`, color: theme.textColorCode }}>
+                        <CheckCircle className="h-3 w-3" style={{ color: theme.accentColor }} />
+                        {lastModelUsed || modelSettings.scriptGeneration}
                       </span>
-                      {plagiarismCheck === "verified" && (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-mono text-emerald-400 font-semibold">
-                          <CheckCircle className="h-3 w-3" /> 100% Plagiarism Free ({plagiarismScore.toFixed(1)}%)
-                        </span>
-                      )}
+                      <span className="text-[10px] font-mono opacity-75" style={{ color: theme.textColorCode }}>
+                        {polishedScript.trim() ? polishedScript.trim().split(/\s+/).length : 0} words
+                      </span>
                     </div>
                   )}
                   {loading ? (
@@ -3723,8 +3710,8 @@ export default function App() {
                     </div>
                   ) : (
                     <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-3">
-                      <div className="h-14 w-14 rounded-2xl border border-dashed flex items-center justify-center text-gray-400 animate-pulse glass-card" style={{ borderColor: `${theme.accentColor}35`, color: theme.accentColor }}>
-                        <Sparkles className="h-7 w-7" />
+                      <div className="h-14 w-14 rounded-2xl border border-dashed flex items-center justify-center text-gray-400 glass-card" style={{ borderColor: `${theme.accentColor}35`, color: theme.accentColor }}>
+                        <FileText className="h-7 w-7" />
                       </div>
                       <div className="space-y-1.5">
                         <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: theme.textColorCode }}>
@@ -3979,21 +3966,25 @@ export default function App() {
                         {/* Quick Shot Duration Presets */}
                         <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
                           <span className="opacity-70 mr-1" style={{ color: theme.textColorCode }}>Presets:</span>
-                          {[4, 5, 6, 8, 10, 12].map((secPreset) => (
-                            <button
-                              key={secPreset}
-                              type="button"
-                              onClick={() => handleShotsInputUpdate(calcMinsInput, calcSecsInput, String(secPreset))}
-                              className="px-2 py-0.5 rounded-lg border font-bold cursor-pointer transition-colors"
-                              style={{
-                                backgroundColor: parsedShot === secPreset ? theme.accentColor : theme.inputBg,
-                                borderColor: parsedShot === secPreset ? theme.accentColor : `${theme.accentColor}30`,
-                                color: parsedShot === secPreset ? "#ffffff" : theme.textColorCode,
-                              }}
-                            >
-                              {secPreset}s
-                            </button>
-                          ))}
+                          {[4, 5, 6, 8, 10, 12].map((secPreset) => {
+                            const isActive = calcShotSecInput.trim() !== "" && parsedShot === secPreset;
+                            return (
+                              <button
+                                key={secPreset}
+                                type="button"
+                                aria-pressed={isActive}
+                                onClick={() => handleShotsInputUpdate(calcMinsInput, calcSecsInput, String(secPreset))}
+                                className="px-2 py-0.5 rounded-lg border font-bold cursor-pointer transition-colors"
+                                style={{
+                                  backgroundColor: isActive ? theme.accentColor : theme.inputBg,
+                                  borderColor: isActive ? theme.accentColor : `${theme.accentColor}30`,
+                                  color: isActive ? "#ffffff" : theme.textColorCode,
+                                }}
+                              >
+                                {secPreset}s
+                              </button>
+                            );
+                          })}
                         </div>
 
                         {/* Live Calculation Breakdown & Explicit Apply Button */}
@@ -4152,7 +4143,7 @@ export default function App() {
                         </>
                       ) : (
                         <>
-                          <Sparkles className="h-3 w-3 animate-pulse" /> GENERATE SCENE PROMPTS
+                          <Film className="h-3 w-3" /> GENERATE SCENE PROMPTS
                         </>
                       )}
                     </button>
@@ -4298,13 +4289,13 @@ export default function App() {
                     ))
                   ) : (
                     <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-3">
-                      <div className="h-12 w-12 rounded-2xl border border-dashed flex items-center justify-center text-gray-400 animate-pulse glass-card" style={{ borderColor: `${theme.accentColor}35`, color: theme.accentColor }}>
-                        <Sparkles className="h-6 w-6" />
+                      <div className="h-12 w-12 rounded-2xl border border-dashed flex items-center justify-center text-gray-400 glass-card" style={{ borderColor: `${theme.accentColor}35`, color: theme.accentColor }}>
+                        <Film className="h-6 w-6" />
                       </div>
                       <div className="space-y-1">
                         <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: theme.textColorCode }}>No Storyboard Generated</p>
                         <p className="text-[11px] text-gray-400 max-w-xs mx-auto">
-                          Paste your transcript in the left panel and click Generate Scene Prompts to build a stunning, optimized storyboard!
+                          Paste your transcript in the left panel and click Generate Scene Prompts to build your storyboard.
                         </p>
                       </div>
                     </div>
@@ -4747,7 +4738,7 @@ export default function App() {
                         </div>
                       ) : (
                         <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-3">
-                          <div className="h-10 w-10 rounded-2xl border border-dashed flex items-center justify-center animate-pulse glass-card" style={{ borderColor: `${theme.accentColor}35`, color: theme.accentColor }}>
+                          <div className="h-10 w-10 rounded-2xl border border-dashed flex items-center justify-center glass-card" style={{ borderColor: `${theme.accentColor}35`, color: theme.accentColor }}>
                             <TrendingUp className="h-5 w-5" />
                           </div>
                           <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: theme.textColorCode }}>Metadata Suite Empty</p>

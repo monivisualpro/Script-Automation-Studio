@@ -688,7 +688,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose }) => 
                   Get an optional Gemini API Key (Google AI):
                 </span>
                 <a
-                  href="https://aistudio.google.com/app/apikey"
+                  href="https://console.cloud.google.com/apis/credentials"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-extrabold text-xs transition-all cursor-pointer border text-white shrink-0"
@@ -697,7 +697,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose }) => 
                     borderColor: theme.secondaryAccentColor,
                   }}
                 >
-                  <span>Google AI Keys</span>
+                  <span>Google Cloud Keys</span>
                   <ExternalLink className="h-3.5 w-3.5" />
                 </a>
               </div>

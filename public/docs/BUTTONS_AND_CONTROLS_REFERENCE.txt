@@ -21,10 +21,7 @@ in Script Automation Studio, detailing its exact purpose and optimal settings.
   Opens AI Model selector (Gemini 2.5 Flash, Gemini Pro), temperature, & safety settings.
 
 • API KEY SETTINGS (Key / Badge):
-  Allows you to input or view your personal Google AI Studio API Key.
-
-• ADMIN CONSOLE (Crown Icon - Admin only):
-  Opens user management, usage statistics, credit allocation, and system logs.
+  Configure your Gemini, OpenAI, or Claude API key, or switch to the Built-In Local Engine.
 
 --------------------------------------------------------------------------------
 2. MAIN SCRIPT GENERATOR CONTROLS
@@ -49,7 +46,6 @@ in Script Automation Studio, detailing its exact purpose and optimal settings.
 • COPY TO CLIPBOARD BUTTON: Copies formatted generated script to your clipboard.
 • DOWNLOAD SCRIPT (.TXT / .MD): Saves script directly to your local computer.
 • SHOTS CALCULATOR (SCENE SPLITTER): Divides script into timestamped camera scenes.
-• CHECK PLAGIARISM BUTTON: Verifies originality score.
 • AUDIO VOICE SIMULATOR (TTS): Converts text to speech audio preview inside studio.
 
 ================================================================================

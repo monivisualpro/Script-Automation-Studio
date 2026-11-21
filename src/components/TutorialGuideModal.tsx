@@ -201,13 +201,6 @@ export const TutorialGuideModal: React.FC = () => {
       purpose: "Calculates video duration, total camera shots, and splits script into B-roll scenes with visual prompts.",
       bestSetting: "Use after generating script to get complete video editing scene breakdown.",
       action: "Opens B-Roll Scene Splitter."
-    },
-    {
-      category: "Action Buttons",
-      name: "Check Plagiarism",
-      purpose: "Verifies script uniqueness score and originality.",
-      bestSetting: "Use before publishing to ensure 100% unique script output.",
-      action: "Runs plagiarism scan."
     }
   ];
 

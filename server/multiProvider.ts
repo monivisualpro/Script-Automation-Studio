@@ -181,7 +181,7 @@ export function formatProviderErrorMessage(provider: AIProviderType, err: any): 
 
   if (provider === "gemini") {
     if (errStr.includes("API_KEY_SERVICE_BLOCKED") || errStr.includes("API_KEY_INVALID") || errStr.includes("API key not valid")) {
-      return "Google Gemini API Key (AIzaSy... or AQ...) was rejected or lacks Generative Language / Vertex Express API permission. Verify the key in Google AI Studio or switch to OpenAI / Claude.";
+      return "Google Gemini API Key (AIzaSy... or AQ...) was rejected or lacks Generative Language / Vertex Express API permission. Verify your key in Settings or switch to OpenAI / Claude / Local Engine.";
     }
     if (errStr.includes("RESOURCE_EXHAUSTED") || errStr.includes("429")) {
       return "Gemini rate limit exceeded. Please wait a moment or switch models.";

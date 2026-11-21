@@ -1,8 +1,8 @@
 # 📖 Complete User & Creator Manual: Script Automation Studio
 
-Welcome to the official, exhaustive guide for **Script Automation Studio** created by **Muhammad Tehseen Irshad** under the **Moni Visual Pro** brand.
+Welcome to the user guide for **Script Automation Studio** created by **Muhammad Tehseen Irshad** under the **Moni Visual Pro** brand.
 
-**Script Automation Studio** is an all-in-one AI production suite engineered for content creators, YouTubers, social media growth managers, documentary filmmakers, and educators. It transforms raw ideas, rough notes, or unformatted video transcripts into 100% original, viral-retention voiceover scripts, shot-by-shot cinematic storyboard prompts, YouTube CTR metadata packages, and thumb-stopping visual concepts.
+**Script Automation Studio** is a desktop production suite for content creators, YouTubers, documentary filmmakers, and educators. It transforms raw ideas, rough notes, or unformatted transcripts into original voiceover scripts, shot-by-shot storyboard prompts, YouTube CTR metadata packages, and thumbnail concepts.
 
 👑 **Created by**: Muhammad Tehseen Irshad  
 🏷️ **Brand**: Moni Visual Pro  
@@ -119,7 +119,7 @@ Welcome to the official, exhaustive guide for **Script Automation Studio** creat
 
 - **Input Source**: Choose between **Topic** (generates draft from scratch), **Video URL** (extracts transcript from YouTube/TikTok/FB/IG), and **Files** (imports `.txt` or `.pdf`).
 - **RAW SOURCE SCRIPT Box**: Primary workspace with character count, speech-to-text mic with live Gemini waveform, and clear button.
-- **POLISHED V.O. SCRIPT Output Box**: Displays transformed script in the single language chosen in **Transformation Option** with 100% Plagiarism-Free badge, in-browser **Listen AI (TTS)** voice simulator, copy, and download actions.
+- **POLISHED V.O. SCRIPT Output Box**: Displays transformed script in the single language chosen in **Transformation Option** with word count, in-browser **Listen AI (TTS)** voice simulator, copy, and download actions.
 
 ---
 

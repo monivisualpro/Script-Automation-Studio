@@ -1,11 +1,11 @@
 # 🎬 Script Automation Studio
 ### AI Script Automation, Storyboard Prompts & YouTube Growth Suite
 
-> An all-in-one AI production suite engineered for content creators, YouTubers, social media growth managers, documentary filmmakers, and educators. Transforms raw ideas, rough notes, or unformatted video transcripts into 100% original, viral-retention voiceover scripts, shot-by-shot cinematic storyboard prompts, YouTube CTR metadata packages, and thumb-stopping visual concepts.
+> A desktop production suite for content creators, YouTubers, documentary filmmakers, and educators. Transforms raw ideas, rough notes, or unformatted transcripts into original voiceover scripts, shot-by-shot storyboard prompts, YouTube CTR metadata packages, and thumbnail concepts.
 
 👑 **Created by**: Muhammad Tehseen Irshad  
 🏷️ **Brand**: Moni Visual Pro  
-💻 **Platforms**: **100% Pure Desktop App** for **Windows**, **Linux**, and **macOS** — zero Firebase, zero Firestore, and zero online accounts required. Run in 1 click via `run-app.bat` (Windows) or `./run-app.sh` (Linux & macOS).  
+💻 **Platforms**: **Desktop Application** for **Windows**, **Linux**, and **macOS** — local disk persistence, Built-In GGUF engine, and zero online accounts required. Run in 1 click via `run-app.bat` (Windows) or `./run-app.sh` (Linux & macOS).  
 📄 **License**: [MIT License](./LICENSE.md)
 
 ---

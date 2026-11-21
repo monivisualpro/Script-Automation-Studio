@@ -125,9 +125,6 @@ ACTION BUTTONS & GENERATION
 • Action: Automatically calculates video duration in minutes/seconds, total camera 
   shots needed, and splits the polished script into timestamped B-roll scenes!
 
-[ BUTTON: CHECK PLAGIARISM & ORIGINALITY ]
-• Action: Scans script uniqueness score and verifies originality.
-
 ================================================================================
 3. PROMPTING & COMMAND GUIDE (HOW TO WRITE INPUTS FOR BEST AI RESULTS)
 ================================================================================
