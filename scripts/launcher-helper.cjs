@@ -20,7 +20,6 @@ switch (cmd) {
 
     if (!fs.existsSync(envPath)) {
       const fallback = [
-        "STANDALONE_MODE=true",
         "PORT=3000",
         "AI_PROVIDER=gemini",
         "",

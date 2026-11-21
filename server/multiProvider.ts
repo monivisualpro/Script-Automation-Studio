@@ -592,7 +592,7 @@ function resolveGeminiClientAndModel(options: ChatRequestOptions, config: AIProv
     ? options.model!.trim()
     : isGeminiModelId(config.model)
     ? config.model!.trim()
-    : "gemini-4-hydrogen";
+    : "gemini-3.1-flash-lite";
 
   return { ai, modelToUse, explicitKey };
 }

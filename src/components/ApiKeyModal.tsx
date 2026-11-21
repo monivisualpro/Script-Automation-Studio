@@ -24,7 +24,6 @@ import {
   FolderOpen,
   Zap,
   Loader2,
-  LogOut,
   Trash2,
 } from "lucide-react";
 
@@ -102,28 +101,19 @@ interface LocalEngineStatus {
 
 export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose }) => {
   const {
-    user,
-    idToken,
-    refreshProfile,
-    profile,
     currentTheme,
     currentBrand,
-    isStandalone,
     envKeyStatus,
     refreshSystemMode,
     activeProviderConfig,
     updateProviderConfig,
-    setIsAuthModalOpen,
-    logout,
     removeApiKey,
   } = useAuth();
 
   const theme = getThemeConfig(currentTheme, currentBrand);
 
   const [selectedProvider, setSelectedProvider] = useState<"gemini" | "openai" | "claude" | "local">(
-    !isStandalone && (profile?.activeProvider === "local" || activeProviderConfig.provider === "local")
-      ? "gemini"
-      : ((profile?.activeProvider as any) || activeProviderConfig.provider || "gemini")
+    activeProviderConfig.provider || "gemini"
   );
   const [apiKeyInput, setApiKeyInput] = useState<string>("");
   const [saveToEnvFile, setSaveToEnvFile] = useState<boolean>(true);
@@ -140,7 +130,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose }) => 
   const [removingKey, setRemovingKey] = useState<boolean>(false);
   const [removedMessage, setRemovedMessage] = useState<string | null>(null);
 
-  // Built-in local engine state (strictly used when isStandalone === true)
+  // Built-in local engine state
   const [localSubMode, setLocalSubMode] = useState<"builtin" | "external">("builtin");
   const [engineStatus, setEngineStatus] = useState<LocalEngineStatus | null>(null);
   const [scanningEngine, setScanningEngine] = useState<boolean>(false);
@@ -162,7 +152,6 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose }) => 
   }, [isOpen]);
 
   const fetchEngineStatus = useCallback(async (quiet = false): Promise<LocalEngineStatus | null> => {
-    if (!isStandalone) return null;
     if (!quiet) setScanningEngine(true);
     try {
       const res = await fetch("/api/local-engine/status");
@@ -197,23 +186,21 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose }) => 
       if (!quiet) setScanningEngine(false);
     }
     return null;
-  }, [isStandalone]);
+  }, []);
 
   useEffect(() => {
     if (!isOpen) return;
-    const rawProvider =
-      (profile?.activeProvider as any) || activeProviderConfig.provider || "gemini";
-    const safeProvider = !isStandalone && rawProvider === "local" ? "gemini" : rawProvider;
+    const safeProvider = activeProviderConfig.provider || "gemini";
     setSelectedProvider(safeProvider);
     setError(null);
     setSuccess(false);
     setConfirmRemoveKey(false);
     setRemovedMessage(null);
 
-    if (safeProvider === "local" && isStandalone) {
-      const existingUrl = profile?.baseUrl || activeProviderConfig.baseUrl || "http://127.0.0.1:1279/v1";
+    if (safeProvider === "local") {
+      const existingUrl = activeProviderConfig.baseUrl || "http://127.0.0.1:1279/v1";
       setBaseUrlInput(existingUrl);
-      setModelInput(profile?.activeModel || activeProviderConfig.model || "default");
+      setModelInput(activeProviderConfig.model || "default");
       if (existingUrl.includes(":1234") || existingUrl.includes(":11434")) {
         setLocalSubMode("external");
       } else {
@@ -221,17 +208,17 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose }) => 
       }
       void fetchEngineStatus();
     }
-  }, [isOpen, isStandalone, profile, activeProviderConfig, fetchEngineStatus]);
+  }, [isOpen, activeProviderConfig, fetchEngineStatus]);
 
   useEffect(() => {
-    if (isOpen && isStandalone && selectedProvider === "local" && !engineStatus) {
+    if (isOpen && selectedProvider === "local" && !engineStatus) {
       void fetchEngineStatus();
     }
-  }, [isOpen, isStandalone, selectedProvider, engineStatus, fetchEngineStatus]);
+  }, [isOpen, selectedProvider, engineStatus, fetchEngineStatus]);
 
   // Poll engine status automatically while a model download or engine startup is active
   useEffect(() => {
-    if (!isOpen || !isStandalone || selectedProvider !== "local") return;
+    if (!isOpen || selectedProvider !== "local") return;
     const isStarting = engineStatus?.processState === "starting";
     const isDownloading = Boolean(engineStatus?.download?.active);
     if (!isStarting && !isDownloading) return;
@@ -242,7 +229,6 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose }) => 
     return () => clearInterval(timer);
   }, [
     isOpen,
-    isStandalone,
     selectedProvider,
     engineStatus?.download?.active,
     engineStatus?.processState,
@@ -421,17 +407,6 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose }) => 
     setError(null);
     setSuccess(false);
 
-    if (!isStandalone && !user) {
-      setError("Please sign in first before saving your personal API key.");
-      setIsAuthModalOpen(true);
-      return;
-    }
-
-    if (!isStandalone && selectedProvider === "local") {
-      setError("Local LLM is only available when running the GitHub repository locally.");
-      return;
-    }
-
     let trimmedKey = apiKeyInput.trim();
     if (
       (trimmedKey.startsWith('"') && trimmedKey.endsWith('"')) ||
@@ -478,30 +453,14 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose }) => 
         apiKey: trimmedKey,
         baseUrl: effectiveBaseUrl,
         model: effectiveModel,
-        saveToEnv: isStandalone ? saveToEnvFile : false,
+        saveToEnv: saveToEnvFile,
       };
-
-      const reqHeaders: Record<string, string> = {
-        "Content-Type": "application/json",
-        "x-standalone-mode": isStandalone ? "true" : "false",
-      };
-      if (!isStandalone) {
-        let liveToken = idToken;
-        if (user) {
-          try {
-            liveToken = await user.getIdToken(false);
-          } catch {
-            // fallback to state token
-          }
-        }
-        if (liveToken) {
-          reqHeaders.Authorization = `Bearer ${liveToken}`;
-        }
-      }
 
       const response = await fetch("/api/user/save-key", {
         method: "POST",
-        headers: reqHeaders,
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify(payload),
       });
 
@@ -513,17 +472,13 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose }) => 
 
       updateProviderConfig({
         provider: selectedProvider,
-        apiKey: isStandalone && data.savedToEnvFile ? "" : trimmedKey,
+        apiKey: data.savedToEnvFile ? "" : trimmedKey,
         baseUrl: effectiveBaseUrl,
         model: effectiveModel,
       });
 
       setSuccess(true);
-      if (isStandalone) {
-        await refreshSystemMode();
-      } else {
-        await refreshProfile();
-      }
+      await refreshSystemMode();
       setTimeout(() => {
         setApiKeyInput("");
         if (onClose) onClose();
@@ -537,7 +492,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose }) => 
   };
 
   const copyEnvSnippet = () => {
-    let envContent = `STANDALONE_MODE=true\nAI_PROVIDER=${selectedProvider}\n`;
+    let envContent = `AI_PROVIDER=${selectedProvider}\n`;
     if (selectedProvider === "gemini") {
       envContent += `GEMINI_API_KEY=${apiKeyInput || "your_gemini_key_here"}\n`;
     } else if (selectedProvider === "openai") {
@@ -572,7 +527,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose }) => 
     >
       <div
         className={`w-full ${
-          selectedProvider === "local" && isStandalone ? "max-w-2xl" : "max-w-xl"
+          selectedProvider === "local" ? "max-w-2xl" : "max-w-xl"
         } rounded-3xl p-6 sm:p-8 relative my-auto border transition-all duration-300 ${
           isLight ? "border-[#E5E5E5] bg-[#FFFFFF] text-[#000000]" : "border-[#2A2A2A] bg-[#1A1A1A] text-white"
         }`}
@@ -612,66 +567,29 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose }) => 
               >
                 Configure AI Provider & Keys
               </h3>
-              {isStandalone && (
-                <span
-                  className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold border"
-                  style={{
-                    backgroundColor: `${theme.accentColor}15`,
-                    borderColor: `${theme.accentColor}40`,
-                    color: theme.textColorCode,
-                  }}
-                >
-                  Local Standalone Mode
-                </span>
-              )}
+              <span
+                className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold border"
+                style={{
+                  backgroundColor: `${theme.accentColor}15`,
+                  borderColor: `${theme.accentColor}40`,
+                  color: theme.textColorCode,
+                }}
+              >
+                Desktop App (Win · Linux · macOS)
+              </span>
             </div>
             <p className="text-xs font-sans mt-1 leading-relaxed" style={{ color: mutedText }}>
-              {isStandalone
-                ? "Running locally on your computer. Use cloud API keys or run Qwen & GGUF models 100% offline with the Built-In Engine."
-                : "Online Cloud Web App. Your API key is encrypted with AES-256 and saved securely to your personal account."}
+              Running 100% locally on your computer. Use personal cloud API keys stored in your local .env or run Qwen &amp; GGUF models completely offline with the Built-In Engine.
             </p>
           </div>
         </div>
 
-        {/* Signed-in Account Gmail Banner + Quick Logout */}
-        {!isStandalone && (user || profile) && (
-          <div
-            className="mb-4 px-4 py-2.5 rounded-2xl border text-xs font-mono flex flex-wrap items-center justify-between gap-2 relative z-10"
-            style={{ backgroundColor: subtleBg, borderColor: borderCol }}
-          >
-            <div className="min-w-0">
-              <span className="text-[10px] block" style={{ color: mutedText }}>
-                Signed in account:
-              </span>
-              <span className="font-bold truncate block" style={{ color: theme.textColorCode }}>
-                {profile?.email || user?.email || "Authenticated Account"}
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                void logout();
-                if (onClose) onClose();
-              }}
-              className="px-3 py-1.5 rounded-xl border text-[11px] font-bold flex items-center gap-1.5 cursor-pointer hover:bg-red-500/10 shrink-0"
-              style={{ borderColor: `${theme.accentColor}55`, color: theme.accentColor }}
-            >
-              <LogOut className="h-3.5 w-3.5" />
-              <span>Log Out</span>
-            </button>
-          </div>
-        )}
-
-        {/* Provider Tabs (3 tabs Online, 4 tabs Local Standalone) */}
+        {/* Provider Tabs */}
         <div className="mb-5 relative z-10">
           <label className="block text-xs font-mono mb-2 font-bold" style={{ color: mutedText }}>
             SELECT ACTIVE AI ENGINE:
           </label>
-          <div
-            className={`grid ${
-              isStandalone ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-3"
-            } gap-2 font-mono text-xs`}
-          >
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 font-mono text-xs">
             {/* 1. Gemini */}
             <button
               type="button"
@@ -735,28 +653,26 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose }) => 
               <span className="font-extrabold text-[11px]">Claude</span>
             </button>
 
-            {/* 4. Local Built-In Engine — ONLY rendered in Local Standalone Mode */}
-            {isStandalone && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedProvider("local");
-                  setError(null);
-                }}
-                className="p-3 rounded-2xl border flex flex-col items-center justify-center gap-1.5 cursor-pointer transition-all"
-                style={{
-                  backgroundColor: selectedProvider === "local" ? `${theme.accentColor}20` : subtleBg,
-                  borderColor: selectedProvider === "local" ? theme.accentColor : borderCol,
-                  color: selectedProvider === "local" ? theme.textColorCode : mutedText,
-                }}
-              >
-                <Server
-                  className="h-4 w-4"
-                  style={selectedProvider === "local" ? { color: theme.accentColor } : undefined}
-                />
-                <span className="font-extrabold text-[11px]">Local Engine</span>
-              </button>
-            )}
+            {/* 4. Local Built-In Engine */}
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedProvider("local");
+                setError(null);
+              }}
+              className="p-3 rounded-2xl border flex flex-col items-center justify-center gap-1.5 cursor-pointer transition-all"
+              style={{
+                backgroundColor: selectedProvider === "local" ? `${theme.accentColor}20` : subtleBg,
+                borderColor: selectedProvider === "local" ? theme.accentColor : borderCol,
+                color: selectedProvider === "local" ? theme.textColorCode : mutedText,
+              }}
+            >
+              <Server
+                className="h-4 w-4"
+                style={selectedProvider === "local" ? { color: theme.accentColor } : undefined}
+              />
+              <span className="font-extrabold text-[11px]">Local Engine</span>
+            </button>
           </div>
         </div>
 
@@ -769,7 +685,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose }) => 
             {selectedProvider === "gemini" && (
               <div className="flex items-center justify-between gap-2 text-xs font-mono">
                 <span className="font-semibold" style={{ color: theme.textColorCode }}>
-                  Get your free Gemini Key from Google AI Studio:
+                  Get an optional Gemini API Key (Google AI):
                 </span>
                 <a
                   href="https://aistudio.google.com/app/apikey"
@@ -874,67 +790,8 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose }) => 
           </div>
         )}
 
-        {/* Current Active Key/Endpoint with Direct Remove Key */}
-        {!isStandalone && profile?.hasApiKey && (
-          <div
-            className="mb-4 px-4 py-3 rounded-2xl border text-xs font-mono space-y-2.5"
-            style={{ backgroundColor: subtleBg, borderColor: borderCol }}
-          >
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <span style={{ color: mutedText }}>Current Active Key: </span>
-                <span className="font-bold" style={{ color: theme.textColorCode }}>
-                  {profile.apiKeyMasked || "Configured"}
-                </span>
-              </div>
-              {!confirmRemoveKey && (
-                <button
-                  type="button"
-                  onClick={() => setConfirmRemoveKey(true)}
-                  className="px-2.5 py-1 rounded-xl border text-[11px] font-bold flex items-center gap-1 cursor-pointer hover:bg-red-500/15"
-                  style={{ borderColor: `${theme.accentColor}65`, color: theme.accentColor }}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  <span>Remove Key</span>
-                </button>
-              )}
-            </div>
-            {confirmRemoveKey && (
-              <div className="p-2.5 rounded-xl border bg-red-950/80 border-red-700 text-white space-y-2">
-                <p className="text-[11px]">Remove your saved API key from your account?</p>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    disabled={removingKey}
-                    onClick={async () => {
-                      setRemovingKey(true);
-                      const ok = await removeApiKey();
-                      setRemovingKey(false);
-                      setConfirmRemoveKey(false);
-                      if (ok) {
-                        setRemovedMessage("Your saved API key has been removed.");
-                      } else {
-                        setError("Failed to remove your API key. Please try again.");
-                      }
-                    }}
-                    className="px-3 py-1 rounded-lg bg-red-600 text-white font-bold text-[11px] cursor-pointer disabled:opacity-50"
-                  >
-                    {removingKey ? "Removing..." : "Yes, Remove Key"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setConfirmRemoveKey(false)}
-                    className="px-3 py-1 rounded-lg bg-gray-800 text-gray-200 text-[11px] cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {isStandalone && selectedProvider !== "local" && (() => {
+        {/* Saved Local Key Status */}
+        {selectedProvider !== "local" && (() => {
           const envEntry =
             selectedProvider === "gemini"
               ? envKeyStatus?.gemini
@@ -1046,27 +903,24 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose }) => 
                 </div>
               </div>
 
-              {isStandalone && (
-                <label
-                  className="flex items-start gap-2.5 p-3 rounded-2xl border cursor-pointer text-[11px] font-mono leading-relaxed"
-                  style={{ backgroundColor: subtleBg, borderColor: borderCol, color: theme.textColorCode }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={saveToEnvFile}
-                    onChange={(e) => setSaveToEnvFile(e.target.checked)}
-                    className="mt-0.5 cursor-pointer accent-current"
-                    style={{ accentColor: theme.accentColor }}
-                  />
-                  <span>
-                    Save directly to your local <code className="font-bold">.env</code> file (gitignored, stays private on this PC and keeps raw keys out of browser storage).
-                  </span>
-                </label>
-              )}
+              <label
+                className="flex items-start gap-2.5 p-3 rounded-2xl border cursor-pointer text-[11px] font-mono leading-relaxed"
+                style={{ backgroundColor: subtleBg, borderColor: borderCol, color: theme.textColorCode }}
+              >
+                <input
+                  type="checkbox"
+                  checked={saveToEnvFile}
+                  onChange={(e) => setSaveToEnvFile(e.target.checked)}
+                  className="mt-0.5 cursor-pointer accent-current"
+                  style={{ accentColor: theme.accentColor }}
+                />
+                <span>
+                  Save directly to your local <code className="font-bold">.env</code> file (gitignored, stays private on this PC and keeps raw keys out of browser storage).
+                </span>
+              </label>
             </div>
           ) : (
-            isStandalone && (
-              <div className="space-y-4 font-sans text-xs">
+            <div className="space-y-4 font-sans text-xs">
                 {/* Local Engine Mode Switch: Built-In llama.cpp vs External Server */}
                 <div
                   className="grid grid-cols-2 gap-2 p-1 rounded-2xl border"
@@ -1672,7 +1526,6 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose }) => 
                   </div>
                 )}
               </div>
-            )
           )}
 
           {selectedProvider === "local" && error && (
@@ -1733,29 +1586,27 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose }) => 
           </div>
         </form>
 
-        {/* Copy .env tool strictly for Local Standalone Mode */}
-        {isStandalone && (
-          <div
-            className="mt-6 pt-4 border-t font-mono text-xs flex flex-col sm:flex-row items-center justify-between gap-3 relative z-10"
-            style={{ borderColor: borderCol, color: mutedText }}
-          >
-            <div className="flex items-center gap-1.5 text-[11px]">
-              <Terminal className="h-3.5 w-3.5 shrink-0" style={{ color: theme.secondaryAccentColor }} />
-              <span>Local .env Config Snippet:</span>
-            </div>
-            <button
-              type="button"
-              onClick={copyEnvSnippet}
-              className={`px-3 py-1.5 rounded-xl border text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                copiedEnv ? "bg-emerald-500/20 text-emerald-500 border-emerald-500/40" : ""
-              }`}
-              style={!copiedEnv ? { backgroundColor: subtleBg, borderColor: borderCol, color: theme.textColorCode } : undefined}
-            >
-              {copiedEnv ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
-              <span>{copiedEnv ? "Copied .env Snippet!" : "Copy .env File Config"}</span>
-            </button>
+        {/* Copy local .env snippet */}
+        <div
+          className="mt-6 pt-4 border-t font-mono text-xs flex flex-col sm:flex-row items-center justify-between gap-3 relative z-10"
+          style={{ borderColor: borderCol, color: mutedText }}
+        >
+          <div className="flex items-center gap-1.5 text-[11px]">
+            <Terminal className="h-3.5 w-3.5 shrink-0" style={{ color: theme.secondaryAccentColor }} />
+            <span>Local .env Config Snippet:</span>
           </div>
-        )}
+          <button
+            type="button"
+            onClick={copyEnvSnippet}
+            className={`px-3 py-1.5 rounded-xl border text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+              copiedEnv ? "bg-emerald-500/20 text-emerald-500 border-emerald-500/40" : ""
+            }`}
+            style={!copiedEnv ? { backgroundColor: subtleBg, borderColor: borderCol, color: theme.textColorCode } : undefined}
+          >
+            {copiedEnv ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
+            <span>{copiedEnv ? "Copied .env Snippet!" : "Copy .env File Config"}</span>
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -3,10 +3,8 @@ import { motion, AnimatePresence } from "motion/react";
 import { useAuth } from "./context/AuthContext";
 import { getThemeConfig } from "./lib/themeConfig";
 import { UserHeader } from "./components/UserHeader";
-import { AuthModal } from "./components/AuthModal";
 import { ApiKeyModal } from "./components/ApiKeyModal";
 import { SettingsModal } from "./components/SettingsModal";
-import { AdminModal } from "./components/AdminModal";
 import { TutorialGuideModal } from "./components/TutorialGuideModal";
 import { RenderingProgressBar } from "./components/RenderingProgressBar";
 import { DesktopAIChatWorkspace, StudioTransferTarget } from "./components/DesktopAIChatWorkspace";
@@ -22,7 +20,6 @@ import {
   Sparkles,
   TrendingUp,
   Globe,
-  Lock,
   Loader2,
   Trash2,
   Plus,
@@ -39,7 +36,6 @@ import {
   Image,
   User,
   Key,
-  LogIn,
   Youtube,
   Instagram,
   Facebook,
@@ -309,17 +305,10 @@ const TARGET_AUDIENCES = [
 
 export default function App() {
   const {
-    user,
-    profile,
-    idToken,
-    isAuthModalOpen,
-    setIsAuthModalOpen,
     isApiKeyModalOpen,
     setIsApiKeyModalOpen,
     isSettingsModalOpen,
     setIsSettingsModalOpen,
-    isAdminModalOpen,
-    setIsAdminModalOpen,
     isImageStudioOpen,
     setIsImageStudioOpen,
     initialImagePrompt,
@@ -327,8 +316,6 @@ export default function App() {
     modelSettings,
     currentTheme,
     currentBrand,
-    isStandalone,
-    systemModeChecked,
     activeProviderConfig,
     activeWorkspace,
     setActiveWorkspace,
@@ -363,12 +350,9 @@ export default function App() {
     );
   };
 
-  // Access validation and auth header constructor
-  const checkAccessAndGetHeaders = (): Record<string, string> | null => {
-    const effectiveProvider =
-      !isStandalone && activeProviderConfig?.provider === "local"
-        ? "gemini"
-        : activeProviderConfig?.provider || "gemini";
+  // Access validation and provider header constructor for 100% pure desktop execution
+  const checkAccessAndGetHeaders = (): Record<string, string> => {
+    const effectiveProvider = activeProviderConfig?.provider || "gemini";
 
     const providerHeaders: Record<string, string> = {
       "x-provider-type": effectiveProvider,
@@ -383,26 +367,9 @@ export default function App() {
       providerHeaders["x-provider-key"] = activeProviderConfig.apiKey.trim();
     }
 
-    if (isStandalone) {
-      return {
-        "Content-Type": "application/json",
-        "x-standalone-mode": "true",
-        ...providerHeaders,
-      };
-    }
-    if (!user) {
-      setIsAuthModalOpen(true);
-      setError("Authentication required: Please Sign Up or Log In first.");
-      return null;
-    }
-    if (!profile?.hasApiKey) {
-      setIsApiKeyModalOpen(true);
-      setError("AI Provider Key required: Please add your API key or configure your provider.");
-      return null;
-    }
     return {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${idToken}`,
+      "x-standalone-mode": "true",
       ...providerHeaders,
     };
   };
@@ -1545,65 +1512,14 @@ export default function App() {
       {/* Top User Navigation Header */}
       <UserHeader />
 
-      {/* Authentication & API Key Modals */}
-      {!isStandalone && <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />}
+      {/* Provider Configuration, Settings & Guide Modals */}
       <ApiKeyModal
         isOpen={isApiKeyModalOpen}
         onClose={() => setIsApiKeyModalOpen(false)}
         canDismiss={true}
       />
       <SettingsModal isOpen={isSettingsModalOpen} onClose={() => setIsSettingsModalOpen(false)} />
-      {!isStandalone && <AdminModal isOpen={isAdminModalOpen} onClose={() => setIsAdminModalOpen(false)} />}
       <TutorialGuideModal />
-
-      {/* Unauthenticated / Missing API Key Alert Banners */}
-      {systemModeChecked && !user && !isStandalone && (
-        <div
-          className="border-b px-4 py-3 text-center text-xs font-mono flex flex-col sm:flex-row items-center justify-center gap-3 backdrop-blur-md shadow-md"
-          style={{
-            backgroundColor: "#111111",
-            borderColor: "#2A2A2A",
-            color: "#FFFFFF",
-          }}
-        >
-          <span className="font-bold flex items-center gap-1.5" style={{ color: "#FFFFFF" }}>
-            <Lock className="h-4 w-4" style={{ color: theme.secondaryAccentColor }} />
-            <span>Authentication Required:</span>
-          </span>
-          <span className="opacity-95 font-medium text-[#BDBDBD]">
-            Sign up or log in with Google / Email to generate scripts using your own personal Google AI API Key.
-          </span>
-          <button
-            onClick={() => setIsAuthModalOpen(true)}
-            className="px-4 py-1.5 rounded-xl font-extrabold text-xs transition-all shadow-md cursor-pointer flex items-center gap-1.5 shrink-0 border text-white"
-            style={{ backgroundColor: theme.accentColor, borderColor: theme.accentColor }}
-          >
-            <LogIn className="h-3.5 w-3.5" />
-            <span>Sign In / Register</span>
-          </button>
-        </div>
-      )}
-
-      {user && !profile?.hasApiKey && (
-        <div
-          className="border-b px-4 py-3 text-center text-xs font-mono flex flex-col sm:flex-row items-center justify-center gap-3 bg-[#111111] text-white"
-          style={{ borderColor: `${theme.accentColor}60` }}
-        >
-          <span className="font-bold flex items-center gap-1.5" style={{ color: "#FFFFFF" }}>
-            <Key className="h-4 w-4" style={{ color: theme.accentColor }} />
-            <span>Personal API Key Needed:</span>
-          </span>
-          <span className="opacity-95 text-[#BDBDBD]">Your account requires a Google AI Studio API Key before script generation can run.</span>
-          <button
-            onClick={() => setIsApiKeyModalOpen(true)}
-            className="px-3.5 py-1.5 rounded-xl text-white font-extrabold text-xs transition-all cursor-pointer flex items-center gap-1.5 shrink-0 border"
-            style={{ backgroundColor: theme.accentColor, borderColor: theme.accentColor }}
-          >
-            <Key className="h-3.5 w-3.5" />
-            <span>Configure Key Now</span>
-          </button>
-        </div>
-      )}
 
       {activeWorkspace === "chat" ? (
         <div className="relative z-10 w-full pt-3">

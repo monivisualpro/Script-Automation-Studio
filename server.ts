@@ -1,20 +1,10 @@
 import express from "express";
 import fs from "fs";
 import path from "path";
-import { GoogleGenAI, Type, Modality, LiveServerMessage } from "@google/genai";
-import { WebSocketServer, WebSocket as WsWebSocket } from "ws";
+import { GoogleGenAI, Type } from "@google/genai";
 import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
-import { loadFirebaseServerConfig } from "./server/firebaseConfig.js";
-
-const firebaseConfig = loadFirebaseServerConfig();
-import { encryptApiKey, decryptApiKey, maskApiKey } from "./server/encryption.js";
-import {
-  getFirestoreDoc,
-  updateFirestoreDoc,
-  deleteFirestoreDoc,
-  listFirestoreCollection,
-} from "./server/firestoreRest.js";
+import { maskApiKey } from "./server/encryption.js";
 import { validateSafeExternalUrl } from "./server/urlValidator.js";
 import {
   executeMultiProviderGeneration,
@@ -82,14 +72,14 @@ app.use((_req, res, next) => {
     "Content-Security-Policy",
     [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://apis.google.com https://www.gstatic.com",
-      "connect-src 'self' https://*.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com https://*.firebaseio.com",
-      "img-src 'self' data: blob: https://*.googleusercontent.com https://api.dicebear.com https://images.unsplash.com https://*.run.app",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+      "connect-src 'self' https://*.googleapis.com https://api.openai.com https://api.anthropic.com http://127.0.0.1:* http://localhost:*",
+      "img-src 'self' data: blob: https://api.dicebear.com https://images.unsplash.com",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com data:",
       "media-src 'self' blob: data:",
-      "frame-src 'self' https://*.firebaseapp.com https://*.google.com",
-      "frame-ancestors 'self' https://*.google.com https://*.googleusercontent.com https://*.ai.studio https://*.run.app https://script-automation-studio.ai.studio"
+      "frame-src 'self'",
+      "frame-ancestors 'self' http://localhost:* http://127.0.0.1:* https://*.google.com https://*.googleusercontent.com"
     ].join("; ")
   );
   next();
@@ -101,213 +91,15 @@ const isElectron = Boolean(process.versions?.electron);
 let httpServer: HttpServer | null = null;
 let serverStartPromise: Promise<HttpServer> | null = null;
 
-app.use(express.json({ limit: "10mb" }));
+app.use(express.json({ limit: "50mb" }));
 
-// ============================================================================
-// Free-Tier In-Memory Rate Limiting & Firestore Read Cache (Firebase Spark Safe)
-// ============================================================================
-interface RateBucket {
-  timestamps: number[];
-}
+// Local Desktop App — No artificial API throttling or usage limits
+const apiRateLimiter: express.RequestHandler = (_req, _res, next) => next();
+const writeRateLimiter: express.RequestHandler = (_req, _res, next) => next();
+const aiBurstLimiter: express.RequestHandler = (_req, _res, next) => next();
 
-const rateBuckets = new Map<string, RateBucket>();
-
-function getClientIdentifier(req: express.Request): string {
-  const forwarded = req.headers["x-forwarded-for"];
-  const ip = typeof forwarded === "string" ? forwarded.split(",")[0].trim() : req.socket.remoteAddress || "unknown-ip";
-  const authHeader = req.headers.authorization || "";
-  const tokenTail = authHeader.startsWith("Bearer ") ? authHeader.slice(-24) : "anon";
-  return `${ip}:${tokenTail}`;
-}
-
-function createRateLimiter(maxRequests: number, windowMs: number, errorMessage: string): express.RequestHandler {
-  return (req, res, next) => {
-    const now = Date.now();
-    const key = `${req.baseUrl || ""}:${maxRequests}:${getClientIdentifier(req)}`;
-    const bucket = rateBuckets.get(key) || { timestamps: [] };
-    bucket.timestamps = bucket.timestamps.filter((ts) => now - ts < windowMs);
-
-    if (bucket.timestamps.length >= maxRequests) {
-      const oldest = bucket.timestamps[0] || now;
-      const retryAfterSec = Math.max(1, Math.ceil((windowMs - (now - oldest)) / 1000));
-      res.setHeader("Retry-After", String(retryAfterSec));
-      return res.status(429).json({
-        error: `${errorMessage} Please retry in ${retryAfterSec}s.`,
-        retryAfterSeconds: retryAfterSec,
-      });
-    }
-
-    bucket.timestamps.push(now);
-    rateBuckets.set(key, bucket);
-    next();
-  };
-}
-
-// General API rate limit (60 requests / 1 minute per client)
-const apiRateLimiter = createRateLimiter(60, 60 * 1000, "Rate limit exceeded (max 60 requests/minute).");
-// Sensitive account/key write rate limit (15 requests / 15 minutes per client)
-const writeRateLimiter = createRateLimiter(15, 15 * 60 * 1000, "Too many account or key update attempts.");
-// Heavy AI generation burst limit (30 requests / 1 minute per client)
-const aiBurstLimiter = createRateLimiter(30, 60 * 1000, "Too many AI generation requests. Please wait a moment before sending more.");
-
-app.use("/api", apiRateLimiter);
-
-interface CachedUserAuthEntry {
-  uid: string;
-  email?: string;
-  name?: string;
-  emailVerified: boolean;
-  plainApiKey: string;
-  activeProvider?: AIProviderType;
-  tokenHash: string;
-  expiresAt: number;
-}
-
-const USER_AUTH_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
-const userAuthKeyCache = new Map<string, CachedUserAuthEntry>();
-
-function invalidateUserAuthCache(uid: string): void {
-  userAuthKeyCache.delete(uid);
-}
-
-// Resilient server-side encrypted key vault (supplements Firestore so personal encrypted API keys
-// remain reliable even when Firestore rules or Firestore API are not yet enabled on the Cloud project).
-const USER_KEYS_VAULT_FILE = path.resolve(process.cwd(), ".aistudio", "user-keys-vault.json");
-
-interface VaultKeyRecord {
-  uid: string;
-  activeProvider: AIProviderType;
-  activeModel: string;
-  baseUrl: string;
-  encryptedApiKey: string | null;
-  apiKeyMasked: string | null;
-  hasApiKey: boolean;
-  modelSettings?: Record<string, any>;
-  updatedAt: string;
-}
-
-const userKeysVault = new Map<string, VaultKeyRecord>();
-
-function loadUserKeysVault(): void {
-  try {
-    if (fs.existsSync(USER_KEYS_VAULT_FILE)) {
-      const raw = fs.readFileSync(USER_KEYS_VAULT_FILE, "utf8");
-      const parsed = JSON.parse(raw);
-      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-        for (const [uid, entry] of Object.entries(parsed)) {
-          if (entry && typeof entry === "object") {
-            userKeysVault.set(uid, entry as VaultKeyRecord);
-          }
-        }
-      }
-    }
-  } catch {
-    // ignore vault load errors
-  }
-}
-
-function saveUserKeysVault(): void {
-  try {
-    const dir = path.dirname(USER_KEYS_VAULT_FILE);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-    const obj: Record<string, VaultKeyRecord> = {};
-    for (const [uid, rec] of userKeysVault.entries()) {
-      obj[uid] = rec;
-    }
-    fs.writeFileSync(USER_KEYS_VAULT_FILE, JSON.stringify(obj, null, 2), {
-      encoding: "utf8",
-      mode: 0o600,
-    });
-  } catch {
-    // ignore vault write errors
-  }
-}
-
-loadUserKeysVault();
-
-function getUserKeyVaultRecord(uid: string): VaultKeyRecord | undefined {
-  return userKeysVault.get(uid);
-}
-
-function upsertUserKeyVaultRecord(uid: string, partial: Partial<VaultKeyRecord>): VaultKeyRecord {
-  const existing = userKeysVault.get(uid);
-  const merged: VaultKeyRecord = {
-    uid,
-    activeProvider: partial.activeProvider ?? existing?.activeProvider ?? "gemini",
-    activeModel: partial.activeModel ?? existing?.activeModel ?? "",
-    baseUrl: partial.baseUrl ?? existing?.baseUrl ?? "",
-    encryptedApiKey:
-      partial.encryptedApiKey !== undefined ? partial.encryptedApiKey : existing?.encryptedApiKey ?? null,
-    apiKeyMasked:
-      partial.apiKeyMasked !== undefined ? partial.apiKeyMasked : existing?.apiKeyMasked ?? null,
-    hasApiKey: partial.hasApiKey ?? existing?.hasApiKey ?? false,
-    modelSettings: partial.modelSettings ?? existing?.modelSettings,
-    updatedAt: partial.updatedAt ?? new Date().toISOString(),
-  };
-  userKeysVault.set(uid, merged);
-  saveUserKeysVault();
-  return merged;
-}
-
-function deleteUserKeyVaultRecord(uid: string): void {
-  if (userKeysVault.delete(uid)) {
-    saveUserKeysVault();
-  }
-}
-
-// Periodic cleanup of expired rate-limit buckets and cache entries every 5 minutes
-setInterval(() => {
-  const now = Date.now();
-  for (const [k, bucket] of rateBuckets.entries()) {
-    const active = bucket.timestamps.filter((ts) => now - ts < 15 * 60 * 1000);
-    if (active.length === 0) {
-      rateBuckets.delete(k);
-    } else {
-      bucket.timestamps = active;
-    }
-  }
-  for (const [uid, entry] of userAuthKeyCache.entries()) {
-    if (entry.expiresAt <= now) {
-      userAuthKeyCache.delete(uid);
-    }
-  }
-}, 5 * 60 * 1000).unref();
-
-// Helper to verify Firebase Auth ID token via Google Identity Toolkit API
-async function verifyAuthToken(idToken: string): Promise<{ uid: string; email?: string; name?: string; emailVerified: boolean }> {
-  const url = `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${firebaseConfig.apiKey}`;
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ idToken }),
-  });
-
-  if (!response.ok) {
-    const errData = await response.json().catch(() => ({}));
-    throw new Error(errData?.error?.message || "Invalid or expired authentication token.");
-  }
-
-  const data = await response.json();
-  if (!data.users || data.users.length === 0) {
-    throw new Error("User associated with token not found.");
-  }
-
-  const user = data.users[0];
-  return {
-    uid: user.localId,
-    email: user.email,
-    name: user.displayName,
-    emailVerified: Boolean(user.emailVerified),
-  };
-}
-
-// Detect Standalone / Local Offline Mode (Zero-Firebase Mode)
-export const isStandaloneMode = process.env.STANDALONE_MODE === "true" ||
-  process.env.LOCAL_OFFLINE_MODE === "true" ||
-  !firebaseConfig.apiKey ||
-  firebaseConfig.apiKey === "YOUR_FIREBASE_API_KEY";
+// 100% Pure Cross-Platform Desktop Mode (Windows, Linux, macOS)
+export const isStandaloneMode = true;
 
 export function resolveRequestProviderConfig(req: express.Request, fallbackKey?: string): AIProviderConfig {
   const bodyConfig = req.body?.providerConfig;
@@ -323,7 +115,7 @@ export function resolveRequestProviderConfig(req: express.Request, fallbackKey?:
       apiKey: sanitizeApiKey(bodyConfig.apiKey) || cleanFallback || "",
       model: bodyConfig.model || "",
       baseUrl: bodyConfig.baseUrl || "",
-      allowEnvFallback: isStandaloneMode,
+      allowEnvFallback: true,
     };
   }
 
@@ -333,25 +125,25 @@ export function resolveRequestProviderConfig(req: express.Request, fallbackKey?:
       apiKey: headerKey || cleanFallback || "",
       model: headerModel || "",
       baseUrl: headerUrl || "",
-      allowEnvFallback: isStandaloneMode,
+      allowEnvFallback: true,
     };
   }
 
-  const envProvider = isStandaloneMode ? (process.env.AI_PROVIDER || "").toLowerCase() : "";
+  const envProvider = (process.env.AI_PROVIDER || "").toLowerCase();
   if (envProvider === "openai" || envProvider === "claude" || envProvider === "local" || envProvider === "gemini") {
     return {
       provider: envProvider,
       apiKey: headerKey || cleanFallback || "",
       model: headerModel || "",
       baseUrl: headerUrl || "",
-      allowEnvFallback: isStandaloneMode,
+      allowEnvFallback: true,
     };
   }
 
   return {
     provider: "gemini",
     apiKey: cleanFallback || "",
-    allowEnvFallback: isStandaloneMode,
+    allowEnvFallback: true,
   };
 }
 
@@ -400,7 +192,7 @@ function createGoogleGenAIClient(apiKey: string): GoogleGenAI {
       },
     });
   }
-  // AQ... (Google AI Studio new Auth Key format) and AIzaSy... (legacy format) are standard API keys
+  // AQ... and AIzaSy... are Gemini API key formats
   return new GoogleGenAI({
     apiKey: trimmed,
     httpOptions: {
@@ -411,184 +203,38 @@ function createGoogleGenAIClient(apiKey: string): GoogleGenAI {
   });
 }
 
-// Authentication Middleware - Enforces user login, personal API key configuration, and 5-min Firestore read cache
-async function verifyUserAuth(req: AuthenticatedRequest, res: express.Response, next: express.NextFunction) {
-  try {
-    const authHeader = req.headers.authorization;
-    // Strictly govern standalone access via server environment — never trust spoofable client headers online
-    const isStandaloneReq = isStandaloneMode;
+// Local Desktop Request Provider & API Key Resolution Middleware
+async function verifyUserAuth(req: AuthenticatedRequest, _res: express.Response, next: express.NextFunction) {
+  req.userAuth = {
+    uid: "desktop-local-creator",
+    email: "local@desktop.workspace",
+    name: "Desktop Creator",
+    emailVerified: true,
+  };
+  const resolvedConfig = resolveRequestProviderConfig(req);
+  const requestedProvider = resolvedConfig.provider;
+  const envKeyForProvider =
+    requestedProvider === "openai"
+      ? sanitizeApiKey(process.env.OPENAI_API_KEY)
+      : requestedProvider === "claude"
+      ? sanitizeApiKey(process.env.ANTHROPIC_API_KEY)
+      : requestedProvider === "local"
+      ? sanitizeApiKey(process.env.LOCAL_LLM_API_KEY)
+      : sanitizeApiKey(process.env.GEMINI_API_KEY);
 
-    if (isStandaloneReq) {
-      req.userAuth = {
-        uid: "standalone-local-creator",
-        email: "local@standalone.workspace",
-        name: "Local Creator",
-        emailVerified: true,
-      };
-      const resolvedConfig = resolveRequestProviderConfig(req);
-      const requestedProvider = resolvedConfig.provider;
-      const envKeyForProvider =
-        requestedProvider === "openai"
-          ? sanitizeApiKey(process.env.OPENAI_API_KEY)
-          : requestedProvider === "claude"
-          ? sanitizeApiKey(process.env.ANTHROPIC_API_KEY)
-          : requestedProvider === "local"
-          ? sanitizeApiKey(process.env.LOCAL_LLM_API_KEY)
-          : sanitizeApiKey(process.env.GEMINI_API_KEY);
+  const headerKey = sanitizeApiKey((req.headers["x-provider-key"] as string) || (req.headers["x-api-key"] as string));
+  const bodyKey = sanitizeApiKey(req.body?.providerConfig?.apiKey || req.body?.apiKey);
+  const effectiveKey = headerKey || bodyKey || envKeyForProvider;
 
-      const headerKey = sanitizeApiKey((req.headers["x-provider-key"] as string) || (req.headers["x-api-key"] as string));
-      const bodyKey = sanitizeApiKey(req.body?.providerConfig?.apiKey || req.body?.apiKey);
-      const effectiveKey = headerKey || bodyKey || envKeyForProvider;
+  const geminiKey =
+    requestedProvider === "gemini"
+      ? effectiveKey
+      : sanitizeApiKey(process.env.GEMINI_API_KEY);
 
-      const geminiKey =
-        requestedProvider === "gemini"
-          ? effectiveKey
-          : sanitizeApiKey(process.env.GEMINI_API_KEY);
-
-      req.userApiKey = effectiveKey;
-      req.userAiClient = geminiKey ? createGoogleGenAIClient(geminiKey) : undefined;
-      req.providerConfig = resolveRequestProviderConfig(req, effectiveKey);
-      return next();
-    }
-
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({ error: "Authentication required. Please sign in and save your personal API key first." });
-    }
-
-    const token = authHeader.substring(7);
-    if (!token || token.startsWith("standalone_")) {
-      return res.status(401).json({ error: "Authentication required. Please sign in with a valid account." });
-    }
-    const tokenSignatureTail = token.slice(-32);
-    const isModelListingRoute = req.path.includes("available-models");
-
-    // Check 5-minute in-memory cache first if same token is presented
-    for (const cached of userAuthKeyCache.values()) {
-      if (cached.tokenHash === tokenSignatureTail && cached.expiresAt > Date.now() && cached.plainApiKey) {
-        req.userAuth = { uid: cached.uid, email: cached.email, emailVerified: cached.emailVerified };
-        req.userApiKey = cached.plainApiKey;
-        req.userAiClient = createGoogleGenAIClient(cached.plainApiKey);
-        req.providerConfig = resolveRequestProviderConfig(req, cached.plainApiKey);
-        if (req.providerConfig.provider === "local") {
-          return res.status(403).json({
-            error: "Local LLM models are only available when running the GitHub repository locally on your computer.",
-          });
-        }
-        const explicitReqKey = sanitizeApiKey((req.headers["x-provider-key"] as string) || req.body?.providerConfig?.apiKey);
-        if (!isModelListingRoute && cached.activeProvider && req.providerConfig.provider !== cached.activeProvider && !explicitReqKey) {
-          return res.status(403).json({
-            error: "NO_API_KEY",
-            message: `Your saved key is for ${cached.activeProvider.toUpperCase()}. Please paste and save your ${req.providerConfig.provider.toUpperCase()} API key in the secure API Key Saver first.`,
-          });
-        }
-        return next();
-      }
-    }
-
-    const userInfo = await verifyAuthToken(token);
-    req.userAuth = userInfo;
-
-    // Retrieve user document from Firestore (with resilient fallback to server encrypted vault)
-    let userData: Record<string, any> | null = null;
-    try {
-      const userDocSnap = await getFirestoreDoc("users", userInfo.uid, token);
-      if (userDocSnap.exists && userDocSnap.data) {
-        userData = userDocSnap.data;
-      }
-    } catch (fsReadErr: any) {
-      // Gracefully fallback to encrypted server vault without logging noisy 403 / permission errors
-    }
-
-    const vaultRecord = getUserKeyVaultRecord(userInfo.uid);
-    const mergedUserData: Record<string, any> = {
-      ...(vaultRecord || {}),
-      ...(userData || {}),
-      encryptedApiKey: userData?.encryptedApiKey || vaultRecord?.encryptedApiKey || null,
-      apiKeyMasked: userData?.apiKeyMasked || vaultRecord?.apiKeyMasked || null,
-      activeProvider: userData?.activeProvider || vaultRecord?.activeProvider || "gemini",
-    };
-
-    upsertDirectoryUser(userInfo.uid, {
-      name: mergedUserData.name || userInfo.name || "User",
-      email: mergedUserData.email || userInfo.email || "No email",
-      provider: mergedUserData.provider || "password",
-      hasApiKey: Boolean(mergedUserData.encryptedApiKey || mergedUserData.apiKeyMasked),
-      apiKeyMasked: mergedUserData.apiKeyMasked || null,
-      createdAt: mergedUserData.createdAt || null,
-      updatedAt: mergedUserData.updatedAt || null,
-    });
-    const encryptedKey = mergedUserData.encryptedApiKey;
-
-    if (!encryptedKey) {
-      return res.status(403).json({
-        error: "NO_API_KEY",
-        message: "No personal AI API Key saved for this account. Please paste and save your API Key in the secure API Key Saver.",
-      });
-    }
-
-    const { plainText: plainKey, isLegacy } = decryptApiKey(encryptedKey);
-    if (!plainKey || !plainKey.trim()) {
-      return res.status(403).json({
-        error: "NO_API_KEY",
-        message: "Invalid or corrupted API Key. Please re-enter your API key in Settings.",
-      });
-    }
-
-    // Auto-migrate legacy record: re-encrypt using ENCRYPTION_SECRET and update Firestore + vault
-    if (isLegacy) {
-      try {
-        const reEncryptedKey = encryptApiKey(plainKey);
-        upsertUserKeyVaultRecord(userInfo.uid, { encryptedApiKey: reEncryptedKey });
-        await updateFirestoreDoc("users", userInfo.uid, {
-          encryptedApiKey: reEncryptedKey,
-          updatedAt: new Date().toISOString(),
-        }, token);
-      } catch (migrateErr) {
-        logSafeError("Failed to auto-upgrade legacy encrypted key:", migrateErr);
-      }
-    }
-
-    const savedProvider: AIProviderType =
-      mergedUserData.activeProvider === "openai" || mergedUserData.activeProvider === "claude" || mergedUserData.activeProvider === "gemini"
-        ? mergedUserData.activeProvider
-        : "gemini";
-
-    // Store in 5-minute cache to protect Firebase Spark daily read quota
-    userAuthKeyCache.set(userInfo.uid, {
-      uid: userInfo.uid,
-      email: userInfo.email,
-      name: userInfo.name,
-      emailVerified: userInfo.emailVerified,
-      plainApiKey: plainKey,
-      activeProvider: savedProvider,
-      tokenHash: tokenSignatureTail,
-      expiresAt: Date.now() + USER_AUTH_CACHE_TTL_MS,
-    });
-
-    // Create a new GoogleGenAI client exclusively using the logged-in user's API key
-    req.userApiKey = plainKey;
-    req.userAiClient = createGoogleGenAIClient(plainKey);
-    req.providerConfig = resolveRequestProviderConfig(req, plainKey);
-
-    if (req.providerConfig.provider === "local") {
-      return res.status(403).json({
-        error: "Local LLM models are only available when running the GitHub repository locally on your computer.",
-      });
-    }
-
-    const explicitReqKey = sanitizeApiKey((req.headers["x-provider-key"] as string) || req.body?.providerConfig?.apiKey);
-    if (!isModelListingRoute && req.providerConfig.provider !== savedProvider && !explicitReqKey) {
-      return res.status(403).json({
-        error: "NO_API_KEY",
-        message: `Your saved key is for ${savedProvider.toUpperCase()}. Please paste and save your ${req.providerConfig.provider.toUpperCase()} API key in the secure API Key Saver first.`,
-      });
-    }
-
-    next();
-  } catch (error: any) {
-    logSafeError("Auth Verification Error:", error);
-    return res.status(401).json({ error: "Authentication failed. Please sign in again." });
-  }
+  req.userApiKey = effectiveKey;
+  req.userAiClient = geminiKey ? createGoogleGenAIClient(geminiKey) : undefined;
+  req.providerConfig = resolveRequestProviderConfig(req, effectiveKey);
+  return next();
 }
 
 // Helper to format Gemini API errors into clean, human-friendly messages
@@ -597,19 +243,19 @@ function formatGeminiErrorMessage(err: any): string {
   const errStr = typeof err === "string" ? err : (err.message || JSON.stringify(err));
   
   if (errStr.includes("API_KEY_SERVICE_BLOCKED")) {
-    return "API Key Restriction Blocked: Your API key is restricted in Google Cloud Console and does not allow the 'Generative Language API', or has HTTP-referrer/IP restrictions blocking server requests. Please generate a new key from Google AI Studio (https://aistudio.google.com/app/apikey) or update your key's API restrictions in Google Cloud Console.";
+    return "API Key Restriction Blocked: Your API key is restricted in Google Cloud Console and does not allow the 'Generative Language API', or has HTTP-referrer/IP restrictions blocking server requests. Please generate a new Gemini API key or update your key's API restrictions in Google Cloud Console.";
   }
   
   if (errStr.includes("API keys are not supported by this API")) {
-    return "API Key Configuration Error: The API key cannot access Generative Language API. Please ensure the Generative Language API is enabled in your Google Cloud project or create a key in Google AI Studio.";
+    return "API Key Configuration Error: The API key cannot access Generative Language API. Please ensure the Generative Language API is enabled in your Google Cloud project or configure a valid Gemini API key.";
   }
   
   if (errStr.includes("API_KEY_INVALID") || errStr.includes("API key not valid")) {
-    return "Invalid API Key: The provided API key is invalid or has been revoked. Please check your Google AI Studio API key.";
+    return "Invalid API Key: The provided API key is invalid or has been revoked. Please check your Gemini API key in Settings.";
   }
 
   if (errStr.includes("RESOURCE_EXHAUSTED") || errStr.includes("429")) {
-    return "Rate Limit / Quota Exceeded (429): You have exceeded your Gemini API quota or rate limit. Please try again shortly or check your Google AI Studio quota.";
+    return "Rate Limit / Quota Exceeded (429): You have exceeded your Gemini API quota or rate limit. Please try again shortly or check your API quota.";
   }
 
   try {
@@ -618,7 +264,7 @@ function formatGeminiErrorMessage(err: any): string {
       const parsed = JSON.parse(jsonMatch[0]);
       if (parsed.error?.message) {
         if (parsed.error.details?.[0]?.reason === "API_KEY_SERVICE_BLOCKED") {
-          return "API Key Restriction Blocked: Your Google API key is restricted and does not allow the Generative Language API. Please create a key in Google AI Studio or allow Generative Language API in Google Cloud Console.";
+          return "API Key Restriction Blocked: Your Google API key is restricted and does not allow the Generative Language API. Please generate an unrestricted Gemini API key or allow Generative Language API in Google Cloud Console.";
         }
         return parsed.error.message;
       }
@@ -709,7 +355,6 @@ const ALLOWED_LOCAL_ENV_KEYS = new Set([
 ]);
 
 function upsertLocalEnvFile(updates: Record<string, string>): void {
-  if (!isStandaloneMode) return;
   const envPath = path.resolve(process.cwd(), ".env");
   const eol = process.platform === "win32" ? "\r\n" : "\n";
   let lines: string[] = [];
@@ -717,7 +362,7 @@ function upsertLocalEnvFile(updates: Record<string, string>): void {
   if (fs.existsSync(envPath)) {
     lines = fs.readFileSync(envPath, "utf8").split(/\r?\n/);
   } else {
-    lines = ["STANDALONE_MODE=true", "PORT=3000"];
+    lines = ["PORT=3000"];
   }
 
   const sanitizedUpdates: Record<string, string> = {};
@@ -775,36 +420,14 @@ function getStandaloneEnvKeySummary() {
   };
 }
 
-// User Management Endpoints
+// Local Desktop Provider Key Management Endpoints
 app.post("/api/user/save-key", writeRateLimiter, async (req, res) => {
   try {
-    const authHeader = req.headers.authorization;
-    const isStandaloneReq = isStandaloneMode;
-
-    let verifiedToken = "";
-    let verifiedUserInfo: { uid: string; email?: string; name?: string; emailVerified: boolean } | null = null;
-    if (!isStandaloneReq) {
-      if (!authHeader || !authHeader.startsWith("Bearer ")) {
-        return res.status(401).json({ error: "Please sign in first before saving your personal API key." });
-      }
-      verifiedToken = authHeader.substring(7);
-      if (!verifiedToken || verifiedToken.startsWith("standalone_")) {
-        return res.status(401).json({ error: "Authentication required. Please sign in first." });
-      }
-      verifiedUserInfo = await verifyAuthToken(verifiedToken);
-    }
-
     const { provider = "gemini", apiKey = "", baseUrl = "", model = "", saveToEnv = true } = req.body;
     const providerType = (provider || "gemini").toLowerCase() as AIProviderType;
     const trimmedKey = sanitizeApiKey(apiKey);
     const trimmedBaseUrl = (baseUrl || "").trim();
     const trimmedModel = (model || "").trim();
-
-    if (!isStandaloneReq && providerType === "local") {
-      return res.status(400).json({
-        error: "Local LLM is disabled on the online published web app. Clone the GitHub repository to run local models offline.",
-      });
-    }
 
     if (providerType !== "local" && !trimmedKey) {
       return res.status(400).json({ error: `API Key is required for ${providerType.toUpperCase()}.` });
@@ -817,7 +440,7 @@ app.post("/api/user/save-key", writeRateLimiter, async (req, res) => {
         apiKey: trimmedKey,
         baseUrl: trimmedBaseUrl,
         model: trimmedModel,
-        allowEnvFallback: isStandaloneMode,
+        allowEnvFallback: true,
       };
       await executeMultiProviderGeneration({
         prompt: "Respond with the word CONNECTED to verify connection.",
@@ -832,89 +455,25 @@ app.post("/api/user/save-key", writeRateLimiter, async (req, res) => {
       });
     }
 
-    if (isStandaloneReq) {
-      let savedToEnvFile = false;
-      if (isStandaloneMode && saveToEnv !== false) {
-        const envUpdates: Record<string, string> = { AI_PROVIDER: providerType };
-        if (providerType === "gemini" && trimmedKey) envUpdates.GEMINI_API_KEY = trimmedKey;
-        if (providerType === "openai" && trimmedKey) envUpdates.OPENAI_API_KEY = trimmedKey;
-        if (providerType === "claude" && trimmedKey) envUpdates.ANTHROPIC_API_KEY = trimmedKey;
-        if (providerType === "local") {
-          if (trimmedBaseUrl) envUpdates.LOCAL_LLM_URL = trimmedBaseUrl;
-          if (trimmedModel) envUpdates.LOCAL_LLM_MODEL = trimmedModel;
-        }
-        upsertLocalEnvFile(envUpdates);
-        savedToEnvFile = true;
+    let savedToEnvFile = false;
+    if (saveToEnv !== false) {
+      const envUpdates: Record<string, string> = { AI_PROVIDER: providerType };
+      if (providerType === "gemini" && trimmedKey) envUpdates.GEMINI_API_KEY = trimmedKey;
+      if (providerType === "openai" && trimmedKey) envUpdates.OPENAI_API_KEY = trimmedKey;
+      if (providerType === "claude" && trimmedKey) envUpdates.ANTHROPIC_API_KEY = trimmedKey;
+      if (providerType === "local") {
+        if (trimmedBaseUrl) envUpdates.LOCAL_LLM_URL = trimmedBaseUrl;
+        if (trimmedModel) envUpdates.LOCAL_LLM_MODEL = trimmedModel;
       }
-
-      return res.json({
-        success: true,
-        activeProvider: providerType,
-        savedToEnvFile,
-        apiKeyMasked: providerType === "local" ? `Local (${trimmedBaseUrl || "http://127.0.0.1:1279/v1"})` : maskApiKey(trimmedKey),
-      });
+      upsertLocalEnvFile(envUpdates);
+      savedToEnvFile = true;
     }
-
-    const token = verifiedToken;
-    const userInfo = verifiedUserInfo!;
-
-    const encrypted = encryptApiKey(trimmedKey || "local-key");
-    const masked = providerType === "local"
-      ? `Local (${trimmedBaseUrl || "http://localhost:1234/v1"})`
-      : maskApiKey(trimmedKey);
-
-    const nowIso = new Date().toISOString();
-
-    upsertUserKeyVaultRecord(userInfo.uid, {
-      activeProvider: providerType,
-      activeModel: trimmedModel,
-      baseUrl: trimmedBaseUrl,
-      encryptedApiKey: encrypted,
-      apiKeyMasked: masked,
-      hasApiKey: true,
-      updatedAt: nowIso,
-    });
-
-    try {
-      await updateFirestoreDoc("users", userInfo.uid, {
-        activeProvider: providerType,
-        activeModel: trimmedModel,
-        baseUrl: trimmedBaseUrl,
-        encryptedApiKey: encrypted,
-        apiKeyMasked: masked,
-        hasApiKey: true,
-        updatedAt: nowIso,
-      }, token);
-    } catch (fsWriteErr) {
-      logSafeError("Firestore save-key sync notice (saved securely in server vault):", fsWriteErr);
-    }
-
-    upsertDirectoryUser(userInfo.uid, {
-      name: userInfo.name,
-      email: userInfo.email,
-      hasApiKey: true,
-      apiKeyMasked: masked,
-      updatedAt: nowIso,
-    });
-
-    userAuthKeyCache.set(userInfo.uid, {
-      uid: userInfo.uid,
-      email: userInfo.email,
-      name: userInfo.name,
-      emailVerified: userInfo.emailVerified,
-      plainApiKey: trimmedKey,
-      activeProvider: providerType,
-      tokenHash: token.slice(-32),
-      expiresAt: Date.now() + USER_AUTH_CACHE_TTL_MS,
-    });
 
     return res.json({
       success: true,
       activeProvider: providerType,
-      activeModel: trimmedModel,
-      baseUrl: trimmedBaseUrl,
-      apiKeyMasked: masked,
-      hasApiKey: true,
+      savedToEnvFile,
+      apiKeyMasked: providerType === "local" ? `Local (${trimmedBaseUrl || "http://127.0.0.1:1279/v1"})` : maskApiKey(trimmedKey),
     });
   } catch (error: any) {
     logSafeError("Error saving API Key / Provider:", error);
@@ -922,95 +481,19 @@ app.post("/api/user/save-key", writeRateLimiter, async (req, res) => {
   }
 });
 
-app.get("/api/user/profile-status", async (req, res) => {
-  try {
-    if (isStandaloneMode) {
-      return res.json({ standalone: true, hasApiKey: true });
-    }
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({ error: "Authentication required." });
-    }
-    const token = authHeader.substring(7);
-    const userInfo = await verifyAuthToken(token);
-
-    let fsData: Record<string, any> | null = null;
-    try {
-      const snap = await getFirestoreDoc("users", userInfo.uid, token);
-      if (snap.exists && snap.data) fsData = snap.data;
-    } catch {
-      // ignore Firestore unavailable
-    }
-
-    const vault = getUserKeyVaultRecord(userInfo.uid);
-    const hasApiKey = Boolean(fsData?.encryptedApiKey || fsData?.apiKeyMasked || vault?.encryptedApiKey || vault?.apiKeyMasked);
-    const apiKeyMasked = fsData?.apiKeyMasked || vault?.apiKeyMasked || null;
-    const activeProvider = fsData?.activeProvider || vault?.activeProvider || "gemini";
-    const activeModel = fsData?.activeModel || vault?.activeModel || "";
-    const baseUrl = fsData?.baseUrl || vault?.baseUrl || "";
-    const modelSettings = fsData?.modelSettings || vault?.modelSettings || null;
-
-    return res.json({
-      hasApiKey,
-      apiKeyMasked,
-      activeProvider,
-      activeModel,
-      baseUrl,
-      modelSettings,
-    });
-  } catch {
-    return res.status(401).json({ error: "Invalid authentication." });
-  }
+app.get("/api/user/profile-status", async (_req, res) => {
+  return res.json({ standalone: true, desktopOnly: true, hasApiKey: true });
 });
 
 app.post("/api/user/remove-key", writeRateLimiter, async (req, res) => {
   try {
-    if (isStandaloneMode) {
-      const targetProvider = String(req.body?.provider || "all").toLowerCase();
-      const envUpdates: Record<string, string> = {};
-      if (targetProvider === "gemini" || targetProvider === "all") envUpdates.GEMINI_API_KEY = "";
-      if (targetProvider === "openai" || targetProvider === "all") envUpdates.OPENAI_API_KEY = "";
-      if (targetProvider === "claude" || targetProvider === "all") envUpdates.ANTHROPIC_API_KEY = "";
-      upsertLocalEnvFile(envUpdates);
-      return res.json({ success: true, clearedLocalEnv: true });
-    }
-
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({ error: "Authentication required." });
-    }
-    const token = authHeader.substring(7);
-    const userInfo = await verifyAuthToken(token);
-
-    const nowIso = new Date().toISOString();
-    upsertUserKeyVaultRecord(userInfo.uid, {
-      encryptedApiKey: null,
-      apiKeyMasked: null,
-      hasApiKey: false,
-      updatedAt: nowIso,
-    });
-
-    try {
-      await updateFirestoreDoc("users", userInfo.uid, {
-        encryptedApiKey: null,
-        apiKeyMasked: null,
-        hasApiKey: false,
-        updatedAt: nowIso,
-      }, token);
-    } catch (fsErr) {
-      logSafeError("Firestore remove-key sync notice:", fsErr);
-    }
-
-    upsertDirectoryUser(userInfo.uid, {
-      name: userInfo.name,
-      email: userInfo.email,
-      hasApiKey: false,
-      apiKeyMasked: null,
-      updatedAt: nowIso,
-    });
-    invalidateUserAuthCache(userInfo.uid);
-
-    return res.json({ success: true });
+    const targetProvider = String(req.body?.provider || "all").toLowerCase();
+    const envUpdates: Record<string, string> = {};
+    if (targetProvider === "gemini" || targetProvider === "all") envUpdates.GEMINI_API_KEY = "";
+    if (targetProvider === "openai" || targetProvider === "all") envUpdates.OPENAI_API_KEY = "";
+    if (targetProvider === "claude" || targetProvider === "all") envUpdates.ANTHROPIC_API_KEY = "";
+    upsertLocalEnvFile(envUpdates);
+    return res.json({ success: true, clearedLocalEnv: true });
   } catch (error: any) {
     logSafeError("Error removing API Key:", error);
     return res.status(500).json({ error: "Failed to remove API key." });
@@ -1022,19 +505,18 @@ app.get("/api/system/mode", (_req, res) => {
     { id: "gemini", name: "Google Gemini", defaultModel: "gemini-3.1-flash-lite" },
     { id: "openai", name: "OpenAI", defaultModel: "gpt-4o-mini" },
     { id: "claude", name: "Anthropic Claude", defaultModel: "claude-3-7-sonnet-20250219" },
-  ];
-  if (isStandaloneMode) {
-    providers.push({
+    {
       id: "local",
       name: "Local Engine (Built-In llama.cpp GPU/CPU / LM Studio / Ollama)",
       defaultModel: "default",
       defaultUrl: "http://127.0.0.1:1279/v1",
-    });
-  }
+    },
+  ];
   return res.json({
-    standalone: isStandaloneMode,
+    standalone: true,
+    desktopOnly: true,
     supportedProviders: providers,
-    ...(isStandaloneMode ? { envKeys: getStandaloneEnvKeySummary() } : {}),
+    envKeys: getStandaloneEnvKeySummary(),
     appName: "Script Automation Studio",
     author: "Muhammad Tehseen Irshad",
     brand: "Moni Visual Pro"
@@ -1042,20 +524,14 @@ app.get("/api/system/mode", (_req, res) => {
 });
 
 // ============================================================================
-// Built-In Local LLM Engine Management (Strictly Local Standalone Mode Only)
+// Built-In Local LLM Engine Management (Windows / Linux / macOS)
 // ============================================================================
 app.get("/api/local-engine/status", (_req, res) => {
-  if (!isStandaloneMode) {
-    return res.status(403).json({ error: "Built-In Local Engine is disabled on the online published web app." });
-  }
   ensureLocalEngineDirs();
   return res.json(getLocalEngineStatus());
 });
 
 app.post("/api/local-engine/start", writeRateLimiter, async (req, res) => {
-  if (!isStandaloneMode) {
-    return res.status(403).json({ error: "Built-In Local Engine is disabled on the online published web app." });
-  }
   try {
     const { modelRelativePath, computeMode, gpuLayers, contextSize, threads, port, async: isAsync } = req.body || {};
     const status = await startLocalEngine({
@@ -1074,17 +550,11 @@ app.post("/api/local-engine/start", writeRateLimiter, async (req, res) => {
 });
 
 app.post("/api/local-engine/stop", async (_req, res) => {
-  if (!isStandaloneMode) {
-    return res.status(403).json({ error: "Built-In Local Engine is disabled on the online published web app." });
-  }
   await stopLocalEngine();
   return res.json({ success: true, status: getLocalEngineStatus() });
 });
 
 app.post("/api/local-engine/download-model", writeRateLimiter, async (req, res) => {
-  if (!isStandaloneMode) {
-    return res.status(403).json({ error: "Built-In Local Engine is disabled on the online published web app." });
-  }
   try {
     const { url, fileName } = req.body || {};
     const download = await startModelDownload(url, fileName);
@@ -1095,17 +565,11 @@ app.post("/api/local-engine/download-model", writeRateLimiter, async (req, res) 
 });
 
 app.post("/api/local-engine/cancel-download", (_req, res) => {
-  if (!isStandaloneMode) {
-    return res.status(403).json({ error: "Built-In Local Engine is disabled on the online published web app." });
-  }
   cancelModelDownload();
   return res.json({ success: true, status: getLocalEngineStatus() });
 });
 
 app.post("/api/local-engine/models-dir", writeRateLimiter, (req, res) => {
-  if (!isStandaloneMode) {
-    return res.status(403).json({ error: "Built-In Local Engine is disabled on the online published web app." });
-  }
   try {
     const { directoryPath } = req.body || {};
     const status = setCustomModelsDirectory(typeof directoryPath === "string" ? directoryPath : "");
@@ -1115,18 +579,12 @@ app.post("/api/local-engine/models-dir", writeRateLimiter, (req, res) => {
   }
 });
 
-// Local Linked Skills Folders (Claude, VS Code, Cursor, Bionic, Agents) - Standalone Software Only
+// Local Linked Skills Folders (Claude, VS Code, Cursor, Bionic, Agents)
 app.get("/api/local-skills", (_req, res) => {
-  if (!isStandaloneMode) {
-    return res.status(403).json({ error: "Local Skills Folder linking is available only in local standalone software mode." });
-  }
   return res.json(scanLinkedSkillFolders());
 });
 
 app.post("/api/local-skills/link", writeRateLimiter, (req, res) => {
-  if (!isStandaloneMode) {
-    return res.status(403).json({ error: "Local Skills Folder linking is available only in local standalone software mode." });
-  }
   try {
     const { directoryPath } = req.body || {};
     if (typeof directoryPath !== "string" || !directoryPath.trim()) {
@@ -1140,18 +598,12 @@ app.post("/api/local-skills/link", writeRateLimiter, (req, res) => {
 });
 
 app.post("/api/local-skills/unlink", writeRateLimiter, (req, res) => {
-  if (!isStandaloneMode) {
-    return res.status(403).json({ error: "Local Skills Folder linking is available only in local standalone software mode." });
-  }
   const { directoryPath } = req.body || {};
   const result = removeLinkedSkillFolder(typeof directoryPath === "string" ? directoryPath : "");
   return res.json({ success: true, ...result });
 });
 
 app.post("/api/local-skills/rescan", (_req, res) => {
-  if (!isStandaloneMode) {
-    return res.status(403).json({ error: "Local Skills Folder linking is available only in local standalone software mode." });
-  }
   return res.json({ success: true, ...scanLinkedSkillFolders() });
 });
 
@@ -1181,7 +633,7 @@ app.post("/api/test-provider-connection", verifyUserAuth as express.RequestHandl
 app.get("/api/user/available-models", verifyUserAuth as express.RequestHandler, async (req: AuthenticatedRequest, res) => {
   try {
     const provider = req.providerConfig?.provider || "gemini";
-    const includeLocal = isStandaloneMode && (req.query.includeLocal === "true" || provider === "local");
+    const includeLocal = req.query.includeLocal !== "false" || provider === "local";
 
     const buildLocalModelsList = async () => {
       const seen = new Set<string>();
@@ -1285,43 +737,47 @@ app.get("/api/user/available-models", verifyUserAuth as express.RequestHandler, 
       }
 
       const defaultModels = [
-        { id: "gemini-4-hydrogen", displayName: "Gemini 4 Hydrogen (Recommended)", providerType: "gemini" as const },
-        { id: "gemini-3.1-flash-lite", displayName: "Gemini 3.1 Flash Lite (Ultra Fast)", providerType: "gemini" as const },
+        { id: "gemini-3.1-flash-lite", displayName: "Gemini 3.1 Flash Lite (Recommended · Ultra Fast)", providerType: "gemini" as const },
+        { id: "gemini-3.6-flash", displayName: "Gemini 3.6 Flash", providerType: "gemini" as const },
         { id: "gemini-2.5-flash", displayName: "Gemini 2.5 Flash", providerType: "gemini" as const },
         { id: "gemini-2.5-pro", displayName: "Gemini 2.5 Pro", providerType: "gemini" as const },
         { id: "gemini-2.5-flash-lite", displayName: "Gemini 2.5 Flash Lite", providerType: "gemini" as const },
       ];
 
-      if (req.userAiClient && provider === "gemini") {
+      const geminiKey = req.userApiKey || "";
+      if (req.userAiClient && provider === "gemini" && geminiKey && !geminiKey.startsWith("AQ.")) {
         try {
-          const response = await req.userAiClient.models.list();
+          const response = await Promise.race([
+            req.userAiClient.models.list(),
+            new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500)),
+          ]);
           const dynamicList: Array<{ id: string; displayName: string; providerType: "gemini" }> = [];
-          if (response && Array.isArray((response as any).models)) {
-            for (const m of (response as any).models) {
-              if (m.name && m.name.includes("gemini")) {
-                const cleanId = m.name.replace(/^models\//, "");
-                dynamicList.push({
-                  id: cleanId,
-                  displayName: m.displayName || cleanId,
-                  providerType: "gemini",
-                });
-              }
+          const pageModels = Array.isArray((response as any)?.page)
+            ? (response as any).page
+            : Array.isArray((response as any)?.models)
+            ? (response as any).models
+            : [];
+
+          for (const m of pageModels) {
+            if (m?.name && String(m.name).includes("gemini")) {
+              const cleanId = String(m.name).replace(/^models\//, "");
+              dynamicList.push({
+                id: cleanId,
+                displayName: m.displayName || cleanId,
+                providerType: "gemini",
+              });
             }
           }
           if (dynamicList.length > 0) {
             return dynamicList;
           }
         } catch {
-          console.warn("Dynamic Gemini model fetching skipped/failed, using curated list.");
+          // Silently fall back to curated list when offline or key lacks list permissions
         }
       }
 
       return defaultModels;
     };
-
-    if (provider === "local" && !isStandaloneMode) {
-      return res.status(403).json({ error: "Local models are disabled on the online published web app." });
-    }
 
     const [localModels, cloudModels] = await Promise.all([
       includeLocal ? buildLocalModelsList() : Promise.resolve([]),
@@ -1347,322 +803,27 @@ app.get("/api/user/available-models", verifyUserAuth as express.RequestHandler, 
   }
 });
 
+const LOCAL_MODEL_SETTINGS_FILE = path.resolve(process.cwd(), ".studio-data", "model-settings.json");
+
 app.post("/api/user/model-settings", writeRateLimiter, async (req, res) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({ error: "Authentication required." });
-    }
-    const token = authHeader.substring(7);
-    const userInfo = await verifyAuthToken(token);
-
     const { modelSettings } = req.body;
     if (!modelSettings || typeof modelSettings !== "object") {
       return res.status(400).json({ error: "Model settings required." });
     }
-
-    const nowIso = new Date().toISOString();
-    upsertUserKeyVaultRecord(userInfo.uid, {
-      modelSettings,
-      updatedAt: nowIso,
-    });
-
-    try {
-      await updateFirestoreDoc("users", userInfo.uid, {
-        modelSettings,
-        updatedAt: nowIso,
-      }, token);
-    } catch (fsErr) {
-      logSafeError("Firestore model-settings sync notice:", fsErr);
-    }
-
-    return res.json({ success: true });
-  } catch (error: any) {
-    logSafeError("Error saving model settings:", error);
-    return res.status(500).json({ error: "Failed to save model settings." });
-  }
-});
-
-app.post("/api/user/delete-account", writeRateLimiter, async (req, res) => {
-  try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({ error: "Authentication required." });
-    }
-    const token = authHeader.substring(7);
-    const userInfo = await verifyAuthToken(token);
-
-    invalidateUserAuthCache(userInfo.uid);
-    removeDirectoryUser(userInfo.uid);
-    deleteUserKeyVaultRecord(userInfo.uid);
-    try {
-      await deleteFirestoreDoc("users", userInfo.uid, token);
-    } catch (fsErr) {
-      logSafeError("Firestore delete-account sync notice:", fsErr);
-    }
-
-    return res.json({ success: true });
-  } catch (error: any) {
-    logSafeError("Error deleting user account:", error);
-    return res.status(500).json({ error: "Failed to delete account." });
-  }
-});
-
-// ============================================================================
-// Admin Endpoints & Resilient Masked User Directory Registry
-// ============================================================================
-const ADMIN_PRIMARY_EMAIL = "tahsinirshad7370@gmail.com";
-const USER_DIRECTORY_FILE = path.resolve(process.cwd(), ".aistudio", "user-directory-cache.json");
-
-interface DirectoryUserEntry {
-  userId: string;
-  name: string;
-  email: string;
-  provider: string;
-  role: "admin" | "user";
-  isAdmin: boolean;
-  hasApiKey: boolean;
-  apiKeyMasked: string | null;
-  createdAt: string | null;
-  updatedAt: string | null;
-}
-
-const userDirectoryRegistry = new Map<string, DirectoryUserEntry>();
-
-function loadDirectoryRegistry(): void {
-  try {
-    if (fs.existsSync(USER_DIRECTORY_FILE)) {
-      const raw = fs.readFileSync(USER_DIRECTORY_FILE, "utf8");
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
-        for (const item of parsed) {
-          if (item && typeof item.userId === "string") {
-            userDirectoryRegistry.set(item.userId, item);
-          }
-        }
-      }
-    }
-  } catch {
-    // ignore cache read errors
-  }
-}
-
-function saveDirectoryRegistry(): void {
-  try {
-    const dir = path.dirname(USER_DIRECTORY_FILE);
+    const dir = path.dirname(LOCAL_MODEL_SETTINGS_FILE);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
     fs.writeFileSync(
-      USER_DIRECTORY_FILE,
-      JSON.stringify(Array.from(userDirectoryRegistry.values()), null, 2),
+      LOCAL_MODEL_SETTINGS_FILE,
+      JSON.stringify({ modelSettings, updatedAt: new Date().toISOString() }, null, 2),
       "utf8"
     );
-  } catch {
-    // ignore cache write errors
-  }
-}
-
-loadDirectoryRegistry();
-
-function upsertDirectoryUser(userId: string, partial: Partial<DirectoryUserEntry>): DirectoryUserEntry {
-  const existing = userDirectoryRegistry.get(userId);
-  const email = (partial.email ?? existing?.email ?? "No email").trim();
-  const isSoleAdmin = email.toLowerCase() === ADMIN_PRIMARY_EMAIL;
-  const nowIso = new Date().toISOString();
-
-  const merged: DirectoryUserEntry = {
-    userId,
-    name: (partial.name ?? existing?.name ?? (email.split("@")[0] || "User")).slice(0, 120),
-    email: email.slice(0, 254),
-    provider: (partial.provider ?? existing?.provider ?? "password").slice(0, 64),
-    role: isSoleAdmin ? "admin" : "user",
-    isAdmin: isSoleAdmin,
-    hasApiKey: partial.hasApiKey ?? existing?.hasApiKey ?? false,
-    apiKeyMasked: partial.apiKeyMasked !== undefined ? partial.apiKeyMasked : (existing?.apiKeyMasked ?? null),
-    createdAt: partial.createdAt ?? existing?.createdAt ?? nowIso,
-    updatedAt: partial.updatedAt ?? existing?.updatedAt ?? nowIso,
-  };
-
-  userDirectoryRegistry.set(userId, merged);
-  saveDirectoryRegistry();
-  return merged;
-}
-
-function removeDirectoryUser(userId: string): void {
-  if (userDirectoryRegistry.delete(userId)) {
-    saveDirectoryRegistry();
-  }
-}
-
-// Lightweight authenticated profile sync so signed-in users appear in Admin Directory even under strict owner-only Firestore rules
-app.post("/api/user/sync-directory", async (req, res) => {
-  try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({ error: "Authentication required." });
-    }
-    const token = authHeader.substring(7);
-    const userInfo = await verifyAuthToken(token);
-
-    const { name, provider, hasApiKey, apiKeyMasked, createdAt, updatedAt } = req.body || {};
-    upsertDirectoryUser(userInfo.uid, {
-      name: typeof name === "string" ? name : userInfo.name,
-      email: userInfo.email,
-      provider: typeof provider === "string" ? provider : "password",
-      hasApiKey: typeof hasApiKey === "boolean" ? hasApiKey : undefined,
-      apiKeyMasked: typeof apiKeyMasked === "string" || apiKeyMasked === null ? apiKeyMasked : undefined,
-      createdAt: typeof createdAt === "string" ? createdAt : undefined,
-      updatedAt: typeof updatedAt === "string" ? updatedAt : undefined,
-    });
-
     return res.json({ success: true });
-  } catch {
-    return res.status(401).json({ error: "Invalid token." });
-  }
-});
-
-function verifyCallerIsAdmin(userInfo: { uid: string; email?: string }): boolean {
-  const callerEmail = (userInfo.email || "").trim().toLowerCase();
-  return callerEmail === ADMIN_PRIMARY_EMAIL.toLowerCase();
-}
-
-app.get("/api/admin/users", async (req, res) => {
-  try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({ error: "Authentication required." });
-    }
-    const token = authHeader.substring(7);
-    const userInfo = await verifyAuthToken(token);
-
-    if (!verifyCallerIsAdmin(userInfo)) {
-      return res.status(403).json({ error: "Access denied. Sole owner privileges required." });
-    }
-
-    // 1. Always ensure the admin's own live Firestore profile is synced into the directory
-    try {
-      const adminSnap = await getFirestoreDoc("users", userInfo.uid, token);
-      if (adminSnap.exists && adminSnap.data) {
-        const d = adminSnap.data;
-        upsertDirectoryUser(userInfo.uid, {
-          name: d.name || userInfo.name || "Primary Owner",
-          email: d.email || userInfo.email || ADMIN_PRIMARY_EMAIL,
-          provider: d.provider || "password",
-          hasApiKey: Boolean(d.encryptedApiKey || d.apiKeyMasked),
-          apiKeyMasked: d.apiKeyMasked || null,
-          createdAt: d.createdAt || null,
-          updatedAt: d.updatedAt || null,
-        });
-      } else {
-        upsertDirectoryUser(userInfo.uid, {
-          name: userInfo.name || "Primary Owner",
-          email: userInfo.email || ADMIN_PRIMARY_EMAIL,
-        });
-      }
-    } catch {
-      upsertDirectoryUser(userInfo.uid, {
-        name: userInfo.name || "Primary Owner",
-        email: userInfo.email || ADMIN_PRIMARY_EMAIL,
-      });
-    }
-
-    // 2. Query Firestore collection list directly using admin's verified ID token
-    try {
-      const docsList = await listFirestoreCollection("users", token);
-      docsList.forEach(({ id, data }) => {
-        upsertDirectoryUser(id, {
-          name: data.name || "User",
-          email: data.email || "No email",
-          provider: data.provider || "password",
-          hasApiKey: Boolean(data.encryptedApiKey || data.apiKeyMasked),
-          apiKeyMasked: data.apiKeyMasked || null,
-          createdAt: data.createdAt || null,
-          updatedAt: data.updatedAt || null,
-        });
-      });
-    } catch (err: any) {
-      logSafeError("[Admin] Firestore live list note (using synced registry fallback):", err);
-    }
-
-    const usersList = Array.from(userDirectoryRegistry.values()).sort((a, b) => {
-      if (a.isAdmin && !b.isAdmin) return -1;
-      if (!a.isAdmin && b.isAdmin) return 1;
-      return (b.updatedAt || "").localeCompare(a.updatedAt || "");
-    });
-
-    return res.json({ 
-      users: usersList,
-      totalUsers: usersList.length,
-      firestoreDatabaseId: firebaseConfig.firestoreDatabaseId,
-      projectId: firebaseConfig.projectId
-    });
   } catch (error: any) {
-    logSafeError("Admin list users error:", error);
-    return res.status(500).json({ error: "Failed to fetch user list." });
-  }
-});
-
-// Admin endpoint to sync / import any Firebase Auth account into the live directory
-app.post("/api/admin/sync-user", async (req, res) => {
-  try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({ error: "Authentication required." });
-    }
-    const token = authHeader.substring(7);
-    const userInfo = await verifyAuthToken(token);
-
-    if (!verifyCallerIsAdmin(userInfo)) {
-      return res.status(403).json({ error: "Access denied. Sole owner privileges required." });
-    }
-
-    const { email, name, userId, provider, hasApiKey } = req.body || {};
-    if (!email || typeof email !== "string" || !email.includes("@")) {
-      return res.status(400).json({ error: "Valid user email address is required." });
-    }
-
-    const cleanEmail = email.trim().toLowerCase();
-    const resolvedUid = (userId && typeof userId === "string" && userId.trim()) 
-      ? userId.trim().slice(0, 128)
-      : `auth_${Buffer.from(cleanEmail).toString("hex").slice(0, 24)}`;
-    const cleanName = (name && typeof name === "string" && name.trim()) 
-      ? name.trim().slice(0, 120) 
-      : cleanEmail.split("@")[0];
-    const cleanProvider = (provider && typeof provider === "string" && provider.trim()) 
-      ? provider.trim().slice(0, 64) 
-      : "google.com";
-
-    const entry = upsertDirectoryUser(resolvedUid, {
-      name: cleanName,
-      email: cleanEmail,
-      provider: cleanProvider,
-      hasApiKey: Boolean(hasApiKey),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    });
-
-    // Also attempt to initialize a live Firestore record if possible
-    try {
-      await updateFirestoreDoc("users", resolvedUid, {
-        userId: resolvedUid,
-        name: cleanName,
-        email: cleanEmail,
-        provider: cleanProvider,
-        role: "user",
-        isAdmin: false,
-        hasApiKey: Boolean(hasApiKey),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      }, token);
-    } catch (fsErr) {
-      logSafeError("[Admin] Firestore sync doc write notice (saved to directory cache):", fsErr);
-    }
-
-    return res.json({ success: true, user: entry });
-  } catch (error: any) {
-    logSafeError("Admin sync user error:", error);
-    return res.status(500).json({ error: "Failed to sync user account." });
+    logSafeError("Error saving model settings:", error);
+    return res.status(500).json({ error: "Failed to save model settings." });
   }
 });
 
@@ -2271,7 +1432,7 @@ app.post("/api/parse-file", verifyUserAuth as express.RequestHandler, aiBurstLim
         return res.status(400).json({ error: "Invalid PDF format. File header does not match PDF specification (%PDF-)." });
       }
 
-      const standaloneGeminiEnv = isStandaloneMode ? sanitizeApiKey(process.env.GEMINI_API_KEY) : "";
+      const standaloneGeminiEnv = sanitizeApiKey(process.env.GEMINI_API_KEY);
       if (!req.userAiClient && !standaloneGeminiEnv) {
         return res.status(400).json({
           error: "PDF binary extraction requires a valid Google Gemini API key. For Local Engine / OpenAI / Claude, please upload a .txt file or paste the text directly.",
@@ -2280,7 +1441,7 @@ app.post("/api/parse-file", verifyUserAuth as express.RequestHandler, aiBurstLim
 
       const geminiConfig: AIProviderConfig = providerConfig.provider === "gemini"
         ? providerConfig
-        : { provider: "gemini", apiKey: standaloneGeminiEnv, allowEnvFallback: isStandaloneMode };
+        : { provider: "gemini", apiKey: standaloneGeminiEnv, allowEnvFallback: true };
 
       const result = await executeMultiProviderGeneration({
         prompt: "Extract and return the full text content of this PDF file.",
@@ -3187,158 +2348,31 @@ const DEFAULT_CHAT_WORKSPACE_INSTRUCTION = `You are an advanced, flagship AI ass
 
 async function prepareChatWorkspacePayload(req: AuthenticatedRequest) {
   const providerConfig = req.providerConfig || resolveRequestProviderConfig(req, req.userApiKey);
-  if (providerConfig.provider === "local" && !isStandaloneMode) {
-    throw Object.assign(
-      new Error("Local LLM execution is available only when running locally in Standalone Mode."),
-      { statusCode: 403 }
-    );
-  }
-
   const rawMessages = Array.isArray(req.body?.messages) ? req.body.messages : [];
-
-  if (!isStandaloneMode && rawMessages.some((m: any) => m && (m.imageDataUrl || (Array.isArray(m.imageDataUrls) && m.imageDataUrls.length > 0)))) {
-    throw Object.assign(
-      new Error(
-        "Direct image uploads are disabled on the free Firebase Spark plan. Paste public Google Drive image links ('Anyone with the link') instead."
-      ),
-      { statusCode: 400 }
-    );
-  }
-
-  if (!isStandaloneMode) {
-    if (rawMessages.length > 40) {
-      throw Object.assign(
-        new Error(
-          "This chat reached the 40-message limit for free Firebase Spark storage. Please delete this chat or start a new chat."
-        ),
-        { statusCode: 400 }
-      );
-    }
-    const oversized = rawMessages.some(
-      (m: any) => typeof m?.content === "string" && m.content.length > 120000
-    );
-    if (oversized) {
-      throw Object.assign(
-        new Error("Message exceeds 120,000 characters. Please split very large screenplays into smaller parts."),
-        { statusCode: 400 }
-      );
-    }
-  }
-
-  const parseDriveId = (val: string): string | null => {
-    const trimmed = val.trim();
-    if (/^[a-zA-Z0-9_-]{10,80}$/.test(trimmed)) return trimmed;
-    try {
-      const parsed = new URL(trimmed);
-      const host = parsed.hostname.toLowerCase();
-      if (host === "drive.google.com" || host === "docs.google.com") {
-        const pathMatch = parsed.pathname.match(/\/d\/([a-zA-Z0-9_-]{10,80})/);
-        if (pathMatch?.[1]) return pathMatch[1];
-        const idParam = parsed.searchParams.get("id");
-        if (idParam && /^[a-zA-Z0-9_-]{10,80}$/.test(idParam)) return idParam;
-      }
-    } catch {
-      return null;
-    }
-    return null;
-  };
-
-  const resolveDriveFileIdsFromMessage = (m: any): string[] => {
-    const ids: string[] = [];
-    const addId = (raw?: any) => {
-      if (typeof raw !== "string" || !raw.trim()) return;
-      const fid = parseDriveId(raw);
-      if (fid && !ids.includes(fid)) ids.push(fid);
-    };
-    if (Array.isArray(m?.driveFileIds)) {
-      for (const item of m.driveFileIds) addId(item);
-    }
-    if (Array.isArray(m?.driveImageUrls)) {
-      for (const item of m.driveImageUrls) addId(item);
-    }
-    addId(m?.driveFileId);
-    addId(m?.driveImageUrl);
-    return ids;
-  };
-
-  const fetchGoogleDriveImageAsDataUrl = async (fileId: string): Promise<string> => {
-    if (!/^[a-zA-Z0-9_-]{10,80}$/.test(fileId)) {
-      throw new Error("Invalid Google Drive image file ID.");
-    }
-
-    const targetUrl = `https://drive.google.com/uc?export=download&id=${encodeURIComponent(fileId)}`;
-    const driveRes = await fetch(targetUrl, {
-      redirect: "follow",
-      signal: AbortSignal.timeout(10000),
-    });
-
-    if (!driveRes.ok) {
-      throw new Error(
-        "Could not fetch image from Google Drive link. Make sure sharing is set to 'Anyone with the link'."
-      );
-    }
-
-    const contentType = (driveRes.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
-    if (!contentType.startsWith("image/")) {
-      throw new Error(
-        "Google Drive link did not return an image (set sharing to 'Anyone with the link' on a PNG/JPG/WEBP file)."
-      );
-    }
-
-    const buf = Buffer.from(await driveRes.arrayBuffer());
-    if (buf.byteLength > 5 * 1024 * 1024) {
-      throw new Error("Google Drive image exceeds the 5MB maximum size.");
-    }
-    return `data:${contentType};base64,${buf.toString("base64")}`;
-  };
 
   const filteredRaw = rawMessages.filter(
     (m: any) =>
       m &&
       typeof m.content === "string" &&
       (m.content.trim() ||
-        (isStandaloneMode && (m.imageDataUrl || (Array.isArray(m.imageDataUrls) && m.imageDataUrls.length > 0))) ||
-        resolveDriveFileIdsFromMessage(m).length > 0)
+        m.imageDataUrl ||
+        (Array.isArray(m.imageDataUrls) && m.imageDataUrls.length > 0))
   );
-
-  // Fetch up to the latest 6 public Google Drive reference images across the thread in memory for vision context
-  const driveIdsByMsgIndex = new Map<number, string[]>();
-  let remainingDriveBudget = 6;
-  for (let i = filteredRaw.length - 1; i >= 0 && remainingDriveBudget > 0; i--) {
-    const fids = resolveDriveFileIdsFromMessage(filteredRaw[i]);
-    if (fids.length > 0) {
-      const slice = fids.slice(0, remainingDriveBudget);
-      driveIdsByMsgIndex.set(i, slice);
-      remainingDriveBudget -= slice.length;
-    }
-  }
 
   const messages: ChatTurnMessage[] = [];
   for (let i = 0; i < filteredRaw.length; i++) {
     const m = filteredRaw[i];
     const resolvedImages: string[] = [];
 
-    if (isStandaloneMode) {
-      if (Array.isArray(m.imageDataUrls)) {
-        for (const img of m.imageDataUrls) {
-          if (typeof img === "string" && img.startsWith("data:image/") && !resolvedImages.includes(img)) {
-            resolvedImages.push(img);
-          }
+    if (Array.isArray(m.imageDataUrls)) {
+      for (const img of m.imageDataUrls) {
+        if (typeof img === "string" && img.startsWith("data:image/") && !resolvedImages.includes(img)) {
+          resolvedImages.push(img);
         }
-      }
-      if (typeof m.imageDataUrl === "string" && m.imageDataUrl.startsWith("data:image/") && !resolvedImages.includes(m.imageDataUrl)) {
-        resolvedImages.push(m.imageDataUrl);
       }
     }
-
-    const driveIds = driveIdsByMsgIndex.get(i);
-    if (driveIds && driveIds.length > 0) {
-      for (const fid of driveIds) {
-        const fetched = await fetchGoogleDriveImageAsDataUrl(fid);
-        if (!resolvedImages.includes(fetched)) {
-          resolvedImages.push(fetched);
-        }
-      }
+    if (typeof m.imageDataUrl === "string" && m.imageDataUrl.startsWith("data:image/") && !resolvedImages.includes(m.imageDataUrl)) {
+      resolvedImages.push(m.imageDataUrl);
     }
 
     messages.push({
@@ -3470,61 +2504,26 @@ app.post("/api/chat/stream", aiBurstLimiter, verifyUserAuth as express.RequestHa
   }
 });
 
-// Chat Workspace Persistent Storage (Local PC Disk when standalone, Firebase Cloud Firestore when online signed-in)
+// Chat Workspace Persistent Storage (100% Local PC Disk: Windows / Linux / macOS)
 const LOCAL_CHAT_WORKSPACE_FILE = path.resolve(process.cwd(), "local-engine", "chat-workspace.json");
 
-app.get("/api/chat/storage", async (req, res) => {
+app.get("/api/chat/storage", async (_req, res) => {
   try {
-    if (isStandaloneMode) {
-      let savedData: Record<string, any> = {};
-      if (fs.existsSync(LOCAL_CHAT_WORKSPACE_FILE)) {
-        try {
-          savedData = JSON.parse(fs.readFileSync(LOCAL_CHAT_WORKSPACE_FILE, "utf-8"));
-        } catch {
-          savedData = {};
-        }
-      }
-      return res.json({
-        storageMode: "local-disk",
-        storageLocation: "local-engine/chat-workspace.json",
-        sessions: Array.isArray(savedData.sessions) ? savedData.sessions : [],
-        projects: Array.isArray(savedData.projects) ? savedData.projects : [],
-        skillsAndAgents: Array.isArray(savedData.skillsAndAgents) ? savedData.skillsAndAgents : null,
-        activeAgentId: savedData.activeAgentId !== undefined ? savedData.activeAgentId : undefined,
-      });
-    }
-
-    const authHeader = req.headers.authorization;
-    if (authHeader && authHeader.startsWith("Bearer ") && firebaseConfig.projectId) {
-      const token = authHeader.substring(7);
-      if (!token.startsWith("standalone_")) {
-        const userInfo = await verifyAuthToken(token);
-        const docSnap = await getFirestoreDoc("users", userInfo.uid, token);
-        const rawJson = docSnap.exists && typeof docSnap.data?.chatWorkspaceJson === "string"
-          ? docSnap.data.chatWorkspaceJson
-          : "";
-        let parsed: Record<string, any> = {};
-        if (rawJson) {
-          try {
-            parsed = JSON.parse(rawJson);
-          } catch {
-            parsed = {};
-          }
-        }
-        return res.json({
-          storageMode: "cloud-firestore",
-          storageLocation: "Firebase Spark (Text-Only Lightweight Sync)",
-          sessions: Array.isArray(parsed.sessions) ? parsed.sessions : [],
-          projects: Array.isArray(parsed.projects) ? parsed.projects : [],
-          skillsAndAgents: Array.isArray(parsed.skillsAndAgents) ? parsed.skillsAndAgents : null,
-          activeAgentId: parsed.activeAgentId !== undefined ? parsed.activeAgentId : undefined,
-        });
+    let savedData: Record<string, any> = {};
+    if (fs.existsSync(LOCAL_CHAT_WORKSPACE_FILE)) {
+      try {
+        savedData = JSON.parse(fs.readFileSync(LOCAL_CHAT_WORKSPACE_FILE, "utf-8"));
+      } catch {
+        savedData = {};
       }
     }
-
     return res.json({
-      storageMode: "browser-local",
-      storageLocation: "Browser Storage",
+      storageMode: "local-disk",
+      storageLocation: "local-engine/chat-workspace.json",
+      sessions: Array.isArray(savedData.sessions) ? savedData.sessions : [],
+      projects: Array.isArray(savedData.projects) ? savedData.projects : [],
+      skillsAndAgents: Array.isArray(savedData.skillsAndAgents) ? savedData.skillsAndAgents : null,
+      activeAgentId: savedData.activeAgentId !== undefined ? savedData.activeAgentId : undefined,
     });
   } catch (error: any) {
     logSafeError("Error reading /api/chat/storage:", error);
@@ -3534,196 +2533,35 @@ app.get("/api/chat/storage", async (req, res) => {
 
 app.post("/api/chat/storage", writeRateLimiter, async (req, res) => {
   try {
-    const rawSessions = Array.isArray(req.body?.sessions) ? req.body.sessions.slice(0, 40) : [];
-    const rawProjects = Array.isArray(req.body?.projects) ? req.body.projects.slice(0, 50) : [];
-    const rawSkills = Array.isArray(req.body?.skillsAndAgents) ? req.body.skillsAndAgents.slice(0, 160) : null;
+    const rawSessions = Array.isArray(req.body?.sessions) ? req.body.sessions : [];
+    const rawProjects = Array.isArray(req.body?.projects) ? req.body.projects : [];
+    const rawSkills = Array.isArray(req.body?.skillsAndAgents) ? req.body.skillsAndAgents : null;
     const activeAgentId =
       typeof req.body?.activeAgentId === "string" || req.body?.activeAgentId === null
         ? req.body.activeAgentId
         : null;
 
-    if (isStandaloneMode) {
-      const dir = path.dirname(LOCAL_CHAT_WORKSPACE_FILE);
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-      }
-      const payload = {
-        sessions: rawSessions,
-        projects: rawProjects,
-        ...(rawSkills ? { skillsAndAgents: rawSkills } : {}),
-        activeAgentId,
-        updatedAt: new Date().toISOString(),
-      };
-      fs.writeFileSync(LOCAL_CHAT_WORKSPACE_FILE, JSON.stringify(payload, null, 2), "utf8");
-      return res.json({
-        success: true,
-        storageMode: "local-disk",
-        storageLocation: "local-engine/chat-workspace.json",
-      });
+    const dir = path.dirname(LOCAL_CHAT_WORKSPACE_FILE);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
     }
-
-    const authHeader = req.headers.authorization;
-    if (authHeader && authHeader.startsWith("Bearer ") && firebaseConfig.projectId) {
-      const token = authHeader.substring(7);
-      if (!token.startsWith("standalone_")) {
-        const userInfo = await verifyAuthToken(token);
-
-        // Firebase Spark Free Tier Protection:
-        // 1) Never store any images in Firestore (0 bytes imageDataUrl)
-        // 2) Never store oversized chats (keep each user document compact <= 40 KB)
-        const compactSkills = rawSkills
-          ? rawSkills
-              .filter((it: any) => it && it.id && it.sourceType !== "linked-folder")
-              .slice(0, 25)
-              .map((it: any) =>
-                it.builtIn
-                  ? { id: it.id, builtIn: true, installed: Boolean(it.installed), enabled: Boolean(it.enabled) }
-                  : {
-                      id: it.id,
-                      name: String(it.name || "").slice(0, 80),
-                      kind: it.kind === "agent" ? "agent" : "skill",
-                      summary: String(it.summary || "").slice(0, 140),
-                      instructions: String(it.instructions || "").slice(0, 2500),
-                      installed: Boolean(it.installed),
-                      enabled: Boolean(it.enabled),
-                    }
-              )
-          : null;
-
-        const compactProjects = rawProjects.slice(0, 15).map((p: any) => ({
-          id: p.id,
-          name: String(p.name || "").slice(0, 80),
-          systemInstruction: String(p.systemInstruction || "").slice(0, 1000),
-          createdAt: p.createdAt,
-        }));
-
-        const buildSparkSessions = (maxSessions: number, maxMsgs: number, maxChars: number) =>
-          rawSessions.slice(0, maxSessions).map((s: any) => ({
-            id: s.id,
-            title: String(s.title || "Chat").slice(0, 80),
-            projectId: s.projectId || null,
-            updatedAt: s.updatedAt || Date.now(),
-            storageType: "spark",
-            messages: Array.isArray(s?.messages)
-              ? s.messages.slice(-maxMsgs).map((m: any) => {
-                  const { imageDataUrl: _omitImage, ...rest } = m || {};
-                  const text = typeof rest.content === "string" ? rest.content : "";
-                  return {
-                    ...rest,
-                    content:
-                      text.length > maxChars
-                        ? `${text.slice(0, maxChars)}\n... [trimmed for Spark free storage]`
-                        : text,
-                  };
-                })
-              : [],
-          }));
-
-        let serialized = JSON.stringify({
-          sessions: buildSparkSessions(10, 20, 3000),
-          projects: compactProjects,
-          ...(compactSkills ? { skillsAndAgents: compactSkills } : {}),
-          activeAgentId,
-        });
-
-        // Hard cap at 40 KB per user document so Firebase Spark 1 GiB quota stays safe
-        if (serialized.length > 40000) {
-          serialized = JSON.stringify({
-            sessions: buildSparkSessions(5, 12, 1500),
-            projects: compactProjects.slice(0, 10),
-            ...(compactSkills ? { skillsAndAgents: compactSkills } : {}),
-            activeAgentId,
-          });
-        }
-        if (serialized.length > 40000) {
-          serialized = JSON.stringify({
-            sessions: buildSparkSessions(2, 6, 800),
-            projects: compactProjects.slice(0, 5),
-            activeAgentId,
-          });
-        }
-
-        try {
-          await updateFirestoreDoc(
-            "users",
-            userInfo.uid,
-            {
-              chatWorkspaceJson: serialized,
-              chatWorkspaceUpdatedAt: new Date().toISOString(),
-            },
-            token
-          );
-        } catch (fsWriteErr) {
-          // Fallback gracefully if Firestore rules restrict document writes
-        }
-
-        return res.json({
-          success: true,
-          storageMode: "cloud-firestore",
-          storageLocation: "Firebase Spark (Text-Only Lightweight Sync)",
-        });
-      }
-    }
-
+    const payload = {
+      sessions: rawSessions,
+      projects: rawProjects,
+      ...(rawSkills ? { skillsAndAgents: rawSkills } : {}),
+      activeAgentId,
+      updatedAt: new Date().toISOString(),
+    };
+    fs.writeFileSync(LOCAL_CHAT_WORKSPACE_FILE, JSON.stringify(payload, null, 2), "utf8");
     return res.json({
       success: true,
-      storageMode: "browser-local",
-      storageLocation: "Browser Storage",
+      storageMode: "local-disk",
+      storageLocation: "local-engine/chat-workspace.json",
     });
   } catch (error: any) {
-    return res.json({
-      success: true,
-      storageMode: "browser-local",
-      storageLocation: "Browser Storage",
-    });
+    logSafeError("Error saving /api/chat/storage:", error);
+    return res.status(500).json({ error: "Failed to save chat workspace to disk." });
   }
-});
-
-// Explicit routes for SEO files and Google Search Console verification
-app.get("/sitemap.xml", (req, res) => {
-  const host = req.get("host") || "script-automation-studio.ai.studio";
-  const protocol = req.protocol === "https" || req.get("x-forwarded-proto") === "https" ? "https" : "http";
-  const baseUrl = `${protocol}://${host}`;
-  res.header("Content-Type", "application/xml; charset=utf-8");
-  res.send(`<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url>
-    <loc>${baseUrl}/</loc>
-    <lastmod>${new Date().toISOString().split("T")[0]}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>1.0</priority>
-  </url>
-  <url>
-    <loc>${baseUrl}/docs/complete-user-guide.html</loc>
-    <lastmod>${new Date().toISOString().split("T")[0]}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.9</priority>
-  </url>
-  <url>
-    <loc>${baseUrl}/docs/prompt-masterclass.html</loc>
-    <lastmod>${new Date().toISOString().split("T")[0]}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>${baseUrl}/docs/controls-reference.html</loc>
-    <lastmod>${new Date().toISOString().split("T")[0]}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.8</priority>
-  </url>
-</urlset>`);
-});
-
-app.get("/robots.txt", (req, res) => {
-  const host = req.get("host") || "script-automation-studio.ai.studio";
-  const protocol = req.protocol === "https" || req.get("x-forwarded-proto") === "https" ? "https" : "http";
-  res.header("Content-Type", "text/plain; charset=utf-8");
-  res.send(`User-agent: *\nAllow: /\nSitemap: ${protocol}://${host}/sitemap.xml\n`);
-});
-
-app.get("/google8b0af31d9f56062a.html", (_req, res) => {
-  res.header("Content-Type", "text/html; charset=utf-8");
-  res.send("google-site-verification: google8b0af31d9f56062a.html\n");
 });
 
 let hasAutoOpenedBrowser = false;
@@ -3735,14 +2573,13 @@ function autoOpenLocalBrowser(appUrl: string): void {
   const autoEnv = (process.env.AUTO_OPEN_BROWSER || "").trim().toLowerCase();
   if (autoEnv === "0" || autoEnv === "false") return;
 
-  const isStandalone = process.env.STANDALONE_MODE === "true";
   const hasDisplay =
     process.platform === "win32" ||
     process.platform === "darwin" ||
     Boolean(process.env.DISPLAY || process.env.WAYLAND_DISPLAY);
 
   if (!hasDisplay) return;
-  if (autoEnv !== "1" && autoEnv !== "true" && !isStandalone) return;
+  if (autoEnv === "") return; // Wait for explicit desktop launcher (run-app / AUTO_OPEN_BROWSER=1) if running via npm run dev
 
   hasAutoOpenedBrowser = true;
   try {
@@ -3763,298 +2600,6 @@ function autoOpenLocalBrowser(appUrl: string): void {
   } catch {
     // Non-fatal if OS browser handler is unavailable
   }
-}
-
-// ============================================================================
-// Gemini Live API WebSocket Bridge (/api/voice-live)
-// Supports:
-//  - gemini-3.5-transcribe-live (Live speech-to-text transcription)
-//  - gemini-3.5-live-translate-preview (Live speech-to-speech & text translation)
-// ============================================================================
-async function resolveLiveVoiceGeminiKey(
-  token?: string,
-  clientApiKey?: string
-): Promise<{ apiKey: string } | { error: string }> {
-  if (isStandaloneMode) {
-    const key = sanitizeApiKey(clientApiKey) || sanitizeApiKey(process.env.GEMINI_API_KEY);
-    if (!key) {
-      return {
-        error: "No Gemini API key found. Please paste and save your Gemini API key in Providers & Local Engine.",
-      };
-    }
-    return { apiKey: key };
-  }
-
-  const cleanToken = typeof token === "string" ? token.trim() : "";
-  if (!cleanToken || cleanToken.startsWith("standalone_")) {
-    return { error: "Please sign in first to use Gemini Live Voice." };
-  }
-
-  try {
-    const tokenSignatureTail = cleanToken.slice(-32);
-    for (const cached of userAuthKeyCache.values()) {
-      if (cached.tokenHash === tokenSignatureTail && cached.expiresAt > Date.now() && cached.plainApiKey) {
-        if (cached.activeProvider && cached.activeProvider !== "gemini") {
-          return {
-            error: `Your active saved key is for ${cached.activeProvider.toUpperCase()}. Gemini Live Voice requires a Gemini API key saved in Configure Provider Key.`,
-          };
-        }
-        return { apiKey: cached.plainApiKey };
-      }
-    }
-
-    const userInfo = await verifyAuthToken(cleanToken);
-    let fsData: Record<string, any> | null = null;
-    try {
-      const userDocSnap = await getFirestoreDoc("users", userInfo.uid, cleanToken);
-      if (userDocSnap.exists && userDocSnap.data) {
-        fsData = userDocSnap.data;
-      }
-    } catch (fsErr) {
-      logSafeError("Live Voice Firestore lookup notice (checking encrypted vault):", fsErr);
-    }
-
-    const vault = getUserKeyVaultRecord(userInfo.uid);
-    const encryptedKey = fsData?.encryptedApiKey || vault?.encryptedApiKey || null;
-    const rawSavedProvider = fsData?.activeProvider || vault?.activeProvider || "gemini";
-
-    if (!encryptedKey) {
-      return {
-        error: "No personal Gemini API key saved for your account. Click 'Configure Provider Key' to add one.",
-      };
-    }
-
-    const savedProvider: AIProviderType =
-      rawSavedProvider === "openai" ||
-      rawSavedProvider === "claude" ||
-      rawSavedProvider === "gemini"
-        ? rawSavedProvider
-        : "gemini";
-
-    if (savedProvider !== "gemini") {
-      return {
-        error: `Your saved key is for ${savedProvider.toUpperCase()}. Gemini Live Voice requires a Gemini API key.`,
-      };
-    }
-
-    const { plainText: plainKey } = decryptApiKey(encryptedKey);
-    if (!plainKey || !plainKey.trim()) {
-      return { error: "Your saved API key could not be decrypted. Please re-save your Gemini API key." };
-    }
-
-    userAuthKeyCache.set(userInfo.uid, {
-      uid: userInfo.uid,
-      email: userInfo.email,
-      name: userInfo.name,
-      emailVerified: userInfo.emailVerified,
-      plainApiKey: plainKey,
-      activeProvider: "gemini",
-      tokenHash: tokenSignatureTail,
-      expiresAt: Date.now() + USER_AUTH_CACHE_TTL_MS,
-    });
-
-    return { apiKey: plainKey };
-  } catch (err: any) {
-    logSafeError("Live Voice auth failed:", err);
-    return { error: "Authentication failed. Please sign in again." };
-  }
-}
-
-function createLiveVoiceAiClient(apiKey: string): GoogleGenAI {
-  const trimmed = apiKey.trim();
-  if (trimmed.startsWith("ya29.")) {
-    return new GoogleGenAI({
-      apiKey: "",
-      httpOptions: {
-        headers: {
-          Authorization: `Bearer ${trimmed}`,
-          "User-Agent": "aistudio-build",
-        },
-      },
-    });
-  }
-  return new GoogleGenAI({
-    apiKey: trimmed,
-    httpOptions: {
-      headers: {
-        "User-Agent": "aistudio-build",
-      },
-    },
-  });
-}
-
-function attachLiveVoiceWebSocket(server: HttpServer): void {
-  const voiceWss = new WebSocketServer({ noServer: true });
-
-  server.on("upgrade", (req, socket, head) => {
-    const pathname = (req.url || "").split("?")[0];
-    if (pathname !== "/api/voice-live") {
-      return;
-    }
-    voiceWss.handleUpgrade(req, socket, head, (ws) => {
-      voiceWss.emit("connection", ws, req);
-    });
-  });
-
-  voiceWss.on("connection", (clientWs, req) => {
-    const parsedUrl = new URL(req.url || "/api/voice-live", "http://localhost");
-    const mode = parsedUrl.searchParams.get("mode") === "translate" ? "translate" : "transcribe";
-    const rawTargetLang = (parsedUrl.searchParams.get("targetLang") || "en").trim();
-    const targetLang = /^[a-zA-Z-]{2,12}$/.test(rawTargetLang) ? rawTargetLang : "en";
-
-    let liveSession: { sendRealtimeInput: (params: any) => void; close: () => void } | null = null;
-    let authenticated = false;
-    let connecting = false;
-    let closed = false;
-
-    const sendJson = (payload: Record<string, unknown>) => {
-      if (!closed && clientWs.readyState === WsWebSocket.OPEN) {
-        clientWs.send(JSON.stringify(payload));
-      }
-    };
-
-    const authTimeout = setTimeout(() => {
-      if (!authenticated && !connecting && !closed) {
-        sendJson({ type: "error", error: "Voice session authentication timed out." });
-        clientWs.close();
-      }
-    }, 6000);
-
-    clientWs.on("message", async (rawData) => {
-      if (closed) return;
-      let msg: any;
-      try {
-        msg = JSON.parse(rawData.toString());
-      } catch {
-        return;
-      }
-
-      if (msg?.type === "auth") {
-        if (authenticated || connecting) return;
-        connecting = true;
-        clearTimeout(authTimeout);
-
-        const resolved = await resolveLiveVoiceGeminiKey(msg.token, msg.apiKey);
-        if ("error" in resolved) {
-          sendJson({ type: "error", error: resolved.error });
-          clientWs.close();
-          return;
-        }
-
-        try {
-          const ai = createLiveVoiceAiClient(resolved.apiKey);
-          const modelId =
-            mode === "translate"
-              ? "gemini-3.5-live-translate-preview"
-              : "gemini-3.5-transcribe-live";
-
-          const session = await ai.live.connect({
-            model: modelId,
-            config:
-              mode === "translate"
-                ? {
-                    responseModalities: [Modality.AUDIO],
-                    inputAudioTranscription: {},
-                    outputAudioTranscription: {},
-                    translationConfig: {
-                      targetLanguageCode: targetLang,
-                      echoTargetLanguage: false,
-                    },
-                  }
-                : {
-                    responseModalities: [Modality.TEXT],
-                    inputAudioTranscription: {
-                      languageCodes: [],
-                    },
-                  },
-            callbacks: {
-              onmessage: (message: LiveServerMessage) => {
-                if (closed || clientWs.readyState !== WsWebSocket.OPEN) return;
-                const content = message.serverContent;
-                if (content?.interimInputTranscription?.text) {
-                  sendJson({
-                    type: "interimTranscript",
-                    text: content.interimInputTranscription.text,
-                  });
-                }
-                if (content?.inputTranscription?.text) {
-                  sendJson({
-                    type: "inputTranscript",
-                    text: content.inputTranscription.text,
-                  });
-                }
-                if (content?.outputTranscription?.text) {
-                  sendJson({
-                    type: "outputTranscript",
-                    text: content.outputTranscription.text,
-                  });
-                }
-                for (const part of content?.modelTurn?.parts ?? []) {
-                  if (part.inlineData?.data) {
-                    sendJson({ type: "audio", data: part.inlineData.data });
-                  }
-                }
-              },
-              onerror: (err: any) => {
-                logSafeError("Gemini Live Voice error:", err);
-                sendJson({ type: "error", error: formatGeminiErrorMessage(err) });
-              },
-              onclose: () => {
-                sendJson({ type: "closed" });
-              },
-            },
-          });
-
-          if (closed) {
-            try {
-              session.close();
-            } catch {}
-            return;
-          }
-
-          liveSession = session;
-          authenticated = true;
-          connecting = false;
-          sendJson({ type: "ready", mode, model: modelId, targetLang });
-        } catch (err: any) {
-          logSafeError("Failed to start Gemini Live Voice session:", err);
-          sendJson({ type: "error", error: formatGeminiErrorMessage(err) });
-          clientWs.close();
-        }
-        return;
-      }
-
-      if (msg?.type === "audio" && authenticated && liveSession && typeof msg.data === "string") {
-        try {
-          liveSession.sendRealtimeInput({
-            audio: { data: msg.data, mimeType: "audio/pcm;rate=16000" },
-          });
-        } catch (err: any) {
-          logSafeError("Live Voice sendRealtimeInput error:", err);
-        }
-        return;
-      }
-
-      if (msg?.type === "stop") {
-        closed = true;
-        clearTimeout(authTimeout);
-        try {
-          liveSession?.close();
-        } catch {}
-        liveSession = null;
-        clientWs.close();
-      }
-    });
-
-    clientWs.on("close", () => {
-      closed = true;
-      clearTimeout(authTimeout);
-      try {
-        liveSession?.close();
-      } catch {}
-      liveSession = null;
-    });
-  });
 }
 
 // Serve static assets or mount Vite dev middleware
@@ -4118,8 +2663,6 @@ export async function setupServer(): Promise<HttpServer> {
       server.once("error", onError);
       server.once("listening", onListening);
     });
-
-    attachLiveVoiceWebSocket(httpServer);
 
     return httpServer;
   })();

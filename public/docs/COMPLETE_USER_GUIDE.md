@@ -4,10 +4,9 @@ Welcome to the official, exhaustive guide for **Script Automation Studio** creat
 
 **Script Automation Studio** is an all-in-one AI production suite engineered for content creators, YouTubers, social media growth managers, documentary filmmakers, and educators. It transforms raw ideas, rough notes, or unformatted video transcripts into 100% original, viral-retention voiceover scripts, shot-by-shot cinematic storyboard prompts, YouTube CTR metadata packages, and thumb-stopping visual concepts.
 
-🌐 **Live Web Application**: [https://script-automation-studio.ai.studio/](https://script-automation-studio.ai.studio/)  
 👑 **Created by**: Muhammad Tehseen Irshad  
 🏷️ **Brand**: Moni Visual Pro  
-⚡ **Access**: Web App & Progressive Web App (PWA) on any device — no code or command-line installation needed.
+💻 **Platforms**: **100% Pure Desktop App** for **Windows**, **Linux**, and **macOS** — local disk persistence (`local-engine/`), Built-In GGUF engine, and zero online cloud databases.
 
 ---
 
@@ -153,4 +152,4 @@ Welcome to the official, exhaustive guide for **Script Automation Studio** creat
 ---
 
 *Script Automation Studio — Designed and Developed by **Muhammad Tehseen Irshad** (Brand: **Moni Visual Pro**).*  
-*Visit the live web app: [https://script-automation-studio.ai.studio/](https://script-automation-studio.ai.studio/)*
+*100% Cross-Platform Desktop Edition — Windows, Linux & macOS*

@@ -1,24 +1,38 @@
 import crypto from "crypto";
 import dotenv from "dotenv";
+import fs from "fs";
+import path from "path";
 
 dotenv.config();
 
-const RAW_SECRET = process.env.ENCRYPTION_SECRET?.trim();
-const IS_LOCAL_STANDALONE =
-  process.env.STANDALONE_MODE === "true" || process.env.LOCAL_OFFLINE_MODE === "true";
+const LOCAL_DATA_DIR = path.resolve(process.cwd(), ".studio-data");
+const LOCAL_SECRET_FILE = path.join(LOCAL_DATA_DIR, "local.secret");
 
-if (!RAW_SECRET && !IS_LOCAL_STANDALONE) {
-  throw new Error(
-    "ENCRYPTION_SECRET environment variable is missing. Server cannot start securely without ENCRYPTION_SECRET configured."
-  );
+function resolveLocalDesktopSecret(): Buffer {
+  const envSecret = process.env.ENCRYPTION_SECRET?.trim();
+  if (envSecret) {
+    return crypto.createHash("sha256").update(envSecret).digest();
+  }
+
+  try {
+    if (fs.existsSync(LOCAL_SECRET_FILE)) {
+      const existingHex = fs.readFileSync(LOCAL_SECRET_FILE, "utf8").trim();
+      if (/^[0-9a-f]{64}$/i.test(existingHex)) {
+        return Buffer.from(existingHex, "hex");
+      }
+    }
+    fs.mkdirSync(LOCAL_DATA_DIR, { recursive: true });
+    const generated = crypto.randomBytes(32);
+    fs.writeFileSync(LOCAL_SECRET_FILE, generated.toString("hex"), { mode: 0o600 });
+    return generated;
+  } catch {
+    return crypto.randomBytes(32);
+  }
 }
 
 const LEGACY_SECRET = process.env.LEGACY_ENCRYPTION_SECRET?.trim();
 
-// Derive 32-byte key from secrets (ephemeral CSPRNG key only used in local standalone mode when omitted)
-const PRIMARY_KEY = RAW_SECRET
-  ? crypto.createHash("sha256").update(RAW_SECRET).digest()
-  : crypto.randomBytes(32);
+const PRIMARY_KEY = resolveLocalDesktopSecret();
 const LEGACY_KEY = LEGACY_SECRET
   ? crypto.createHash("sha256").update(LEGACY_SECRET).digest()
   : null;
@@ -48,7 +62,7 @@ export function decryptApiKey(cipherText: string): DecryptionResult {
     return { plainText: "", isLegacy: false };
   }
 
-  // 1. Try primary decryption with ENCRYPTION_SECRET
+  // 1. Try primary decryption with PRIMARY_KEY
   try {
     const iv = Buffer.from(ivHex, "hex");
     const decipher = crypto.createDecipheriv(ALGORITHM, PRIMARY_KEY, iv);
@@ -85,4 +99,3 @@ export function maskApiKey(apiKey: string): string {
   if (trimmed.length <= 10) return "****";
   return `${trimmed.slice(0, 6)}...${trimmed.slice(-4)}`;
 }
-

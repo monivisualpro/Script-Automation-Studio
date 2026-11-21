@@ -11,8 +11,6 @@ import {
   MessageSquare,
   Settings,
   Plus,
-  Mic,
-  MicOff,
   ArrowUp,
   ChevronDown,
   Copy,
@@ -38,13 +36,6 @@ import {
   Wand2,
   Loader2,
   HardDrive,
-  Lock,
-  Link2,
-  AlertTriangle,
-  LogOut,
-  Languages,
-  Volume2,
-  VolumeX,
   Square,
   FastForward,
   Film,
@@ -61,10 +52,6 @@ import {
   mergeWithBuiltInSkills,
 } from "../lib/agentSkills";
 import { SkillsAgentsModal } from "./SkillsAgentsModal";
-import {
-  extractGoogleDriveFileId,
-  getPublicDriveThumbnailUrl,
-} from "../lib/googleDrive";
 
 export type StudioTransferTarget = "script" | "scenes" | "ctr" | "thumbnail";
 
@@ -78,11 +65,6 @@ interface ChatMessageItem {
   content: string;
   imageDataUrl?: string;
   imageDataUrls?: string[];
-  driveFileId?: string;
-  driveFileIds?: string[];
-  driveImageUrl?: string;
-  driveImageUrls?: string[];
-  driveSource?: "public-link";
   attachmentName?: string;
   modelUsed?: string;
   providerUsed?: string;
@@ -104,7 +86,7 @@ interface ChatSession {
   projectId: string | null;
   messages: ChatMessageItem[];
   updatedAt: number;
-  storageType?: "spark" | "local-disk";
+  storageType?: "local-disk";
 }
 
 interface UnifiedModelChoice {
@@ -526,22 +508,14 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
   onSendToStudio,
 }) => {
   const {
-    user,
-    idToken,
-    isStandalone,
-    systemModeChecked,
-    profile,
     envKeyStatus,
     activeProviderConfig,
     availableModels,
     availableLocalModels,
     fetchAvailableModels,
-    setIsAuthModalOpen,
     setIsApiKeyModalOpen,
     setIsSettingsModalOpen,
     setActiveWorkspace,
-    logout,
-    removeApiKey,
     currentTheme,
     currentBrand,
   } = useAuth();
@@ -580,26 +554,9 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [chatSearch, setChatSearch] = useState<string>("");
 
-  const [storageMode, setStorageMode] = useState<"local-disk" | "cloud-firestore" | "browser-local">(
-    isStandalone ? "local-disk" : idToken ? "cloud-firestore" : "browser-local"
-  );
-  const [storageLocation, setStorageLocation] = useState<string>(
-    isStandalone ? "local-engine/chat-workspace.json" : idToken ? "Firebase Cloud" : "Browser Storage"
-  );
+  const [storageMode, setStorageMode] = useState<"local-disk" | "browser-local">("local-disk");
+  const [storageLocation, setStorageLocation] = useState<string>("local-engine/chat-workspace.json");
   const storageHydratedRef = useRef<boolean>(false);
-
-  useEffect(() => {
-    setStorageMode(
-      isStandalone ? "local-disk" : idToken ? "cloud-firestore" : "browser-local"
-    );
-    setStorageLocation(
-      isStandalone
-        ? "local-engine/chat-workspace.json"
-        : idToken
-        ? "Firebase Spark (Text-Only Lightweight Sync)"
-        : "Browser Storage"
-    );
-  }, [isStandalone, idToken]);
 
   useEffect(() => {
     try {
@@ -609,31 +566,22 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
 
   useEffect(() => {
     try {
-      const sanitizedSessions = !isStandalone
-        ? sessions.slice(0, 12).map((s) => ({
-            ...s,
-            messages: (s.messages || []).slice(-25).map(({ imageDataUrl: _omit, imageDataUrls: _omitArr, ...rest }) => rest),
-          }))
-        : sessions.slice(0, 40);
-      localStorage.setItem(STORAGE_SESSIONS_KEY, JSON.stringify(sanitizedSessions));
-    } catch {}
-  }, [sessions, isStandalone]);
+      localStorage.setItem(STORAGE_SESSIONS_KEY, JSON.stringify(sessions));
+    } catch {
+      // Fallback if browser localStorage quota is full due to many large images; full data remains on PC disk
+      try {
+        const lightSessions = sessions.slice(0, 25).map((s) => ({
+          ...s,
+          messages: (s.messages || []).map(({ imageDataUrl: _a, imageDataUrls: _b, ...rest }) => rest),
+        }));
+        localStorage.setItem(STORAGE_SESSIONS_KEY, JSON.stringify(lightSessions));
+      } catch {}
+    }
+  }, [sessions]);
 
   // Composer & Generation State
   const [promptInput, setPromptInput] = useState<string>("");
   const [attachedImages, setAttachedImages] = useState<Array<{ dataUrl: string; name: string }>>([]);
-  const [attachedDriveImages, setAttachedDriveImages] = useState<
-    Array<{
-      fileId: string;
-      name: string;
-      source: "public-link";
-      previewUrl: string;
-      driveUrl?: string;
-    }>
-  >([]);
-  const [showDriveLinkInput, setShowDriveLinkInput] = useState<boolean>(false);
-  const [driveLinkInput, setDriveLinkInput] = useState<string>("");
-  const [limitModalOpen, setLimitModalOpen] = useState<boolean>(false);
   const [attachedFileText, setAttachedFileText] = useState<{ name: string; content: string } | null>(null);
   const [isSending, setIsSending] = useState<boolean>(false);
   const [chatError, setChatError] = useState<string | null>(null);
@@ -686,18 +634,16 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
     } catch {}
   }, [activeAgentId]);
 
-  // Hydrate persistent chats/projects from PC Disk (standalone) or Firebase Cloud (online signed-in)
+  // Hydrate persistent chats/projects from PC Disk (100% unlimited local storage)
   useEffect(() => {
     let cancelled = false;
     storageHydratedRef.current = false;
 
     const loadPersistentWorkspace = async () => {
       try {
-        const headers: Record<string, string> = {};
-        if (isStandalone) headers["x-standalone-mode"] = "true";
-        else if (idToken) headers.Authorization = `Bearer ${idToken}`;
-
-        const res = await fetch("/api/chat/storage", { headers });
+        const res = await fetch("/api/chat/storage", {
+          headers: { "x-standalone-mode": "true" },
+        });
         if (!res.ok || cancelled) {
           storageHydratedRef.current = true;
           return;
@@ -705,63 +651,62 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
         const data = await res.json();
         if (cancelled) return;
 
-        if (data.storageMode) setStorageMode(data.storageMode);
+        if (data.storageMode === "local-disk" || data.storageMode === "browser-local") {
+          setStorageMode(data.storageMode);
+        }
         if (data.storageLocation) setStorageLocation(data.storageLocation);
 
-        if (data.storageMode === "local-disk" || data.storageMode === "cloud-firestore") {
-          if (Array.isArray(data.projects) && data.projects.length > 0) {
-            setProjects((prev) => {
-              const map = new Map<string, ChatProject>();
-              for (const p of [...data.projects, ...prev]) {
-                if (p?.id && p.id !== "proj-scripts" && p.id !== "proj-prompts") {
-                  map.set(p.id, p);
+        if (Array.isArray(data.projects) && data.projects.length > 0) {
+          setProjects((prev) => {
+            const map = new Map<string, ChatProject>();
+            for (const p of [...data.projects, ...prev]) {
+              if (p?.id && p.id !== "proj-scripts" && p.id !== "proj-prompts") {
+                map.set(p.id, p);
+              }
+            }
+            return Array.from(map.values()).sort((a, b) => b.createdAt - a.createdAt);
+          });
+        }
+        if (Array.isArray(data.sessions) && data.sessions.length > 0) {
+          setSessions((prev) => {
+            const map = new Map<string, ChatSession>();
+            for (const s of [...data.sessions, ...prev]) {
+              if (s?.id) {
+                const existing = map.get(s.id);
+                if (!existing || (s.updatedAt || 0) > (existing.updatedAt || 0)) {
+                  map.set(s.id, s);
                 }
               }
-              return Array.from(map.values()).sort((a, b) => b.createdAt - a.createdAt);
-            });
-          }
-          if (Array.isArray(data.sessions) && data.sessions.length > 0) {
-            setSessions((prev) => {
-              const map = new Map<string, ChatSession>();
-              for (const s of [...data.sessions, ...prev]) {
-                if (s?.id) {
-                  const existing = map.get(s.id);
-                  if (!existing || (s.updatedAt || 0) > (existing.updatedAt || 0)) {
-                    map.set(s.id, s);
-                  }
-                }
+            }
+            return Array.from(map.values()).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+          });
+        }
+        if (Array.isArray(data.skillsAndAgents) && data.skillsAndAgents.length > 0) {
+          setSkillsAndAgents((prev) => {
+            const map = new Map<string, AgentSkillItem>();
+            for (const it of prev) if (it?.id) map.set(it.id, it);
+            for (const it of data.skillsAndAgents) {
+              if (!it?.id) continue;
+              const existing = map.get(it.id);
+              if (existing && (!it.instructions || !it.name)) {
+                map.set(it.id, {
+                  ...existing,
+                  installed: it.installed !== undefined ? Boolean(it.installed) : existing.installed,
+                  enabled: it.enabled !== undefined ? Boolean(it.enabled) : existing.enabled,
+                });
+              } else {
+                map.set(it.id, it);
               }
-              return Array.from(map.values())
-                .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
-                .slice(0, 40);
-            });
-          }
-          if (Array.isArray(data.skillsAndAgents) && data.skillsAndAgents.length > 0) {
-            setSkillsAndAgents((prev) => {
-              const map = new Map<string, AgentSkillItem>();
-              for (const it of prev) if (it?.id) map.set(it.id, it);
-              for (const it of data.skillsAndAgents) {
-                if (!it?.id) continue;
-                const existing = map.get(it.id);
-                if (existing && (!it.instructions || !it.name)) {
-                  map.set(it.id, {
-                    ...existing,
-                    installed: it.installed !== undefined ? Boolean(it.installed) : existing.installed,
-                    enabled: it.enabled !== undefined ? Boolean(it.enabled) : existing.enabled,
-                  });
-                } else {
-                  map.set(it.id, it);
-                }
-              }
-              return mergeWithBuiltInSkills(Array.from(map.values()));
-            });
-          }
-          if (data.activeAgentId !== undefined) {
-            setActiveAgentId(data.activeAgentId || null);
-          }
+            }
+            return mergeWithBuiltInSkills(Array.from(map.values()));
+          });
+        }
+        if (data.activeAgentId !== undefined) {
+          setActiveAgentId(data.activeAgentId || null);
         }
       } catch {
-        // Fallback smoothly to browser localStorage
+        setStorageMode("browser-local");
+        setStorageLocation("Browser Storage");
       } finally {
         if (!cancelled) {
           storageHydratedRef.current = true;
@@ -773,40 +718,32 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [isStandalone, idToken]);
+  }, []);
 
-  // Auto-sync workspace edits to PC Disk (standalone) or Firebase Cloud (online signed-in)
+  // Auto-sync workspace edits to PC Disk (unlimited sessions, projects & images)
   useEffect(() => {
     if (!storageHydratedRef.current) return;
-    if (!isStandalone && !idToken) return;
 
     const timer = setTimeout(async () => {
       try {
-        const headers: Record<string, string> = { "Content-Type": "application/json" };
-        if (isStandalone) headers["x-standalone-mode"] = "true";
-        else if (idToken) headers.Authorization = `Bearer ${idToken}`;
-
-        const syncSessions = !isStandalone
-          ? sessions.slice(0, 10).map((s) => ({
-              ...s,
-              messages: (s.messages || []).slice(-20).map(({ imageDataUrl: _omit, ...rest }) => rest),
-            }))
-          : sessions.slice(0, 40);
-        const syncProjects = !isStandalone ? projects.slice(0, 15) : projects.slice(0, 50);
-
         const res = await fetch("/api/chat/storage", {
           method: "POST",
-          headers,
+          headers: {
+            "Content-Type": "application/json",
+            "x-standalone-mode": "true",
+          },
           body: JSON.stringify({
-            sessions: syncSessions,
-            projects: syncProjects,
+            sessions,
+            projects,
             skillsAndAgents,
             activeAgentId,
           }),
         });
         if (res.ok) {
           const data = await res.json();
-          if (data.storageMode) setStorageMode(data.storageMode);
+          if (data.storageMode === "local-disk" || data.storageMode === "browser-local") {
+            setStorageMode(data.storageMode);
+          }
           if (data.storageLocation) setStorageLocation(data.storageLocation);
         }
       } catch {
@@ -815,7 +752,7 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [sessions, projects, skillsAndAgents, activeAgentId, isStandalone, idToken]);
+  }, [sessions, projects, skillsAndAgents, activeAgentId]);
 
   const applyLocalSkillsPayload = (data: {
     linkedFolders?: LinkedFolderInfo[];
@@ -845,25 +782,21 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
   };
 
   const fetchLocalSkillsFromDisk = async () => {
-    if (!isStandalone) return;
     try {
       const res = await fetch("/api/local-skills");
       if (!res.ok) return;
       const data = await res.json();
       applyLocalSkillsPayload(data);
     } catch {
-      // Non-fatal if offline endpoints unavailable
+      // Non-fatal if endpoint temporarily unavailable
     }
   };
 
   useEffect(() => {
-    if (isStandalone) {
-      void fetchLocalSkillsFromDisk();
-    }
-  }, [isStandalone, isSkillsModalOpen]);
+    void fetchLocalSkillsFromDisk();
+  }, [isSkillsModalOpen]);
 
   const handleLinkFolder = async (directoryPath: string): Promise<boolean> => {
-    if (!isStandalone) return false;
     setIsLinkingFolder(true);
     setFolderSyncError(null);
     try {
@@ -888,7 +821,6 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
   };
 
   const handleUnlinkFolder = async (directoryPath: string): Promise<void> => {
-    if (!isStandalone) return;
     setIsLinkingFolder(true);
     setFolderSyncError(null);
     try {
@@ -907,7 +839,6 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
   };
 
   const handleRescanFolders = async (): Promise<void> => {
-    if (!isStandalone) return;
     setIsLinkingFolder(true);
     setFolderSyncError(null);
     try {
@@ -928,42 +859,16 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
     modelId: string;
     baseUrl?: string;
   }>(() => ({
-    provider: !isStandalone && activeProviderConfig.provider === "local" ? "gemini" : activeProviderConfig.provider,
+    provider: activeProviderConfig.provider,
     modelId:
       activeProviderConfig.model ||
-      (activeProviderConfig.provider === "local" ? "default" : "gemini-4-hydrogen"),
+      (activeProviderConfig.provider === "local" ? "default" : "gemini-3.1-flash-lite"),
     baseUrl: activeProviderConfig.baseUrl || "http://127.0.0.1:1279/v1",
   }));
 
   useEffect(() => {
     void fetchAvailableModels();
   }, []);
-
-  // Gemini Live Voice (gemini-3.5-transcribe-live & gemini-3.5-live-translate-preview)
-  const [isListening, setIsListening] = useState<boolean>(false);
-  const [voiceConnecting, setVoiceConnecting] = useState<boolean>(false);
-  const [voiceMode, setVoiceMode] = useState<"transcribe" | "translate">("transcribe");
-  const [voiceTargetLang, setVoiceTargetLang] = useState<string>("en");
-  const [voiceSpeakerEnabled, setVoiceSpeakerEnabled] = useState<boolean>(true);
-  const [liveInterimText, setLiveInterimText] = useState<string>("");
-
-  const isListeningRef = useRef<boolean>(false);
-  const voiceModeRef = useRef<"transcribe" | "translate">("transcribe");
-  const voiceSpeakerRef = useRef<boolean>(true);
-  const voiceWsRef = useRef<WebSocket | null>(null);
-  const inputAudioCtxRef = useRef<AudioContext | null>(null);
-  const outputAudioCtxRef = useRef<AudioContext | null>(null);
-  const mediaStreamRef = useRef<MediaStream | null>(null);
-  const processorRef = useRef<ScriptProcessorNode | null>(null);
-  const nextStartTimeRef = useRef<number>(0);
-
-  useEffect(() => {
-    voiceModeRef.current = voiceMode;
-  }, [voiceMode]);
-
-  useEffect(() => {
-    voiceSpeakerRef.current = voiceSpeakerEnabled;
-  }, [voiceSpeakerEnabled]);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -1022,38 +927,35 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
   const unifiedModels = useMemo<UnifiedModelChoice[]>(() => {
     const list: UnifiedModelChoice[] = [];
 
-    if (isStandalone) {
-      if (availableLocalModels.length > 0) {
-        for (const lm of availableLocalModels) {
-          list.push({
-            key: `local:${lm.id}:${lm.baseUrl || ""}`,
-            provider: "local",
-            modelId: lm.id,
-            label: lm.displayName
-              .replace(/^Built-In Folder GGUF:\s*/i, "")
-              .replace(/^Built-In Active:\s*/i, "Active · "),
-            category: "Local Device",
-            baseUrl: lm.baseUrl || activeProviderConfig.baseUrl || "http://127.0.0.1:1279/v1",
-            ready: true,
-          });
-        }
-      } else {
+    if (availableLocalModels.length > 0) {
+      for (const lm of availableLocalModels) {
         list.push({
-          key: "local:default",
+          key: `local:${lm.id}:${lm.baseUrl || ""}`,
           provider: "local",
-          modelId: activeProviderConfig.model || "default",
-          label: "Local GGUF (Built-In Engine / LM Studio / Ollama)",
+          modelId: lm.id,
+          label: lm.displayName
+            .replace(/^Built-In Folder GGUF:\s*/i, "")
+            .replace(/^Built-In Active:\s*/i, "Active · "),
           category: "Local Device",
-          baseUrl: activeProviderConfig.baseUrl || "http://127.0.0.1:1279/v1",
+          baseUrl: lm.baseUrl || activeProviderConfig.baseUrl || "http://127.0.0.1:1279/v1",
           ready: true,
         });
       }
+    } else {
+      list.push({
+        key: "local:default",
+        provider: "local",
+        modelId: activeProviderConfig.model || "default",
+        label: "Local GGUF (Built-In Engine / LM Studio / Ollama)",
+        category: "Local Device",
+        baseUrl: activeProviderConfig.baseUrl || "http://127.0.0.1:1279/v1",
+        ready: true,
+      });
     }
 
     const gemConfigured = Boolean(
       envKeyStatus?.gemini?.configured ||
-        (activeProviderConfig.provider === "gemini" && activeProviderConfig.apiKey) ||
-        profile?.hasApiKey
+        (activeProviderConfig.provider === "gemini" && activeProviderConfig.apiKey)
     );
     const oaiConfigured = Boolean(
       envKeyStatus?.openai?.configured ||
@@ -1065,8 +967,8 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
     );
 
     const gemModels = [
-      { id: "gemini-4-hydrogen", label: "Gemini 4 Hydrogen (Fast & Smart)" },
       { id: "gemini-3.1-flash-lite", label: "Gemini 3.1 Flash Lite" },
+      { id: "gemini-3.6-flash", label: "Gemini 3.6 Flash" },
       { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
       { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro" },
     ];
@@ -1125,7 +1027,7 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
     }
 
     return list;
-  }, [isStandalone, availableLocalModels, availableModels, envKeyStatus, activeProviderConfig, profile]);
+  }, [availableLocalModels, availableModels, envKeyStatus, activeProviderConfig]);
 
   const activeChoiceDisplay = useMemo(() => {
     const found = unifiedModels.find(
@@ -1172,247 +1074,6 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
     setIsCreatingProject(false);
   };
 
-  const float32ToPcm16Base64 = (float32: Float32Array): string => {
-    const pcm16 = new Int16Array(float32.length);
-    for (let i = 0; i < float32.length; i++) {
-      const clamped = Math.max(-1, Math.min(1, float32[i]));
-      pcm16[i] = clamped < 0 ? clamped * 0x8000 : clamped * 0x7fff;
-    }
-    const bytes = new Uint8Array(pcm16.buffer);
-    let binary = "";
-    const chunkSize = 0x8000;
-    for (let i = 0; i < bytes.length; i += chunkSize) {
-      binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
-    }
-    return btoa(binary);
-  };
-
-  const playPcm24kChunk = (base64Audio: string) => {
-    try {
-      if (!outputAudioCtxRef.current || outputAudioCtxRef.current.state === "closed") {
-        outputAudioCtxRef.current = new AudioContext({ sampleRate: 24000 });
-        nextStartTimeRef.current = 0;
-      }
-      const ctx = outputAudioCtxRef.current;
-      if (ctx.state === "suspended") {
-        void ctx.resume();
-      }
-      const binary = atob(base64Audio);
-      const byteLen = binary.length;
-      const bytes = new Uint8Array(byteLen);
-      for (let i = 0; i < byteLen; i++) {
-        bytes[i] = binary.charCodeAt(i);
-      }
-      const pcm16 = new Int16Array(bytes.buffer);
-      const float32 = new Float32Array(pcm16.length);
-      for (let i = 0; i < pcm16.length; i++) {
-        float32[i] = pcm16[i] / 32768;
-      }
-      const buffer = ctx.createBuffer(1, float32.length, 24000);
-      buffer.copyToChannel(float32, 0);
-
-      const source = ctx.createBufferSource();
-      source.buffer = buffer;
-      source.connect(ctx.destination);
-
-      const now = ctx.currentTime;
-      const startAt = Math.max(now, nextStartTimeRef.current);
-      source.start(startAt);
-      nextStartTimeRef.current = startAt + buffer.duration;
-    } catch {
-      // Ignore malformed audio chunk
-    }
-  };
-
-  const stopLiveVoice = () => {
-    isListeningRef.current = false;
-    setIsListening(false);
-    setVoiceConnecting(false);
-    setLiveInterimText("");
-
-    try {
-      processorRef.current?.disconnect();
-    } catch {}
-    processorRef.current = null;
-
-    try {
-      mediaStreamRef.current?.getTracks().forEach((t) => t.stop());
-    } catch {}
-    mediaStreamRef.current = null;
-
-    try {
-      if (inputAudioCtxRef.current && inputAudioCtxRef.current.state !== "closed") {
-        void inputAudioCtxRef.current.close();
-      }
-    } catch {}
-    inputAudioCtxRef.current = null;
-
-    try {
-      if (outputAudioCtxRef.current && outputAudioCtxRef.current.state !== "closed") {
-        void outputAudioCtxRef.current.close();
-      }
-    } catch {}
-    outputAudioCtxRef.current = null;
-    nextStartTimeRef.current = 0;
-
-    try {
-      if (voiceWsRef.current) {
-        if (voiceWsRef.current.readyState === WebSocket.OPEN) {
-          voiceWsRef.current.send(JSON.stringify({ type: "stop" }));
-        }
-        voiceWsRef.current.close();
-      }
-    } catch {}
-    voiceWsRef.current = null;
-  };
-
-  useEffect(() => {
-    return () => {
-      stopLiveVoice();
-    };
-  }, []);
-
-  const handleToggleVoice = async () => {
-    if (isListening || voiceConnecting) {
-      stopLiveVoice();
-      return;
-    }
-
-    setChatError(null);
-
-    if (!isStandalone && !user) {
-      setChatError("Please sign in and save your Gemini API key to use Gemini Live Voice.");
-      setIsAuthModalOpen(true);
-      return;
-    }
-
-    if (!isStandalone && !profile?.hasApiKey) {
-      setChatError("Please save your Gemini API key first to use Gemini Live Voice.");
-      setIsApiKeyModalOpen(true);
-      return;
-    }
-
-    if (!navigator.mediaDevices?.getUserMedia) {
-      setChatError("Microphone access is not available in this browser context.");
-      return;
-    }
-
-    setVoiceConnecting(true);
-    setLiveInterimText("");
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaStreamRef.current = stream;
-
-      const proto = window.location.protocol === "https:" ? "wss" : "ws";
-      const wsUrl = `${proto}://${window.location.host}/api/voice-live?mode=${voiceMode}&targetLang=${encodeURIComponent(
-        voiceTargetLang
-      )}`;
-      const ws = new WebSocket(wsUrl);
-      voiceWsRef.current = ws;
-
-      ws.onopen = () => {
-        ws.send(
-          JSON.stringify({
-            type: "auth",
-            token: idToken || "",
-            apiKey: activeProviderConfig.apiKey || "",
-          })
-        );
-      };
-
-      ws.onmessage = (event) => {
-        let msg: any;
-        try {
-          msg = JSON.parse(event.data);
-        } catch {
-          return;
-        }
-
-        if (msg.type === "ready") {
-          setVoiceConnecting(false);
-          setIsListening(true);
-          isListeningRef.current = true;
-
-          const inputCtx = new AudioContext({ sampleRate: 16000 });
-          inputAudioCtxRef.current = inputCtx;
-          const source = inputCtx.createMediaStreamSource(stream);
-          const processor = inputCtx.createScriptProcessor(4096, 1, 1);
-          processorRef.current = processor;
-
-          source.connect(processor);
-          processor.connect(inputCtx.destination);
-
-          processor.onaudioprocess = (e) => {
-            if (!isListeningRef.current || ws.readyState !== WebSocket.OPEN) return;
-            const channel = e.inputBuffer.getChannelData(0);
-            const base64 = float32ToPcm16Base64(channel);
-            ws.send(JSON.stringify({ type: "audio", data: base64 }));
-          };
-          return;
-        }
-
-        if (msg.type === "interimTranscript" && msg.text) {
-          setLiveInterimText(String(msg.text));
-          return;
-        }
-
-        if (msg.type === "inputTranscript" && msg.text) {
-          const clean = String(msg.text).trim();
-          if (!clean) return;
-          if (voiceModeRef.current === "transcribe") {
-            setPromptInput((prev) => (prev ? `${prev.trimEnd()} ${clean}` : clean));
-            setLiveInterimText("");
-          } else {
-            setLiveInterimText(`Heard: ${clean}`);
-          }
-          return;
-        }
-
-        if (msg.type === "outputTranscript" && msg.text) {
-          const clean = String(msg.text).trim();
-          if (!clean) return;
-          setPromptInput((prev) => (prev ? `${prev.trimEnd()} ${clean}` : clean));
-          setLiveInterimText("");
-          return;
-        }
-
-        if (msg.type === "audio" && msg.data) {
-          if (voiceModeRef.current === "translate" && voiceSpeakerRef.current) {
-            playPcm24kChunk(String(msg.data));
-          }
-          return;
-        }
-
-        if (msg.type === "error") {
-          setChatError(msg.error || "Gemini Live Voice encountered an error.");
-          stopLiveVoice();
-          return;
-        }
-
-        if (msg.type === "closed") {
-          stopLiveVoice();
-        }
-      };
-
-      ws.onerror = () => {
-        setChatError("Could not connect to Gemini Live Voice stream.");
-        stopLiveVoice();
-      };
-
-      ws.onclose = () => {
-        if (isListeningRef.current) {
-          stopLiveVoice();
-        } else {
-          setVoiceConnecting(false);
-        }
-      };
-    } catch (err: any) {
-      setChatError(err?.message || "Microphone permission denied or unavailable.");
-      stopLiveVoice();
-    }
-  };
-
   const handleAttachFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -1420,23 +1081,15 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
     setChatError(null);
 
     if (file.type.startsWith("image/")) {
-      if (file.size > 5 * 1024 * 1024) {
-        setChatError("Attached image must be under 5MB.");
-        return;
-      }
-
-      if (!isStandalone) {
-        setShowDriveLinkInput(true);
-        setChatError(
-          "Direct image uploads are disabled on the free Firebase Spark plan. Paste a public Google Drive image link ('Anyone with the link') instead."
-        );
+      if (file.size > 20 * 1024 * 1024) {
+        setChatError("Attached image must be under 20MB.");
         return;
       }
 
       const reader = new FileReader();
       reader.onload = () => {
         if (typeof reader.result === "string") {
-          setAttachedImages((prev) => [...prev.slice(0, 5), { dataUrl: reader.result as string, name: file.name }]);
+          setAttachedImages((prev) => [...prev, { dataUrl: reader.result as string, name: file.name }]);
         }
       };
       reader.readAsDataURL(file);
@@ -1445,22 +1098,21 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
 
     if (file.name.toLowerCase().endsWith(".txt") || file.name.toLowerCase().endsWith(".md")) {
       const text = await file.text();
-      setAttachedFileText({ name: file.name, content: text.slice(0, isStandalone ? 120000 : 80000) });
+      setAttachedFileText({ name: file.name, content: text });
       return;
     }
 
     if (file.name.toLowerCase().endsWith(".pdf")) {
-      if (!ensureChatAccess()) return;
       const reader = new FileReader();
       reader.onload = async () => {
         if (typeof reader.result !== "string") return;
         try {
-          const headers: Record<string, string> = { "Content-Type": "application/json" };
-          if (isStandalone) headers["x-standalone-mode"] = "true";
-          else if (idToken) headers.Authorization = `Bearer ${idToken}`;
           const res = await fetch("/api/parse-file", {
             method: "POST",
-            headers,
+            headers: {
+              "Content-Type": "application/json",
+              "x-standalone-mode": "true",
+            },
             body: JSON.stringify({
               fileName: file.name,
               fileType: file.type,
@@ -1469,7 +1121,7 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
           });
           const data = await res.json();
           if (!res.ok) throw new Error(data.error || "Could not extract PDF text.");
-          setAttachedFileText({ name: file.name, content: (data.rawScript || data.text || "").slice(0, 80000) });
+          setAttachedFileText({ name: file.name, content: data.rawScript || data.text || "" });
         } catch (err: any) {
           setChatError(err.message || "Failed to read PDF attachment.");
         }
@@ -1556,35 +1208,7 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
     return parts.join("\n\n");
   };
 
-  const ensureChatAccess = (): boolean => {
-    if (isStandalone) return true;
-    if (!user || !idToken) {
-      setIsAuthModalOpen(true);
-      setChatError(
-        "Sign in required: Please sign in first, then paste and save your personal API key in the secure API Key Saver to generate."
-      );
-      return false;
-    }
-    if (!profile?.hasApiKey) {
-      setIsApiKeyModalOpen(true);
-      setChatError(
-        "Personal API Key required: Please paste and save your API key in the secure API Key Saver first."
-      );
-      return false;
-    }
-    const savedProvider = profile?.activeProvider || "gemini";
-    if (
-      selectedChoice.provider !== savedProvider &&
-      !(activeProviderConfig.provider === selectedChoice.provider && activeProviderConfig.apiKey?.trim())
-    ) {
-      setIsApiKeyModalOpen(true);
-      setChatError(
-        `Your saved key is for ${savedProvider.toUpperCase()}. Please paste and save your ${selectedChoice.provider.toUpperCase()} key in the secure API Key Saver first.`
-      );
-      return false;
-    }
-    return true;
-  };
+  const ensureChatAccess = (): boolean => true;
 
   const handleOptimizePrompt = async () => {
     if (isOptimizing || isSending) return;
@@ -1601,6 +1225,7 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
     try {
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
+        "x-standalone-mode": "true",
         "x-provider-type": selectedChoice.provider,
         "x-provider-model": selectedChoice.modelId,
       };
@@ -1612,11 +1237,6 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
         activeProviderConfig.provider === selectedChoice.provider
       ) {
         headers["x-provider-key"] = activeProviderConfig.apiKey.trim();
-      }
-      if (isStandalone) {
-        headers["x-standalone-mode"] = "true";
-      } else if (idToken) {
-        headers.Authorization = `Bearer ${idToken}`;
       }
 
       const optimizerContextParts = [PROMPT_OPTIMIZER_SYSTEM_INSTRUCTION];
@@ -1721,6 +1341,7 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
     try {
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
+        "x-standalone-mode": "true",
         "x-provider-type": selectedChoice.provider,
         "x-provider-model": selectedChoice.modelId,
       };
@@ -1732,11 +1353,6 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
         activeProviderConfig.provider === selectedChoice.provider
       ) {
         headers["x-provider-key"] = activeProviderConfig.apiKey.trim();
-      }
-      if (isStandalone) {
-        headers["x-standalone-mode"] = "true";
-      } else if (idToken) {
-        headers.Authorization = `Bearer ${idToken}`;
       }
 
       const payloadBody = JSON.stringify({
@@ -1755,19 +1371,10 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
         messages: messagesForRequest.map((m) => ({
           role: m.role,
           content: m.content,
-          ...(isStandalone && m.imageDataUrl ? { imageDataUrl: m.imageDataUrl } : {}),
-          ...(isStandalone && Array.isArray(m.imageDataUrls) && m.imageDataUrls.length > 0
+          ...(m.imageDataUrl ? { imageDataUrl: m.imageDataUrl } : {}),
+          ...(Array.isArray(m.imageDataUrls) && m.imageDataUrls.length > 0
             ? { imageDataUrls: m.imageDataUrls }
             : {}),
-          ...(m.driveFileId ? { driveFileId: m.driveFileId } : {}),
-          ...(Array.isArray(m.driveFileIds) && m.driveFileIds.length > 0
-            ? { driveFileIds: m.driveFileIds }
-            : {}),
-          ...(m.driveImageUrl ? { driveImageUrl: m.driveImageUrl } : {}),
-          ...(Array.isArray(m.driveImageUrls) && m.driveImageUrls.length > 0
-            ? { driveImageUrls: m.driveImageUrls }
-            : {}),
-          ...(m.driveSource ? { driveSource: m.driveSource } : {}),
         })),
       });
 
@@ -1887,11 +1494,6 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
 
   const handleContinueGeneration = async () => {
     if (!activeSession || isSending) return;
-    if (!ensureChatAccess()) return;
-    if (!isStandalone && activeSession.messages.length >= 40) {
-      setLimitModalOpen(true);
-      return;
-    }
 
     const continueMsg: ChatMessageItem = {
       id: `msg-${Date.now()}-cont`,
@@ -1909,90 +1511,48 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
     await sendChatTurn(nextMessages, activeSession.id);
   };
 
-  const handleAttachDriveLink = () => {
-    const fileId = extractGoogleDriveFileId(driveLinkInput);
-    if (!fileId) {
-      setChatError("Please paste a valid Google Drive share link (e.g. https://drive.google.com/file/d/...).");
-      return;
-    }
-    setAttachedDriveImages((prev) => {
-      if (prev.some((p) => p.fileId === fileId)) return prev;
-      return [
-        ...prev.slice(0, 5),
-        {
-          fileId,
-          name: `Drive Reference ${prev.length + 1}`,
-          source: "public-link" as const,
-          previewUrl: getPublicDriveThumbnailUrl(fileId),
-          driveUrl: driveLinkInput.trim(),
-        },
-      ];
-    });
-    setDriveLinkInput("");
-    setShowDriveLinkInput(false);
-    setChatError(null);
-  };
-
   const handlePastePrompt = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
-    if (isStandalone) return;
     const clipboard = e.clipboardData;
     if (!clipboard) return;
 
-    const pastedFiles = Array.from(clipboard.files as FileList);
-    const imageFile = pastedFiles.find((f: File) => f.type.startsWith("image/"));
-    const hasImageItem =
-      Boolean(imageFile) ||
-      Array.from(clipboard.items as DataTransferItemList).some((item: DataTransferItem) =>
-        item.type.startsWith("image/")
-      );
-
-    if (hasImageItem) {
-      e.preventDefault();
-      setAttachedImages([]);
-      setShowDriveLinkInput(true);
-      setChatError(
-        "Direct image pasting is disabled on the free Firebase Spark plan. Paste public Google Drive image links ('Anyone with the link') instead."
-      );
-      return;
+    const pastedFiles = Array.from(clipboard.files as FileList).filter((f: File) =>
+      f.type.startsWith("image/")
+    );
+    if (pastedFiles.length === 0 && clipboard.items) {
+      for (const item of Array.from(clipboard.items as DataTransferItemList)) {
+        if (item.type.startsWith("image/")) {
+          const f = item.getAsFile();
+          if (f) pastedFiles.push(f);
+        }
+      }
     }
 
-    const pastedText = clipboard.getData("text/plain") || "";
-    if (pastedText.length > 100000) {
+    if (pastedFiles.length > 0) {
       e.preventDefault();
-      const allowed = pastedText.slice(0, 100000);
-      setPromptInput((prev) => `${prev}${allowed}`.slice(0, 115000));
-      setChatError(
-        "Very large paste trimmed to 100,000 characters."
-      );
+      for (const imgFile of pastedFiles) {
+        if (imgFile.size > 20 * 1024 * 1024) {
+          setChatError("Pasted image must be under 20MB.");
+          continue;
+        }
+        const reader = new FileReader();
+        reader.onload = () => {
+          if (typeof reader.result === "string") {
+            setAttachedImages((prev) => [
+              ...prev,
+              { dataUrl: reader.result as string, name: imgFile.name || `pasted-image-${Date.now()}.png` },
+            ]);
+          }
+        };
+        reader.readAsDataURL(imgFile);
+      }
     }
   };
 
   const handleSubmitPrompt = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (isSending) return;
-    if (!ensureChatAccess()) return;
     const rawText = promptInput.trim();
-    if (
-      !rawText &&
-      !(isStandalone && attachedImages.length > 0) &&
-      attachedDriveImages.length === 0 &&
-      !attachedFileText
-    ) {
-      return;
-    }
-
-    if (!isStandalone && attachedImages.length > 0) {
-      setAttachedImages([]);
-      setChatError("Direct image storage in Firebase is disabled. Paste public Google Drive image links instead.");
-      return;
-    }
-
-    if (
-      !isStandalone &&
-      activeSession &&
-      activeSession.messages.length >= 40
-    ) {
-      setLimitModalOpen(true);
+    if (!rawText && attachedImages.length === 0 && !attachedFileText) {
       return;
     }
 
@@ -2000,57 +1560,19 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
       ? `${rawText ? rawText + "\n\n" : ""}--- Attached File: ${attachedFileText.name} ---\n${attachedFileText.content}`
       : rawText;
 
-    if (!isStandalone && fullUserText.length > 120000) {
-      setChatError(
-        "Prompt exceeds 120,000 characters. Please split very large scripts into sections."
-      );
-      return;
-    }
-
-    // Auto-detect Google Drive image URLs pasted directly in text (supports multiple reference images)
-    const finalDriveAttachments = [...attachedDriveImages];
-    if (!isStandalone) {
-      const urlMatches = rawText.match(/https?:\/\/(?:drive|docs)\.google\.com\/[^\s]+/gi) || [];
-      for (const u of urlMatches) {
-        const detectedId = extractGoogleDriveFileId(u);
-        if (detectedId && !finalDriveAttachments.some((d) => d.fileId === detectedId) && finalDriveAttachments.length < 6) {
-          finalDriveAttachments.push({
-            fileId: detectedId,
-            name: `Drive Reference ${finalDriveAttachments.length + 1}`,
-            source: "public-link",
-            previewUrl: getPublicDriveThumbnailUrl(detectedId),
-            driveUrl: u,
-          });
-        }
-      }
-    }
-
     const userMsg: ChatMessageItem = {
       id: `msg-${Date.now()}-usr`,
       role: "user",
-      content: fullUserText || (finalDriveAttachments.length > 0 ? "Analyze the attached Google Drive reference image(s)." : ""),
-      ...(isStandalone && attachedImages.length > 0
+      content: fullUserText || "Analyze the attached image(s).",
+      ...(attachedImages.length > 0
         ? {
             imageDataUrl: attachedImages[0].dataUrl,
             imageDataUrls: attachedImages.map((img) => img.dataUrl),
           }
         : {}),
-      ...(finalDriveAttachments.length > 0
-        ? {
-            driveFileId: finalDriveAttachments[0].fileId,
-            driveFileIds: finalDriveAttachments.map((d) => d.fileId),
-            driveSource: "public-link" as const,
-            driveImageUrl: finalDriveAttachments[0].driveUrl,
-            driveImageUrls: finalDriveAttachments.map((d) => d.driveUrl).filter(Boolean) as string[],
-            attachmentName:
-              finalDriveAttachments.length === 1
-                ? finalDriveAttachments[0].name
-                : `${finalDriveAttachments.length} Drive References`,
-          }
-        : {}),
       ...(attachedFileText
         ? { attachmentName: attachedFileText.name }
-        : isStandalone && attachedImages.length > 0
+        : attachedImages.length > 0
         ? {
             attachmentName:
               attachedImages.length === 1
@@ -2069,7 +1591,6 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
       const cleanTitle = (
         rawText ||
         attachedFileText?.name ||
-        finalDriveAttachments[0]?.name ||
         attachedImages[0]?.name ||
         "New Chat"
       )
@@ -2082,7 +1603,7 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
         projectId: activeProjectId,
         messages: nextMessages,
         updatedAt: Date.now(),
-        storageType: isStandalone ? "local-disk" : "spark",
+        storageType: "local-disk",
       };
       setSessions((prev) => [newSession, ...prev]);
       setActiveSessionId(newId);
@@ -2098,7 +1619,6 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
 
     setPromptInput("");
     setAttachedImages([]);
-    setAttachedDriveImages([]);
     setAttachedFileText(null);
     await sendChatTurn(nextMessages, targetSessionId);
   };
@@ -2455,48 +1975,8 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
             </div>
           </div>
 
-          {/* Sidebar Bottom Settings, Account Gmail, Remove Key & Provider Trigger */}
+          {/* Sidebar Bottom Settings & Local Storage Status */}
           <div className="p-2.5 border-t space-y-1" style={{ borderColor: borderCol }}>
-            {!isStandalone && (user || profile) && (
-              <div
-                className="px-2.5 py-2 rounded-xl border space-y-1.5 mb-1"
-                style={{
-                  borderColor: borderCol,
-                  backgroundColor: isLight ? "#FFFFFF" : "#212121",
-                }}
-              >
-                <div className="text-[10px] font-mono truncate" style={{ color: mutedText }} title={profile?.email || user?.email || ""}>
-                  <span className="font-bold block truncate" style={{ color: primaryText }}>
-                    {profile?.email || user?.email || "Signed In"}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  {profile?.hasApiKey && (
-                    <button
-                      type="button"
-                      onClick={() => void removeApiKey()}
-                      className="flex-1 px-2 py-1 rounded-lg border text-[10px] font-bold flex items-center justify-center gap-1 cursor-pointer hover:bg-red-500/10"
-                      style={{ borderColor: `${theme.accentColor}45`, color: theme.accentColor }}
-                      title="Remove your saved API key"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                      <span>Remove Key</span>
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => void logout()}
-                    className="flex-1 px-2 py-1 rounded-lg border text-[10px] font-bold flex items-center justify-center gap-1 cursor-pointer hover:bg-red-500/10"
-                    style={{ borderColor: `${theme.accentColor}45`, color: theme.accentColor }}
-                    title="Log out of your account"
-                  >
-                    <LogOut className="h-3 w-3" />
-                    <span>Log Out</span>
-                  </button>
-                </div>
-              </div>
-            )}
-
             <button
               type="button"
               onClick={() => setIsApiKeyModalOpen(true)}
@@ -2504,7 +1984,7 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
               style={{ color: primaryText }}
             >
               <Key className="h-3.5 w-3.5" style={{ color: theme.secondaryAccentColor }} />
-              <span>{isStandalone ? "Providers & Local Engine" : "Manage / Remove API Key"}</span>
+              <span>Providers &amp; Local Engine</span>
             </button>
             <button
               type="button"
@@ -2523,17 +2003,11 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
             >
               {storageMode === "local-disk" ? (
                 <HardDrive className="h-3 w-3 shrink-0" style={{ color: theme.secondaryAccentColor }} />
-              ) : storageMode === "cloud-firestore" ? (
-                <Cloud className="h-3 w-3 shrink-0" style={{ color: theme.accentColor }} />
               ) : (
                 <Monitor className="h-3 w-3 shrink-0" />
               )}
               <span className="truncate">
-                {storageMode === "local-disk"
-                  ? "Saved on PC Disk"
-                  : storageMode === "cloud-firestore"
-                  ? "Cloud Sync (Text Only · Spark)"
-                  : "Saved in Browser"}
+                {storageMode === "local-disk" ? "Saved on PC Disk" : "Saved in Browser"}
               </span>
             </div>
           </div>
@@ -2673,30 +2147,14 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
                         : `${activeChoiceDisplay.category} · Cloud`}
                     </span>
                   </div>
-                  {!isStandalone && systemModeChecked && !user ? (
-                    <button
-                      type="button"
-                      onClick={() => setIsAuthModalOpen(true)}
-                      className="text-[11px] font-bold underline cursor-pointer inline-flex items-center gap-1"
-                      style={{ color: theme.accentColor }}
-                    >
-                      <Lock className="h-3 w-3" />
-                      <span>Sign In &amp; Save API Key to Generate</span>
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setIsApiKeyModalOpen(true)}
-                      className="text-[11px] font-medium underline cursor-pointer"
-                      style={{ color: !isStandalone && !profile?.hasApiKey ? theme.accentColor : mutedText }}
-                    >
-                      {!isStandalone && !profile?.hasApiKey
-                        ? "Paste & Save Personal API Key to Generate"
-                        : isStandalone
-                        ? "Manage API Keys & Local Engine"
-                        : "Manage Secure API Key"}
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => setIsApiKeyModalOpen(true)}
+                    className="text-[11px] font-medium underline cursor-pointer"
+                    style={{ color: mutedText }}
+                  >
+                    Manage API Keys &amp; Local Engine
+                  </button>
                 </div>
 
                 {/* Flagship Workflow Starter Cards */}
@@ -2802,12 +2260,6 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
                     : msg.imageDataUrl
                     ? [msg.imageDataUrl]
                     : [];
-                const driveIds =
-                  Array.isArray(msg.driveFileIds) && msg.driveFileIds.length > 0
-                    ? msg.driveFileIds
-                    : msg.driveFileId
-                    ? [msg.driveFileId]
-                    : [];
                 const needsContinueHighlight =
                   Boolean(msg.truncated) ||
                   /\b(batch|next scene|continue|scene\s+\d+|part\s+\d+)\b/i.test(msg.content);
@@ -2839,20 +2291,7 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
                             ))}
                           </div>
                         )}
-                        {localImgs.length === 0 && driveIds.length > 0 && (
-                          <div className="flex flex-wrap gap-2 mb-2">
-                            {driveIds.map((fid, idx) => (
-                              <img
-                                key={`${msg.id}-drv-${fid}-${idx}`}
-                                src={getPublicDriveThumbnailUrl(fid)}
-                                alt={`Google Drive reference ${idx + 1}`}
-                                className="max-h-52 rounded-xl object-contain border"
-                                style={{ borderColor: borderCol }}
-                              />
-                            ))}
-                          </div>
-                        )}
-                        {msg.attachmentName && localImgs.length === 0 && driveIds.length === 0 && (
+                        {msg.attachmentName && localImgs.length === 0 && (
                           <div
                             className="text-[11px] font-mono mb-1.5 flex items-center gap-1.5"
                             style={{ color: theme.secondaryAccentColor }}
@@ -3108,69 +2547,6 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
         onUnlinkFolder={handleUnlinkFolder}
         onRescanFolders={handleRescanFolders}
       />
-
-      {/* Strict 40-Message Limit Modal (Delete Chat OR Export & Start New Chat) */}
-      {limitModalOpen && activeSession && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
-          <div
-            className="w-full max-w-md rounded-3xl border p-6 space-y-4 shadow-2xl"
-            style={{ backgroundColor: sidebarBg, borderColor: borderCol, color: primaryText }}
-          >
-            <div className="flex items-start gap-3">
-              <div
-                className="p-2.5 rounded-2xl border shrink-0"
-                style={{ borderColor: borderCol, backgroundColor: `${theme.accentColor}15` }}
-              >
-                <AlertTriangle className="h-5 w-5" style={{ color: theme.accentColor }} />
-              </div>
-              <div>
-                <h3 className="text-base font-extrabold">40-Message Free Storage Limit</h3>
-                <p className="text-xs mt-1 leading-relaxed" style={{ color: mutedText }}>
-                  This chat has reached 40 messages on free Firebase Spark storage. Please <strong>delete this chat</strong> or start a fresh chat to stay within free cloud limits.
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-2.5 pt-1">
-              <button
-                type="button"
-                onClick={() => {
-                  setSessions((prev) => prev.filter((x) => x.id !== activeSession.id));
-                  setActiveSessionId(null);
-                  setLimitModalOpen(false);
-                }}
-                className="w-full py-2.5 px-4 rounded-xl bg-red-600 text-white font-bold text-xs flex items-center justify-center gap-2 cursor-pointer hover:bg-red-500"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-                <span>Delete This Chat (Free Spark Plan)</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  handleExportSession();
-                  handleNewChat(activeProjectId);
-                  setLimitModalOpen(false);
-                }}
-                className="w-full py-2.5 px-4 rounded-xl border font-bold text-xs flex items-center justify-center gap-2 cursor-pointer"
-                style={{ borderColor: borderCol, color: primaryText }}
-              >
-                <Download className="h-3.5 w-3.5" />
-                <span>Export .md &amp; Start New Chat</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setLimitModalOpen(false)}
-                className="w-full py-2 rounded-xl border text-xs font-semibold cursor-pointer"
-                style={{ borderColor: borderCol, color: mutedText }}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </section>
   );
 
@@ -3211,42 +2587,7 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
           </div>
         )}
 
-        {showDriveLinkInput && (
-          <div className="mx-3.5 mt-3 flex items-center gap-2">
-            <input
-              type="url"
-              placeholder="Paste public Google Drive image link (https://drive.google.com/file/d/...)"
-              value={driveLinkInput}
-              onChange={(e) => setDriveLinkInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  handleAttachDriveLink();
-                }
-              }}
-              className="flex-1 rounded-xl border px-3 py-1.5 text-xs focus:outline-none"
-              style={{ borderColor: borderCol, backgroundColor: sidebarBg, color: primaryText }}
-            />
-            <button
-              type="button"
-              onClick={handleAttachDriveLink}
-              className="px-3 py-1.5 rounded-xl text-xs font-bold text-white cursor-pointer"
-              style={{ backgroundColor: theme.secondaryAccentColor }}
-            >
-              Attach Link
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowDriveLinkInput(false)}
-              className="p-1.5 rounded-lg cursor-pointer"
-              style={{ color: mutedText }}
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        )}
-
-        {(attachedImages.length > 0 || attachedDriveImages.length > 0 || attachedFileText) && (
+        {(attachedImages.length > 0 || attachedFileText) && (
           <div className="px-4 pt-3 flex flex-wrap gap-2">
             {attachedImages.map((img, idx) => (
               <div
@@ -3263,28 +2604,6 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
                 <button
                   type="button"
                   onClick={() => setAttachedImages((prev) => prev.filter((_, i) => i !== idx))}
-                  className="cursor-pointer opacity-75 hover:opacity-100"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </div>
-            ))}
-            {attachedDriveImages.map((drv, idx) => (
-              <div
-                key={`drv-ref-${drv.fileId}-${idx}`}
-                className="inline-flex items-center gap-2 px-2.5 py-1 rounded-xl border text-xs"
-                style={{ borderColor: borderCol, backgroundColor: sidebarBg }}
-              >
-                <img
-                  src={drv.previewUrl}
-                  alt={drv.name}
-                  className="h-5 w-5 rounded object-cover"
-                />
-                <Link2 className="h-3 w-3 shrink-0" style={{ color: theme.secondaryAccentColor }} />
-                <span className="truncate max-w-[160px]">{drv.name}</span>
-                <button
-                  type="button"
-                  onClick={() => setAttachedDriveImages((prev) => prev.filter((_, i) => i !== idx))}
                   className="cursor-pointer opacity-75 hover:opacity-100"
                 >
                   <X className="h-3 w-3" />
@@ -3310,41 +2629,6 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
           </div>
         )}
 
-        {(isListening || voiceConnecting) && (
-          <div
-            className="mx-3.5 mt-3 px-3 py-2 rounded-xl border text-xs font-mono flex items-center justify-between gap-2"
-            style={{
-              borderColor: theme.secondaryAccentColor,
-              backgroundColor: `${theme.secondaryAccentColor}15`,
-              color: primaryText,
-            }}
-          >
-            <div className="flex items-center gap-2 min-w-0">
-              <span
-                className="h-2 w-2 rounded-full animate-pulse shrink-0"
-                style={{ backgroundColor: voiceConnecting ? theme.accentColor : theme.secondaryAccentColor }}
-              />
-              <span className="font-bold shrink-0">
-                {voiceConnecting
-                  ? "Connecting Gemini Live..."
-                  : voiceMode === "translate"
-                  ? `Live Translate (${voiceTargetLang.toUpperCase()})`
-                  : "Transcribe Live"}
-              </span>
-              {liveInterimText && (
-                <span className="truncate opacity-85 italic">{liveInterimText}</span>
-              )}
-            </div>
-            <button
-              type="button"
-              onClick={stopLiveVoice}
-              className="px-2 py-0.5 rounded-lg bg-red-600 text-white text-[10px] font-bold cursor-pointer shrink-0"
-            >
-              Stop
-            </button>
-          </div>
-        )}
-
         <textarea
           rows={hasMessages ? 2 : 3}
           value={promptInput}
@@ -3356,7 +2640,7 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
               void handleSubmitPrompt();
             }
           }}
-          placeholder="Message Chat Workspace (write any transcript, prompt, script, or chat...)"
+          placeholder="Message Chat Workspace (write any transcript, prompt, script, or paste images...)"
           className="w-full bg-transparent px-4 pt-3.5 pb-2 text-[15px] focus:outline-none resize-none leading-relaxed"
           style={{ color: primaryText }}
         />
@@ -3368,34 +2652,10 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
               onClick={() => fileInputRef.current?.click()}
               className="h-8 w-8 rounded-full border flex items-center justify-center cursor-pointer transition-colors hover:opacity-90"
               style={{ borderColor: borderCol, color: primaryText }}
-              title={
-                isStandalone
-                  ? "Attach .txt, .md, .pdf, or image"
-                  : "Attach .txt, .md, or .pdf (use Drive Image button for public Google Drive image links)"
-              }
+              title="Attach .txt, .md, .pdf, or image"
             >
               <Plus className="h-4 w-4" />
             </button>
-
-            {!isStandalone && (
-              <button
-                type="button"
-                onClick={() => setShowDriveLinkInput((v) => !v)}
-                className="h-8 px-2.5 rounded-full border flex items-center gap-1 text-xs cursor-pointer transition-colors hover:opacity-90"
-                style={{
-                  borderColor: showDriveLinkInput || attachedDriveImages.length > 0 ? theme.secondaryAccentColor : borderCol,
-                  color: primaryText,
-                }}
-                title="Attach up to 6 public Google Drive reference image links (0 KB Firebase storage)"
-              >
-                <Link2 className="h-3.5 w-3.5" style={{ color: theme.secondaryAccentColor }} />
-                <span className="hidden sm:inline font-medium">
-                  {attachedDriveImages.length > 0
-                    ? `Drive Ref (${attachedDriveImages.length}/6)`
-                    : "Drive Ref"}
-                </span>
-              </button>
-            )}
 
             <div className="relative" ref={optionsMenuRef}>
               <button
@@ -3779,98 +3039,6 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
               )}
             </div>
 
-            {/* Gemini Live Voice Controls: Transcribe Live & Live Translate */}
-            <div
-              className="flex items-center gap-1 rounded-full border px-1.5 py-0.5"
-              style={{
-                borderColor: isListening ? theme.accentColor : borderCol,
-                backgroundColor: isLight ? "#F8FAFC" : "#212121",
-              }}
-            >
-              <select
-                value={voiceMode}
-                disabled={isListening || voiceConnecting}
-                onChange={(e) => setVoiceMode(e.target.value as "transcribe" | "translate")}
-                className="bg-transparent text-[11px] font-medium focus:outline-none cursor-pointer px-1 disabled:opacity-60"
-                style={{
-                  colorScheme: isLight ? "light" : "dark",
-                  color: primaryText,
-                }}
-                title="Choose Gemini 3.5 Live Voice Model"
-              >
-                <option value="transcribe" style={{ backgroundColor: composerBg, color: primaryText }}>
-                  Transcribe Live
-                </option>
-                <option value="translate" style={{ backgroundColor: composerBg, color: primaryText }}>
-                  Live Translate
-                </option>
-              </select>
-
-              {voiceMode === "translate" && (
-                <>
-                  <Languages className="h-3 w-3 shrink-0 opacity-75" style={{ color: theme.secondaryAccentColor }} />
-                  <select
-                    value={voiceTargetLang}
-                    disabled={isListening || voiceConnecting}
-                    onChange={(e) => setVoiceTargetLang(e.target.value)}
-                    className="bg-transparent text-[11px] font-medium focus:outline-none cursor-pointer pr-1 disabled:opacity-60"
-                    style={{
-                      colorScheme: isLight ? "light" : "dark",
-                      color: primaryText,
-                    }}
-                    title="Target Translation Language"
-                  >
-                    <option value="en" style={{ backgroundColor: composerBg, color: primaryText }}>EN</option>
-                    <option value="ur" style={{ backgroundColor: composerBg, color: primaryText }}>UR</option>
-                    <option value="hi" style={{ backgroundColor: composerBg, color: primaryText }}>HI</option>
-                    <option value="ar" style={{ backgroundColor: composerBg, color: primaryText }}>AR</option>
-                    <option value="es" style={{ backgroundColor: composerBg, color: primaryText }}>ES</option>
-                    <option value="fr" style={{ backgroundColor: composerBg, color: primaryText }}>FR</option>
-                    <option value="de" style={{ backgroundColor: composerBg, color: primaryText }}>DE</option>
-                    <option value="tr" style={{ backgroundColor: composerBg, color: primaryText }}>TR</option>
-                    <option value="pt" style={{ backgroundColor: composerBg, color: primaryText }}>PT</option>
-                    <option value="zh" style={{ backgroundColor: composerBg, color: primaryText }}>ZH</option>
-                    <option value="ja" style={{ backgroundColor: composerBg, color: primaryText }}>JA</option>
-                    <option value="ko" style={{ backgroundColor: composerBg, color: primaryText }}>KO</option>
-                  </select>
-                  <button
-                    type="button"
-                    onClick={() => setVoiceSpeakerEnabled((v) => !v)}
-                    className="p-1 rounded-full cursor-pointer opacity-80 hover:opacity-100"
-                    style={{ color: voiceSpeakerEnabled ? theme.secondaryAccentColor : mutedText }}
-                    title={voiceSpeakerEnabled ? "Translated audio playback ON" : "Translated audio playback muted (text only)"}
-                  >
-                    {voiceSpeakerEnabled ? <Volume2 className="h-3 w-3" /> : <VolumeX className="h-3 w-3" />}
-                  </button>
-                </>
-              )}
-
-              <button
-                type="button"
-                onClick={() => void handleToggleVoice()}
-                className="h-7 w-7 rounded-full flex items-center justify-center cursor-pointer transition-colors"
-                style={{
-                  backgroundColor: isListening ? theme.accentColor : "transparent",
-                  color: isListening ? "#FFFFFF" : voiceConnecting ? theme.accentColor : mutedText,
-                }}
-                title={
-                  isListening
-                    ? "Stop Gemini Live Voice"
-                    : voiceMode === "translate"
-                    ? "Start Gemini 3.5 Live Translate"
-                    : "Start Gemini 3.5 Transcribe Live"
-                }
-              >
-                {voiceConnecting ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : isListening ? (
-                  <MicOff className="h-3.5 w-3.5" />
-                ) : (
-                  <Mic className="h-3.5 w-3.5" />
-                )}
-              </button>
-            </div>
-
             {isSending ? (
               <button
                 type="button"
@@ -3887,7 +3055,6 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
                 disabled={
                   !promptInput.trim() &&
                   attachedImages.length === 0 &&
-                  attachedDriveImages.length === 0 &&
                   !attachedFileText
                 }
                 className="h-8 w-8 rounded-full flex items-center justify-center text-white cursor-pointer disabled:opacity-40 transition-transform active:scale-95"

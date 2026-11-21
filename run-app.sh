@@ -62,11 +62,11 @@ fi
 
 # 1. Securely bootstrap .env without overwriting existing user config
 if [[ ! -f ".env" ]]; then
-  echo "[INFO] Creating .env for local standalone mode..."
+  echo "[INFO] Creating .env for local desktop app..."
   if [[ -f ".env.example" ]]; then
     cp ".env.example" ".env"
   else
-    printf "STANDALONE_MODE=true\nPORT=3000\nAI_PROVIDER=gemini\n" > ".env"
+    printf "PORT=3000\nAI_PROVIDER=gemini\n" > ".env"
   fi
   chmod 600 ".env" || true
 else

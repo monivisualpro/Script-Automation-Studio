@@ -1,39 +1,22 @@
-import React, { useState, useRef, useEffect } from "react";
+import React from "react";
 import { useAuth } from "../context/AuthContext";
 import { getThemeConfig } from "../lib/themeConfig";
-import { 
-  LogOut, 
-  Settings, 
-  Key, 
-  CheckCircle2, 
-  AlertTriangle, 
-  Crown, 
-  User as UserIcon, 
-  ChevronDown, 
-  Cpu, 
-  LogIn,
-  Wand2,
+import {
+  Settings,
+  Key,
+  CheckCircle2,
   Sun,
   Moon,
   BookOpen,
   Clapperboard,
   MessageSquare,
-  Trash2
 } from "lucide-react";
 
 export const UserHeader: React.FC = () => {
-  const { 
-    user,
-    profile, 
-    logout,
-    removeApiKey,
-    setIsAuthModalOpen, 
-    setIsApiKeyModalOpen, 
-    setIsSettingsModalOpen, 
-    setIsAdminModalOpen,
+  const {
+    setIsApiKeyModalOpen,
+    setIsSettingsModalOpen,
     setIsTutorialModalOpen,
-    isStandalone,
-    systemModeChecked,
     envKeyStatus,
     activeProviderConfig,
     currentTheme,
@@ -41,41 +24,36 @@ export const UserHeader: React.FC = () => {
     currentBrand,
     setCurrentBrand,
     activeWorkspace,
-    setActiveWorkspace
+    setActiveWorkspace,
   } = useAuth();
 
   const theme = getThemeConfig(currentTheme, currentBrand);
 
-  const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
-  const [removingKey, setRemovingKey] = useState<boolean>(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  const displayEmail = profile?.email || user?.email || "";
-  const displayName =
-    profile?.name ||
-    user?.displayName ||
-    (displayEmail ? displayEmail.split("@")[0] : "Creator Account");
-  const displayPhoto =
-    profile?.profilePhoto ||
-    user?.photoURL ||
-    `https://api.dicebear.com/7.x/bottts/svg?seed=${profile?.userId || user?.uid || "user"}`;
-
-  // Close dropdown on outside click
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsDropdownOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  const activeProv = activeProviderConfig.provider || "gemini";
+  const envEntry =
+    activeProv === "gemini"
+      ? envKeyStatus?.gemini
+      : activeProv === "openai"
+      ? envKeyStatus?.openai
+      : activeProv === "claude"
+      ? envKeyStatus?.claude
+      : null;
+  const hasBrowserKey = Boolean(activeProviderConfig.apiKey?.trim());
+  const isLocalReady = activeProv === "local";
+  const isConfigured = isLocalReady || hasBrowserKey || Boolean(envEntry?.configured);
+  const detailLabel = isLocalReady
+    ? "Local Engine"
+    : hasBrowserKey
+    ? "Local Key"
+    : envEntry?.masked
+    ? `.env: ${envEntry.masked}`
+    : "Setup Key / .env";
 
   return (
     <header
       className={`w-full border-b px-4 py-2.5 sm:px-6 sticky top-0 z-40 flex flex-wrap items-center justify-between gap-2 sm:gap-4 select-none transition-colors duration-200 ${
-        theme.isLight 
-          ? "bg-[#F7F7F7] border-[#E5E5E5] text-[#000000]" 
+        theme.isLight
+          ? "bg-[#F7F7F7] border-[#E5E5E5] text-[#000000]"
           : "bg-[#111111] border-[#2A2A2A] text-white"
       }`}
     >
@@ -86,17 +64,6 @@ export const UserHeader: React.FC = () => {
           alt="Script Automation Studio Logo"
           className="h-8 sm:h-9 w-auto object-contain cursor-pointer"
         />
-        {profile && (profile.isAdmin || profile.role === "admin") && (
-          <span 
-            className={`text-[10px] font-mono px-2.5 py-0.5 rounded-full border font-bold flex items-center gap-1 shadow-sm ${
-              theme.isLight ? "bg-[#FFFFFF]" : "bg-[#111111]"
-            }`}
-            style={{ color: theme.textColorCode, borderColor: `${theme.secondaryAccentColor}80` }}
-          >
-            <Crown className="h-3 w-3" style={{ color: theme.secondaryAccentColor }} />
-            Admin
-          </span>
-        )}
       </div>
 
       {/* Center Workspace Mode Tabs */}
@@ -140,19 +107,23 @@ export const UserHeader: React.FC = () => {
         </button>
       </nav>
 
-      {/* Right User Navigation & Controls */}
+      {/* Right Desktop Controls */}
       <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 relative">
         {/* Brand Color Switcher (Red / Blue) */}
-        <div className={`flex items-center p-0.5 rounded-2xl border ${
-          theme.isLight ? "bg-[#FFFFFF] border-[#E5E5E5]" : "bg-[#1A1A1A] border-[#2A2A2A]"
-        }`}>
+        <div
+          className={`flex items-center p-0.5 rounded-2xl border ${
+            theme.isLight ? "bg-[#FFFFFF] border-[#E5E5E5]" : "bg-[#1A1A1A] border-[#2A2A2A]"
+          }`}
+        >
           <button
             type="button"
             onClick={() => setCurrentBrand("orange")}
             className={`px-2.5 py-1.5 rounded-xl font-mono text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
               currentBrand === "orange" || currentBrand === "red"
                 ? "bg-[#FF073A] text-white shadow-sm"
-                : (theme.isLight ? "text-[#444444] hover:text-[#000000]" : "text-[#BDBDBD] hover:text-white")
+                : theme.isLight
+                ? "text-[#444444] hover:text-[#000000]"
+                : "text-[#BDBDBD] hover:text-white"
             }`}
             title="Red Brand (#FF073A Primary, #2774FC Secondary)"
           >
@@ -165,7 +136,9 @@ export const UserHeader: React.FC = () => {
             className={`px-2.5 py-1.5 rounded-xl font-mono text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
               currentBrand === "blue"
                 ? "bg-[#2774FC] text-white shadow-sm"
-                : (theme.isLight ? "text-[#444444] hover:text-[#000000]" : "text-[#BDBDBD] hover:text-white")
+                : theme.isLight
+                ? "text-[#444444] hover:text-[#000000]"
+                : "text-[#BDBDBD] hover:text-white"
             }`}
             title="Blue Brand (#2774FC Primary, #FF073A Secondary)"
           >
@@ -178,8 +151,8 @@ export const UserHeader: React.FC = () => {
         <button
           onClick={() => setCurrentTheme(theme.isLight ? "Night" : "Day")}
           className={`px-3 py-2 rounded-2xl border transition-all cursor-pointer flex items-center gap-1.5 shadow-sm ${
-            theme.isLight 
-              ? "bg-[#FFFFFF] text-[#000000] border-[#E5E5E5]" 
+            theme.isLight
+              ? "bg-[#FFFFFF] text-[#000000] border-[#E5E5E5]"
               : "bg-[#1A1A1A] text-white border-[#2A2A2A]"
           }`}
           title={theme.isLight ? "Switch to Night Mode (🌙)" : "Switch to Day Mode (☀️)"}
@@ -201,8 +174,8 @@ export const UserHeader: React.FC = () => {
         <button
           onClick={() => setIsTutorialModalOpen(true)}
           className={`p-2 sm:px-3 py-2 rounded-2xl border transition-all cursor-pointer flex items-center gap-1.5 shadow-sm ${
-            theme.isLight 
-              ? "bg-[#FFFFFF] text-[#000000] border-[#E5E5E5]" 
+            theme.isLight
+              ? "bg-[#FFFFFF] text-[#000000] border-[#E5E5E5]"
               : "bg-[#1A1A1A] text-white border-[#2A2A2A]"
           }`}
           title="Open Tutorials, Controls Dictionary & Downloadable Guides"
@@ -211,14 +184,12 @@ export const UserHeader: React.FC = () => {
           <span className="text-xs font-mono font-bold hidden sm:inline">Tutorials & Guides</span>
         </button>
 
-
-
         {/* Settings Button */}
         <button
           onClick={() => setIsSettingsModalOpen(true)}
           className={`p-2 sm:px-3 py-2 rounded-2xl border transition-all cursor-pointer flex items-center gap-1.5 ${
-            theme.isLight 
-              ? "bg-[#FFFFFF] text-[#000000] border-[#E5E5E5]" 
+            theme.isLight
+              ? "bg-[#FFFFFF] text-[#000000] border-[#E5E5E5]"
               : "bg-[#1A1A1A] text-white border-[#2A2A2A]"
           }`}
           title="Open Settings & Model Configuration"
@@ -227,257 +198,30 @@ export const UserHeader: React.FC = () => {
           <span className="text-xs font-mono hidden lg:inline">Settings</span>
         </button>
 
-        {isStandalone ? (
-          (() => {
-            const activeProv = activeProviderConfig.provider || "gemini";
-            const envEntry =
-              activeProv === "gemini"
-                ? envKeyStatus?.gemini
-                : activeProv === "openai"
-                ? envKeyStatus?.openai
-                : activeProv === "claude"
-                ? envKeyStatus?.claude
-                : null;
-            const hasBrowserKey = Boolean(activeProviderConfig.apiKey?.trim());
-            const isLocalReady = activeProv === "local";
-            const isConfigured = isLocalReady || hasBrowserKey || Boolean(envEntry?.configured);
-            const detailLabel = isLocalReady
-              ? "Local Engine"
-              : hasBrowserKey
-              ? "Browser Key"
-              : envEntry?.masked
-              ? `.env: ${envEntry.masked}`
-              : "Setup Key / .env";
-
-            return (
-              <button
-                onClick={() => setIsApiKeyModalOpen(true)}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-2xl border transition-all cursor-pointer text-[11px] font-mono ${
-                  theme.isLight ? "bg-[#FFFFFF]" : "bg-[#1A1A1A]"
-                } ${!isConfigured ? "font-bold" : ""}`}
-                style={{
-                  backgroundColor: !isConfigured ? `${theme.accentColor}1A` : undefined,
-                  color: theme.textColorCode,
-                  borderColor: isConfigured ? `${theme.secondaryAccentColor}99` : theme.accentColor,
-                }}
-                title="Configure AI Provider, Local .env Key, or Built-In Local Engine"
-              >
-                {isConfigured ? (
-                  <CheckCircle2 className="h-3.5 w-3.5" style={{ color: theme.secondaryAccentColor }} />
-                ) : (
-                  <Key className="h-3.5 w-3.5" style={{ color: theme.accentColor }} />
-                )}
-                <span className="font-bold hidden md:inline">
-                  {activeProv.toUpperCase()}
-                </span>
-                <span className={`text-[10px] ${theme.isLight ? "text-[#444444]" : "text-[#BDBDBD]"}`}>
-                  ({detailLabel})
-                </span>
-              </button>
-            );
-          })()
-        ) : !systemModeChecked ? null : !(profile || user) ? (
-          /* Unauthenticated online state: Show prominent Login / Sign Up button */
-          <button
-            onClick={() => setIsAuthModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-2xl font-extrabold text-xs transition-all shadow-xl cursor-pointer border text-white"
-            style={{ backgroundColor: theme.accentColor, borderColor: theme.accentColor }}
-          >
-            <LogIn className="h-4 w-4" />
-            <span>Login / Sign Up</span>
-          </button>
-        ) : (
-          /* Authenticated online state: Show Admin, API Status, Gmail Profile Dropdown & Direct Logout */
-          <>
-            {/* Admin Dashboard Trigger */}
-            {profile && (profile.isAdmin || profile.role === "admin") && (
-              <button
-                onClick={() => setIsAdminModalOpen(true)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-2xl border transition-all cursor-pointer text-[11px] font-mono font-bold ${
-                  theme.isLight ? "bg-[#FFFFFF]" : "bg-[#1A1A1A]"
-                }`}
-                style={{ color: theme.textColorCode, borderColor: `${theme.secondaryAccentColor}80` }}
-                title="Open Admin Command Console"
-              >
-                <Crown className="h-3.5 w-3.5" style={{ color: theme.secondaryAccentColor }} />
-                <span className="hidden md:inline">Admin</span>
-              </button>
-            )}
-
-            {/* API / Multi-Provider Status Badge */}
-            {profile?.hasApiKey || isStandalone ? (
-              <button
-                onClick={() => setIsApiKeyModalOpen(true)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-2xl border transition-all cursor-pointer text-[11px] font-mono ${
-                  theme.isLight ? "bg-[#FFFFFF]" : "bg-[#1A1A1A]"
-                }`}
-                style={{ color: theme.textColorCode, borderColor: `${theme.secondaryAccentColor}99` }}
-                title="Click to configure or remove your API Key"
-              >
-                <CheckCircle2 className="h-3.5 w-3.5" style={{ color: theme.secondaryAccentColor }} />
-                <span className="font-bold hidden md:inline">
-                  {profile?.activeProvider
-                    ? `${profile.activeProvider.toUpperCase()} Active`
-                    : activeProviderConfig.provider
-                    ? `${activeProviderConfig.provider.toUpperCase()} Active`
-                    : "AI Active"}
-                </span>
-                <span className={`text-[10px] ${theme.isLight ? "text-[#444444]" : "text-[#BDBDBD]"}`}>
-                  ({profile?.apiKeyMasked || (isStandalone ? "Local Standalone" : "Active Key")})
-                </span>
-              </button>
-            ) : (
-              <button
-                onClick={() => setIsApiKeyModalOpen(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl transition-all cursor-pointer text-[11px] font-mono font-bold border"
-                style={{ backgroundColor: `${theme.accentColor}1A`, color: theme.textColorCode, borderColor: theme.accentColor }}
-                title="Configure your AI Provider and API key"
-              >
-                <AlertTriangle className="h-3.5 w-3.5" style={{ color: theme.accentColor }} />
-                <span>Configure Provider Key</span>
-              </button>
-            )}
-
-            {/* User Profile Box & Dropdown Menu (Always shows Gmail clearly) */}
-            <div className="relative" ref={dropdownRef}>
-              <button
-                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                className={`flex items-center gap-2 pl-2 pr-2.5 py-1 rounded-2xl border transition-all cursor-pointer group ${
-                  theme.isLight ? "bg-[#FFFFFF] border-[#E5E5E5]" : "bg-[#1A1A1A] border-[#2A2A2A]"
-                }`}
-                title={displayEmail ? `Signed in as ${displayEmail}` : "Account menu"}
-              >
-                <img
-                  src={displayPhoto}
-                  alt={displayName}
-                  referrerPolicy="no-referrer"
-                  className={`w-7 h-7 rounded-xl object-cover border shrink-0 ${
-                    theme.isLight ? "border-[#E5E5E5]" : "border-[#2A2A2A]"
-                  }`}
-                />
-                <div className="flex flex-col text-left leading-tight min-w-0">
-                  <span className={`text-xs font-bold truncate max-w-[120px] hidden sm:block ${
-                    theme.isLight ? "text-[#000000]" : "text-white"
-                  }`}>
-                    {displayName}
-                  </span>
-                  <span className={`text-[10px] font-mono truncate max-w-[150px] sm:max-w-[180px] ${
-                    theme.isLight ? "text-[#444444]" : "text-[#BDBDBD]"
-                  }`}>
-                    {displayEmail || "Signed In"}
-                  </span>
-                </div>
-                <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform duration-200 ${isDropdownOpen ? "rotate-180" : ""}`} style={{ color: theme.secondaryAccentColor }} />
-              </button>
-
-              {/* Profile Dropdown Menu */}
-              {isDropdownOpen && (
-                <div
-                  className={`absolute right-0 mt-3 w-64 rounded-2xl shadow-2xl py-2 z-50 font-mono text-xs border ${
-                    theme.isLight 
-                      ? "border-[#E5E5E5] bg-[#FFFFFF] text-[#000000]" 
-                      : "border-[#2A2A2A] bg-[#1A1A1A] text-white"
-                  }`}
-                >
-                  <div className={`px-4 py-2.5 border-b mb-1 ${
-                    theme.isLight ? "border-[#E5E5E5]" : "border-[#2A2A2A]"
-                  }`}>
-                    <p className="font-bold truncate" style={{ color: theme.textColorCode }}>{displayName}</p>
-                    <p className={`text-[10px] break-all ${
-                      theme.isLight ? "text-[#444444]" : "text-[#BDBDBD]"
-                    }`}>{displayEmail || "No email on profile"}</p>
-                  </div>
-
-                  <button
-                    onClick={() => {
-                      setIsDropdownOpen(false);
-                      setIsSettingsModalOpen(true);
-                    }}
-                    className={`w-full px-4 py-2.5 text-left flex items-center gap-2.5 transition-colors cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 ${
-                      theme.isLight ? "text-[#000000]" : "text-white"
-                    }`}
-                  >
-                    <UserIcon className="h-4 w-4" style={{ color: theme.secondaryAccentColor }} />
-                    <span>My Profile &amp; Account</span>
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      setIsDropdownOpen(false);
-                      setIsApiKeyModalOpen(true);
-                    }}
-                    className={`w-full px-4 py-2.5 text-left flex items-center gap-2.5 transition-colors cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 ${
-                      theme.isLight ? "text-[#000000]" : "text-white"
-                    }`}
-                  >
-                    <Key className="h-4 w-4" style={{ color: theme.secondaryAccentColor }} />
-                    <span>Manage / Change API Key</span>
-                  </button>
-
-                  {profile?.hasApiKey && (
-                    <button
-                      disabled={removingKey}
-                      onClick={async () => {
-                        setRemovingKey(true);
-                        await removeApiKey();
-                        setRemovingKey(false);
-                        setIsDropdownOpen(false);
-                      }}
-                      className="w-full px-4 py-2.5 text-left flex items-center gap-2.5 transition-colors cursor-pointer hover:bg-red-500/10 disabled:opacity-50"
-                      style={{ color: theme.accentColor }}
-                    >
-                      <Trash2 className="h-4 w-4 shrink-0" />
-                      <span>{removingKey ? "Removing Key..." : "Remove Saved API Key"}</span>
-                    </button>
-                  )}
-
-                  <button
-                    onClick={() => {
-                      setIsDropdownOpen(false);
-                      setIsSettingsModalOpen(true);
-                    }}
-                    className={`w-full px-4 py-2.5 text-left flex items-center gap-2.5 transition-colors cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 ${
-                      theme.isLight ? "text-[#000000]" : "text-white"
-                    }`}
-                  >
-                    <Cpu className="h-4 w-4" style={{ color: theme.secondaryAccentColor }} />
-                    <span>AI Model Preferences</span>
-                  </button>
-
-                  <div className={`my-1 border-t ${theme.isLight ? "border-[#E5E5E5]" : "border-[#2A2A2A]"}`} />
-
-                  <button
-                    onClick={() => {
-                      setIsDropdownOpen(false);
-                      void logout();
-                    }}
-                    className="w-full px-4 py-2.5 text-left flex items-center gap-2.5 transition-colors cursor-pointer hover:bg-red-500/10 font-bold"
-                    style={{ color: theme.accentColor }}
-                  >
-                    <LogOut className="h-4 w-4" />
-                    <span>Log Out</span>
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Direct 1-Click Logout Button */}
-            <button
-              type="button"
-              onClick={() => void logout()}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-2xl border transition-all cursor-pointer text-[11px] font-mono font-bold ${
-                theme.isLight ? "bg-[#FFFFFF] hover:bg-red-50" : "bg-[#1A1A1A] hover:bg-red-950/40"
-              }`}
-              style={{ color: theme.accentColor, borderColor: `${theme.accentColor}55` }}
-              title={displayEmail ? `Log out (${displayEmail})` : "Log out"}
-            >
-              <LogOut className="h-3.5 w-3.5" />
-              <span>Log Out</span>
-            </button>
-          </>
-        )}
+        {/* Desktop AI Provider / Local Engine Button */}
+        <button
+          onClick={() => setIsApiKeyModalOpen(true)}
+          className={`flex items-center gap-1.5 px-3 py-2 rounded-2xl border transition-all cursor-pointer text-[11px] font-mono ${
+            theme.isLight ? "bg-[#FFFFFF]" : "bg-[#1A1A1A]"
+          } ${!isConfigured ? "font-bold" : ""}`}
+          style={{
+            backgroundColor: !isConfigured ? `${theme.accentColor}1A` : undefined,
+            color: theme.textColorCode,
+            borderColor: isConfigured ? `${theme.secondaryAccentColor}99` : theme.accentColor,
+          }}
+          title="Configure AI Provider, Local .env Key, or Built-In Local Engine"
+        >
+          {isConfigured ? (
+            <CheckCircle2 className="h-3.5 w-3.5" style={{ color: theme.secondaryAccentColor }} />
+          ) : (
+            <Key className="h-3.5 w-3.5" style={{ color: theme.accentColor }} />
+          )}
+          <span className="font-bold hidden md:inline">{activeProv.toUpperCase()}</span>
+          <span className={`text-[10px] ${theme.isLight ? "text-[#444444]" : "text-[#BDBDBD]"}`}>
+            ({detailLabel})
+          </span>
+        </button>
       </div>
     </header>
   );
 };
-

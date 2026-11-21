@@ -2,10 +2,8 @@ import React, { useState, useEffect } from "react";
 import { useAuth, FeatureModelConfig } from "../context/AuthContext";
 import { getThemeConfig } from "../lib/themeConfig";
 import { 
-  User, 
   Key, 
   ShieldCheck, 
-  LogOut, 
   Trash2, 
   X, 
   CheckCircle2, 
@@ -23,16 +21,10 @@ interface SettingsModalProps {
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
   const { 
-    profile, 
-    idToken, 
-    isStandalone,
     envKeyStatus,
     refreshSystemMode,
     activeProviderConfig,
     updateProviderConfig,
-    refreshProfile, 
-    logout, 
-    deleteAccount, 
     setIsApiKeyModalOpen,
     modelSettings,
     updateModelSettings,
@@ -44,7 +36,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
   } = useAuth();
   const theme = getThemeConfig(currentTheme, currentBrand);
 
-  const [activeTab, setActiveTab] = useState<"models" | "api" | "account">("models");
+  const [activeTab, setActiveTab] = useState<"models" | "api">("models");
   const [localModels, setLocalModels] = useState<FeatureModelConfig>(modelSettings);
   const [savingModels, setSavingModels] = useState<boolean>(false);
   const [refreshingModels, setRefreshingModels] = useState<boolean>(false);
@@ -53,22 +45,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
   const [confirmRemoveKey, setConfirmRemoveKey] = useState<boolean>(false);
   const [confirmClearChats, setConfirmClearChats] = useState<boolean>(false);
   const [clearingChats, setClearingChats] = useState<boolean>(false);
-  const [deletingAcc, setDeletingAcc] = useState<boolean>(false);
-  const [confirmDelete, setConfirmDelete] = useState<boolean>(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   useEffect(() => {
     if (isOpen) {
       setLocalModels(modelSettings);
       fetchAvailableModels();
-      if (isStandalone) {
-        void refreshSystemMode();
-        if (activeTab === "account") {
-          setActiveTab("models");
-        }
-      }
+      void refreshSystemMode();
     }
-  }, [isOpen, isStandalone]);
+  }, [isOpen]);
 
   useEffect(() => {
     if (availableLocalModels.length > 0 && !quickLocalModel) {
@@ -124,7 +109,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
             {currentValue} (Saved)
           </option>
         )}
-        {isStandalone && availableLocalModels.length > 0 && (
+        {availableLocalModels.length > 0 && (
           <optgroup label="Local Models (Built-In GGUF / LM Studio / Ollama)" style={optStyle}>
             {availableLocalModels.map((m) => (
               <option key={`local-${m.id}`} value={m.id} style={optStyle}>
@@ -160,7 +145,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
       ];
       const matchedLocalId = selectedTextModels.find((id) => isLocalModelChoice(id));
 
-      if (isStandalone && matchedLocalId) {
+      if (matchedLocalId) {
         const localMeta = availableLocalModels.find((m) => m.id === matchedLocalId);
         updateProviderConfig({
           provider: "local",
@@ -172,7 +157,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
           text: `AI Model preferences saved! Active provider synced to Local Model (${matchedLocalId}).`,
         });
       } else {
-        if (isStandalone && activeProviderConfig.provider === "local") {
+        if (activeProviderConfig.provider === "local") {
           const primaryLower = (localModels.scriptGeneration || "").toLowerCase();
           const targetCloudProvider: "gemini" | "openai" | "claude" =
             primaryLower.startsWith("gpt-") || primaryLower.startsWith("o1-") || primaryLower.startsWith("o3-") || primaryLower.startsWith("o4-")
@@ -198,16 +183,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
     setRemovingKey(true);
     setMessage(null);
     try {
-      const headers: Record<string, string> = {
-        "Content-Type": "application/json",
-      };
-      if (!isStandalone && idToken) {
-        headers.Authorization = `Bearer ${idToken}`;
-      }
       const response = await fetch("/api/user/remove-key", {
         method: "POST",
-        headers,
-        body: isStandalone ? JSON.stringify({ provider: "all" }) : undefined,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ provider: "all" }),
       });
 
       if (!response.ok) {
@@ -215,14 +194,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
       }
 
       setConfirmRemoveKey(false);
-      if (isStandalone) {
-        updateProviderConfig({ apiKey: "" });
-        await refreshSystemMode();
-        setMessage({ type: "success", text: "Local .env and browser API keys cleared." });
-      } else {
-        setMessage({ type: "success", text: "API Key removed successfully." });
-        await refreshProfile();
-      }
+      updateProviderConfig({ apiKey: "" });
+      await refreshSystemMode();
+      setMessage({ type: "success", text: "Local .env and browser API keys cleared." });
     } catch (err: any) {
       console.error(err);
       setMessage({ type: "error", text: err.message || "Failed to remove key." });
@@ -235,16 +209,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
     setClearingChats(true);
     setMessage(null);
     try {
-      if (!isStandalone && idToken) {
-        await fetch("/api/chat/storage", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${idToken}`,
-          },
-          body: JSON.stringify({ sessions: [], projects: [] }),
-        });
-      }
+      await fetch("/api/chat/storage", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessions: [], projects: [] }),
+      });
       try {
         localStorage.removeItem("sas_chat_sessions_v1");
         localStorage.removeItem("sas_chat_projects_v1");
@@ -252,23 +221,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
         localStorage.removeItem("sas_desktop_chat_projects_v1");
       } catch {}
       setConfirmClearChats(false);
-      setMessage({ type: "success", text: "Cloud & browser chat history cleared." });
+      setMessage({ type: "success", text: "Local disk & browser chat history cleared." });
     } catch (err: any) {
       setMessage({ type: "error", text: err?.message || "Failed to clear chat history." });
     } finally {
       setClearingChats(false);
-    }
-  };
-
-  const handleDeleteAccount = async () => {
-    setDeletingAcc(true);
-    try {
-      await deleteAccount();
-      onClose();
-    } catch (err: any) {
-      console.error(err);
-      setMessage({ type: "error", text: err.message || "Failed to delete account." });
-      setDeletingAcc(false);
     }
   };
 
@@ -314,7 +271,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
               Settings & AI Preferences
             </h3>
             <p className="text-xs font-mono opacity-80 mt-0.5" style={{ color: isLight ? "#444444" : "#BDBDBD" }}>
-              Configure per-feature AI models, API keys, and account details
+              Configure per-feature AI models, local engine, and API keys
             </p>
           </div>
         </div>
@@ -343,22 +300,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
             }}
           >
             <Key className="h-4 w-4" />
-            <span>API Settings</span>
+            <span>API &amp; Storage Settings</span>
           </button>
-          {!isStandalone && (
-            <button
-              onClick={() => { setActiveTab("account"); setMessage(null); }}
-              className="flex-1 py-2.5 rounded-full font-bold transition-all flex items-center justify-center gap-2 cursor-pointer"
-              style={{
-                backgroundColor: activeTab === "account" ? theme.accentColor : "transparent",
-                color: activeTab === "account" ? (isLight ? "#ffffff" : "#000000") : modalTextColor,
-                boxShadow: activeTab === "account" ? `0 4px 15px ${theme.accentColor}50` : "none"
-              }}
-            >
-              <User className="h-4 w-4" />
-              <span>Account</span>
-            </button>
-          )}
         </div>
 
         {/* Message Banner */}
@@ -421,11 +364,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                 </div>
               </div>
               <p className="opacity-90">
-                {isStandalone
-                  ? "Customize which Cloud or Local model (.gguf Built-In Engine, LM Studio, or Ollama) powers each studio tool. Selecting a local model automatically routes requests to your local server when saved."
-                  : "Customize which AI model powers each feature of the studio. Fast models are recommended for transcripts, while Pro/Sonnet models deliver maximum creativity for script generation."}
+                Customize which Cloud or Local model (.gguf Built-In Engine, LM Studio, or Ollama) powers each studio tool. Selecting a local model automatically routes requests to your local server when saved.
               </p>
-              {isStandalone && availableLocalModels.length > 0 && (
+              {availableLocalModels.length > 0 && (
                 <div className="pt-2 border-t flex flex-col sm:flex-row sm:items-center gap-2" style={{ borderColor: isLight ? "rgba(0,0,0,0.1)" : "rgba(255,255,255,0.1)" }}>
                   <span className="text-[11px] font-bold shrink-0">Quick Apply Local Model:</span>
                   <div className="flex items-center gap-2 flex-1">
@@ -671,321 +612,135 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
           </div>
         )}
 
-        {/* TAB 2: API SETTINGS */}
+        {/* TAB 2: LOCAL API & DESKTOP STORAGE SETTINGS */}
         {activeTab === "api" && (
           <div className="space-y-4">
-            {isStandalone ? (
-              <>
-                <div className={`p-4 rounded-2xl border space-y-3 ${isLight ? "border-slate-200" : "border-white/10"}`} style={{ backgroundColor: isLight ? "#f8fafc" : "rgba(0,0,0,0.3)" }}>
-                  <div className="flex items-center justify-between flex-wrap gap-2">
-                    <span className="text-xs font-mono font-bold flex items-center gap-2" style={{ color: modalTextColor }}>
-                      <Key className="h-4 w-4" style={{ color: theme.accentColor }} />
-                      <span>Local .env File &amp; Provider Keys</span>
-                    </span>
-                    <span className="px-2.5 py-0.5 rounded-full border text-[10px] font-mono font-bold" style={{ backgroundColor: `${theme.accentColor}15`, borderColor: theme.accentColor, color: modalTextColor }}>
-                      Active: {activeProviderConfig.provider.toUpperCase()}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-mono">
-                    {[
-                      { label: "GEMINI_API_KEY (.env)", status: envKeyStatus?.gemini },
-                      { label: "OPENAI_API_KEY (.env)", status: envKeyStatus?.openai },
-                      { label: "ANTHROPIC_API_KEY (.env)", status: envKeyStatus?.claude },
-                    ].map((row) => (
-                      <div key={row.label} className="p-2.5 rounded-xl border flex items-center justify-between gap-2" style={{ borderColor: isLight ? "#e2e8f0" : "rgba(255,255,255,0.1)" }}>
-                        <span className="truncate opacity-80">{row.label}</span>
-                        <span className="font-bold shrink-0" style={{ color: row.status?.configured ? theme.secondaryAccentColor : modalTextColor }}>
-                          {row.status?.configured ? row.status.masked : "Empty"}
-                        </span>
-                      </div>
-                    ))}
-                    <div className="p-2.5 rounded-xl border flex items-center justify-between gap-2" style={{ borderColor: isLight ? "#e2e8f0" : "rgba(255,255,255,0.1)" }}>
-                      <span className="truncate opacity-80">Local Engine URL</span>
-                      <span className="font-bold truncate max-w-[140px]" title={envKeyStatus?.local?.url || activeProviderConfig.baseUrl}>
-                        {activeProviderConfig.baseUrl || envKeyStatus?.local?.url || "127.0.0.1:1279"}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="pt-2 flex items-center gap-2 flex-wrap">
-                    <button
-                      onClick={() => {
-                        onClose();
-                        setIsApiKeyModalOpen(true);
-                      }}
-                      className="flex-1 py-2.5 px-3 rounded-xl font-bold text-xs transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
-                      style={{
-                        backgroundColor: theme.accentColor,
-                        color: "#ffffff"
-                      }}
-                    >
-                      <Key className="h-3.5 w-3.5" />
-                      <span>Edit Keys / Local Engine</span>
-                    </button>
-
-                    {(envKeyStatus?.gemini?.configured || envKeyStatus?.openai?.configured || envKeyStatus?.claude?.configured || activeProviderConfig.apiKey) && !confirmRemoveKey && (
-                      <button
-                        onClick={() => setConfirmRemoveKey(true)}
-                        className="py-2.5 px-3 rounded-xl bg-red-950/60 text-white border border-red-900/60 hover:bg-red-900 hover:text-white transition-all text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                        <span>Clear Local Keys</span>
-                      </button>
-                    )}
-                  </div>
-                  {confirmRemoveKey && (
-                    <div className="p-3 rounded-xl bg-red-950/90 border border-red-800 space-y-2 text-xs font-mono text-white">
-                      <p>Clear saved API keys from your local .env file and browser storage?</p>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={handleRemoveApiKey}
-                          disabled={removingKey}
-                          className="px-3 py-1.5 rounded-lg bg-red-600 text-white font-bold cursor-pointer disabled:opacity-50"
-                        >
-                          {removingKey ? "Clearing..." : "Yes, Clear Keys"}
-                        </button>
-                        <button
-                          onClick={() => setConfirmRemoveKey(false)}
-                          className="px-3 py-1.5 rounded-lg bg-gray-800 text-gray-200 cursor-pointer"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div className={`p-4 rounded-2xl border text-xs font-mono opacity-85 space-y-2 ${isLight ? "border-slate-200" : "border-white/10"}`} style={{ backgroundColor: isLight ? "#f8fafc" : "rgba(0,0,0,0.2)", color: modalTextColor }}>
-                  <div className="font-bold flex items-center gap-2" style={{ color: modalTextColor }}>
-                    <ShieldCheck className="h-4 w-4" style={{ color: theme.accentColor }} />
-                    <span>Local File Security &amp; GitHub Safety</span>
-                  </div>
-                  <p className="text-[11px] leading-relaxed">
-                    No login or authorization is used in Local Standalone Mode. API keys saved to your local <code className="font-bold">.env</code> file remain private on your machine (gitignored by <code className="font-bold">.gitignore</code>) and are never compiled into frontend bundles. Never commit <code className="font-bold">.env</code> to GitHub or expose port 3000 on a public network without auth.
-                  </p>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className={`p-4 rounded-2xl border space-y-3 ${isLight ? "border-slate-200" : "border-white/10"}`} style={{ backgroundColor: isLight ? "#f8fafc" : "rgba(0,0,0,0.3)" }}>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-mono font-bold flex items-center gap-2" style={{ color: modalTextColor }}>
-                      <Key className="h-4 w-4" style={{ color: theme.accentColor }} />
-                      <span>Personal Google AI API Key Status</span>
-                    </span>
-                    {profile?.hasApiKey ? (
-                      <span className="px-2.5 py-0.5 rounded-full border text-[10px] font-mono font-bold flex items-center gap-1" style={{ backgroundColor: `${theme.accentColor}20`, borderColor: theme.accentColor, color: modalTextColor }}>
-                        <CheckCircle2 className="h-3 w-3" style={{ color: theme.accentColor }} />
-                        <span>Active &amp; Validated</span>
-                      </span>
-                    ) : (
-                      <span className="px-2.5 py-0.5 rounded-full bg-amber-950/80 border border-amber-500 text-amber-300 text-[10px] font-mono font-bold flex items-center gap-1">
-                        <AlertTriangle className="h-3 w-3" />
-                        <span>Not Configured</span>
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="text-xs font-mono opacity-80" style={{ color: modalTextColor }}>
-                    {profile?.hasApiKey ? (
-                      <div className="flex items-center justify-between p-3 rounded-xl border mt-1" style={{ backgroundColor: `${theme.accentColor}10`, borderColor: `${theme.accentColor}30` }}>
-                        <span>Masked Key:</span>
-                        <span className="font-bold font-mono" style={{ color: modalTextColor }}>{profile.apiKeyMasked}</span>
-                      </div>
-                    ) : (
-                      <p className="text-amber-200/90 leading-relaxed pt-1">
-                        Script Automation Studio operates with user-isolated personal keys. You must provide a valid Google AI Studio key to perform AI script generations.
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="pt-2 flex items-center gap-2 flex-wrap">
-                    <button
-                      onClick={() => {
-                        onClose();
-                        setIsApiKeyModalOpen(true);
-                      }}
-                      className="flex-1 py-2.5 px-3 rounded-xl font-bold text-xs transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
-                      style={{
-                        backgroundColor: theme.accentColor,
-                        color: "#ffffff"
-                      }}
-                    >
-                      <Key className="h-3.5 w-3.5" />
-                      <span>{profile?.hasApiKey ? "Change / Re-test API Key" : "Add Personal API Key"}</span>
-                    </button>
-
-                    {profile?.hasApiKey && !confirmRemoveKey && (
-                      <button
-                        onClick={() => setConfirmRemoveKey(true)}
-                        className="py-2.5 px-3 rounded-xl bg-red-950/60 text-white border border-red-900/60 hover:bg-red-900 hover:text-white transition-all text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                        <span>Remove Key</span>
-                      </button>
-                    )}
-                  </div>
-                  {confirmRemoveKey && (
-                    <div className="p-3 rounded-xl bg-red-950/90 border border-red-800 space-y-2 text-xs font-mono text-white">
-                      <p>Remove your stored API key from Firestore? You won't be able to generate until you add a new key.</p>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={handleRemoveApiKey}
-                          disabled={removingKey}
-                          className="px-3 py-1.5 rounded-lg bg-red-600 text-white font-bold cursor-pointer disabled:opacity-50"
-                        >
-                          {removingKey ? "Removing..." : "Yes, Remove Key"}
-                        </button>
-                        <button
-                          onClick={() => setConfirmRemoveKey(false)}
-                          className="px-3 py-1.5 rounded-lg bg-gray-800 text-gray-200 cursor-pointer"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div className={`p-4 rounded-2xl border text-xs font-mono opacity-80 space-y-2 ${isLight ? "border-slate-200" : "border-white/10"}`} style={{ backgroundColor: isLight ? "#f8fafc" : "rgba(0,0,0,0.2)", color: modalTextColor }}>
-                  <div className="font-bold flex items-center gap-2" style={{ color: modalTextColor }}>
-                    <ShieldCheck className="h-4 w-4" style={{ color: theme.accentColor }} />
-                    <span>Security &amp; Encryption Protocol</span>
-                  </div>
-                  <p className="text-[11px] leading-relaxed">
-                    Your key is stored in Firestore encrypted with AES-256. It is never logged or exposed to other users. The server decrypts it temporarily strictly during your own generation requests.
-                  </p>
-                </div>
-              </>
-            )}
-          </div>
-        )}
-
-        {/* TAB 3: ACCOUNT & USER PROFILE */}
-        {!isStandalone && activeTab === "account" && (
-          <div className="space-y-4">
-            <div className={`flex items-center gap-3 p-4 rounded-2xl border ${isLight ? "border-slate-200" : "border-white/10"}`} style={{ backgroundColor: isLight ? "#f8fafc" : "rgba(0,0,0,0.3)" }}>
-              <img
-                src={profile?.profilePhoto}
-                alt={profile?.name}
-                referrerPolicy="no-referrer"
-                className="w-14 h-14 rounded-2xl object-cover border-2 shadow-md"
-                style={{ borderColor: theme.accentColor }}
-              />
-              <div>
-                <h4 className="text-base font-extrabold font-sans" style={{ color: modalTextColor }}>
-                  {profile?.name}
-                </h4>
-                <p className="text-xs font-mono opacity-80 mt-0.5" style={{ color: modalTextColor }}>
-                  {profile?.email}
-                </p>
-                <span className="inline-block mt-1 px-2 py-0.5 rounded-md border text-[10px] font-mono font-bold" style={{ backgroundColor: `${theme.accentColor}20`, borderColor: `${theme.accentColor}50`, color: modalTextColor }}>
-                  {profile?.provider === "google.com" ? "Google Authentication" : profile?.provider === "anonymous" ? "Guest Creator" : "Email & Password"}
+            <div className={`p-4 rounded-2xl border space-y-3 ${isLight ? "border-slate-200" : "border-white/10"}`} style={{ backgroundColor: isLight ? "#f8fafc" : "rgba(0,0,0,0.3)" }}>
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <span className="text-xs font-mono font-bold flex items-center gap-2" style={{ color: modalTextColor }}>
+                  <Key className="h-4 w-4" style={{ color: theme.accentColor }} />
+                  <span>Local .env File &amp; Provider Keys</span>
+                </span>
+                <span className="px-2.5 py-0.5 rounded-full border text-[10px] font-mono font-bold" style={{ backgroundColor: `${theme.accentColor}15`, borderColor: theme.accentColor, color: modalTextColor }}>
+                  Active: {activeProviderConfig.provider.toUpperCase()}
                 </span>
               </div>
-            </div>
 
-            <div className={`p-4 rounded-2xl border space-y-2.5 text-xs font-mono ${isLight ? "border-slate-200" : "border-white/10"}`} style={{ backgroundColor: isLight ? "#f8fafc" : "rgba(0,0,0,0.2)" }}>
-              <div className="flex items-center justify-between opacity-80" style={{ color: modalTextColor }}>
-                <span>User ID:</span>
-                <span className="font-mono text-[10px] font-bold" style={{ color: modalTextColor }}>{profile?.userId}</span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-mono">
+                {[
+                  { label: "GEMINI_API_KEY (.env)", status: envKeyStatus?.gemini },
+                  { label: "OPENAI_API_KEY (.env)", status: envKeyStatus?.openai },
+                  { label: "ANTHROPIC_API_KEY (.env)", status: envKeyStatus?.claude },
+                ].map((row) => (
+                  <div key={row.label} className="p-2.5 rounded-xl border flex items-center justify-between gap-2" style={{ borderColor: isLight ? "#e2e8f0" : "rgba(255,255,255,0.1)" }}>
+                    <span className="truncate opacity-80">{row.label}</span>
+                    <span className="font-bold shrink-0" style={{ color: row.status?.configured ? theme.secondaryAccentColor : modalTextColor }}>
+                      {row.status?.configured ? row.status.masked : "Empty"}
+                    </span>
+                  </div>
+                ))}
+                <div className="p-2.5 rounded-xl border flex items-center justify-between gap-2" style={{ borderColor: isLight ? "#e2e8f0" : "rgba(255,255,255,0.1)" }}>
+                  <span className="truncate opacity-80">Local Engine URL</span>
+                  <span className="font-bold truncate max-w-[140px]" title={envKeyStatus?.local?.url || activeProviderConfig.baseUrl}>
+                    {activeProviderConfig.baseUrl || envKeyStatus?.local?.url || "127.0.0.1:1279"}
+                  </span>
+                </div>
               </div>
-              <div className="flex items-center justify-between opacity-80" style={{ color: modalTextColor }}>
-                <span>Role:</span>
-                <span className="font-bold uppercase" style={{ color: modalTextColor }}>{profile?.role}</span>
-              </div>
-              <div className="flex items-center justify-between opacity-80" style={{ color: modalTextColor }}>
-                <span>Member Since:</span>
-                <span style={{ color: modalTextColor }}>{profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString() : "N/A"}</span>
-              </div>
-            </div>
 
-            <div className="space-y-3 pt-2">
-              <button
-                onClick={() => {
-                  logout();
-                  onClose();
-                }}
-                className="w-full py-2.5 px-4 rounded-xl border transition-all font-mono font-bold text-xs flex items-center justify-center gap-2 cursor-pointer"
-                style={{
-                  backgroundColor: `${theme.accentColor}15`,
-                  borderColor: `${theme.accentColor}40`,
-                  color: modalTextColor
-                }}
-              >
-                <LogOut className="h-4 w-4" style={{ color: theme.accentColor }} />
-                <span>Log Out of Studio</span>
-              </button>
-
-              {!confirmClearChats ? (
+              <div className="pt-2 flex items-center gap-2 flex-wrap">
                 <button
-                  type="button"
-                  onClick={() => setConfirmClearChats(true)}
-                  className="w-full py-2.5 px-4 rounded-xl border transition-all font-mono text-xs flex items-center justify-center gap-2 cursor-pointer"
+                  onClick={() => {
+                    onClose();
+                    setIsApiKeyModalOpen(true);
+                  }}
+                  className="flex-1 py-2.5 px-3 rounded-xl font-bold text-xs transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
                   style={{
-                    borderColor: isLight ? "#E5E5E5" : "#333333",
-                    color: modalTextColor,
+                    backgroundColor: theme.accentColor,
+                    color: "#ffffff"
                   }}
                 >
-                  <Trash2 className="h-4 w-4 opacity-75" />
-                  <span>Clear Cloud &amp; Browser Chat History</span>
+                  <Key className="h-3.5 w-3.5" />
+                  <span>Edit Keys / Local Engine</span>
                 </button>
-              ) : (
-                <div className="p-3.5 rounded-2xl bg-red-950/90 border border-red-800 space-y-2 text-white font-mono text-xs">
-                  <p className="text-center font-bold">
-                    Clear all synced Chat Workspace sessions from Firebase &amp; this browser?
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={handleClearSyncedChats}
-                      disabled={clearingChats}
-                      className="flex-1 py-2 rounded-xl bg-red-600 text-white font-bold cursor-pointer disabled:opacity-50"
-                    >
-                      {clearingChats ? "Clearing..." : "Yes, Clear Chats"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setConfirmClearChats(false)}
-                      className="px-4 py-2 rounded-xl bg-gray-800 text-gray-300 font-bold cursor-pointer"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              )}
 
-              {!confirmDelete ? (
-                <button
-                  onClick={() => setConfirmDelete(true)}
-                  className={`w-full py-2.5 px-4 rounded-xl bg-red-950/30 border border-red-950 hover:bg-red-950 hover:text-white hover:border-red-800 transition-all font-mono text-xs flex items-center justify-center gap-2 cursor-pointer ${isLight ? "text-[#000000]" : "text-white"}`}
-                >
-                  <Trash2 className="h-4 w-4" />
-                  <span>Delete Account & Erase Personal Data</span>
-                </button>
-              ) : (
-                <div className="p-3.5 rounded-2xl bg-red-950/90 border border-red-800 space-y-2 animate-[fadeIn_0.2s_ease]">
-                  <p className="text-xs text-white font-mono text-center font-bold">
-                    Are you absolutely sure? This will delete your profile, synced chats, and encrypted API key permanently.
-                  </p>
+                {(envKeyStatus?.gemini?.configured || envKeyStatus?.openai?.configured || envKeyStatus?.claude?.configured || activeProviderConfig.apiKey) && !confirmRemoveKey && (
+                  <button
+                    onClick={() => setConfirmRemoveKey(true)}
+                    className="py-2.5 px-3 rounded-xl bg-red-950/60 text-white border border-red-900/60 hover:bg-red-900 hover:text-white transition-all text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    <span>Clear Local Keys</span>
+                  </button>
+                )}
+              </div>
+              {confirmRemoveKey && (
+                <div className="p-3 rounded-xl bg-red-950/90 border border-red-800 space-y-2 text-xs font-mono text-white">
+                  <p>Clear saved API keys from your local .env file and browser storage?</p>
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={handleDeleteAccount}
-                      disabled={deletingAcc}
-                      className="flex-1 py-2 rounded-xl bg-red-600 text-white font-bold text-xs hover:bg-red-500 transition-all cursor-pointer disabled:opacity-50"
+                      onClick={handleRemoveApiKey}
+                      disabled={removingKey}
+                      className="px-3 py-1.5 rounded-lg bg-red-600 text-white font-bold cursor-pointer disabled:opacity-50"
                     >
-                      {deletingAcc ? "Deleting..." : "Yes, Permanently Delete"}
+                      {removingKey ? "Clearing..." : "Yes, Clear Keys"}
                     </button>
                     <button
-                      onClick={() => setConfirmDelete(false)}
-                      className="px-4 py-2 rounded-xl bg-gray-800 text-gray-300 font-bold text-xs hover:bg-gray-700 transition-all cursor-pointer"
+                      onClick={() => setConfirmRemoveKey(false)}
+                      className="px-3 py-1.5 rounded-lg bg-gray-800 text-gray-200 cursor-pointer"
                     >
                       Cancel
                     </button>
                   </div>
                 </div>
               )}
+            </div>
+
+            {!confirmClearChats ? (
+              <button
+                type="button"
+                onClick={() => setConfirmClearChats(true)}
+                className="w-full py-2.5 px-4 rounded-xl border transition-all font-mono text-xs flex items-center justify-center gap-2 cursor-pointer"
+                style={{
+                  borderColor: isLight ? "#E5E5E5" : "#333333",
+                  color: modalTextColor,
+                }}
+              >
+                <Trash2 className="h-4 w-4 opacity-75" />
+                <span>Clear Local Disk &amp; Browser Chat History</span>
+              </button>
+            ) : (
+              <div className="p-3.5 rounded-2xl bg-red-950/90 border border-red-800 space-y-2 text-white font-mono text-xs">
+                <p className="text-center font-bold">
+                  Clear all Chat Workspace sessions from local disk (local-engine/chat-workspace.json) and browser storage?
+                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleClearSyncedChats}
+                    disabled={clearingChats}
+                    className="flex-1 py-2 rounded-xl bg-red-600 text-white font-bold cursor-pointer disabled:opacity-50"
+                  >
+                    {clearingChats ? "Clearing..." : "Yes, Clear Chats"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmClearChats(false)}
+                    className="px-4 py-2 rounded-xl bg-gray-800 text-gray-300 font-bold cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className={`p-4 rounded-2xl border text-xs font-mono opacity-85 space-y-2 ${isLight ? "border-slate-200" : "border-white/10"}`} style={{ backgroundColor: isLight ? "#f8fafc" : "rgba(0,0,0,0.2)", color: modalTextColor }}>
+              <div className="font-bold flex items-center gap-2" style={{ color: modalTextColor }}>
+                <ShieldCheck className="h-4 w-4" style={{ color: theme.accentColor }} />
+                <span>100% Pure Desktop Privacy</span>
+              </div>
+              <p className="text-[11px] leading-relaxed">
+                All chats, workspaces, skills, and API keys stay strictly on your Windows, Linux, or macOS computer. Keys saved to your local <code className="font-bold">.env</code> file remain gitignored and never touch any online database.
+              </p>
             </div>
           </div>
         )}

@@ -1,4 +1,4 @@
-# Multi-stage Dockerfile for Google Cloud Run (Full-Stack Node.js + React Vite + Express)
+# Multi-stage Dockerfile for local / containerized desktop execution (Node.js + React Vite + Express)
 
 FROM node:22-alpine AS builder
 

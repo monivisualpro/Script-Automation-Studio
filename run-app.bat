@@ -57,12 +57,11 @@ if errorlevel 1 (
 
 REM 1. Bootstrap .env safely without overwriting existing config
 if not exist ".env" (
-  echo [INFO] Creating .env for local standalone mode...
+  echo [INFO] Creating .env for local desktop app...
   if exist ".env.example" (
     copy /Y ".env.example" ".env" >nul
   ) else (
     > ".env" (
-      echo STANDALONE_MODE=true
       echo PORT=3000
       echo AI_PROVIDER=gemini
     )

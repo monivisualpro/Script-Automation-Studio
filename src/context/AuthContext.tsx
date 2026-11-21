@@ -1,12 +1,4 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { User, onAuthStateChanged, signOut, deleteUser } from "firebase/auth";
-import {
-  auth,
-  db,
-  syncUserProfile,
-  UserProfile,
-} from "../lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
 
 export interface FeatureModelConfig {
   youtubeTranscript: string;
@@ -50,6 +42,17 @@ export interface EnvKeyStatus {
   local: { configured: boolean; url: string; model: string };
 }
 
+export interface LocalProfileStub {
+  userId: string;
+  name: string;
+  email: string;
+  activeProvider?: "gemini" | "openai" | "claude" | "local";
+  activeModel?: string;
+  baseUrl?: string;
+  hasApiKey?: boolean;
+  apiKeyMasked?: string | null;
+}
+
 export const DEFAULT_PROVIDER_CONFIG: ActiveProviderConfig = {
   provider: "gemini",
   apiKey: "",
@@ -58,8 +61,8 @@ export const DEFAULT_PROVIDER_CONFIG: ActiveProviderConfig = {
 };
 
 interface AuthContextType {
-  user: User | null;
-  profile: UserProfile | null;
+  user: null;
+  profile: LocalProfileStub | null;
   loading: boolean;
   idToken: string | null;
   isStandalone: boolean;
@@ -102,10 +105,10 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType>({
   user: null,
   profile: null,
-  loading: true,
+  loading: false,
   idToken: null,
-  isStandalone: false,
-  systemModeChecked: false,
+  isStandalone: true,
+  systemModeChecked: true,
   envKeyStatus: null,
   refreshSystemMode: async () => {},
   activeProviderConfig: DEFAULT_PROVIDER_CONFIG,
@@ -142,16 +145,9 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [idToken, setIdToken] = useState<string | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState<boolean>(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState<boolean>(false);
-  const [isAdminModalOpen, setIsAdminModalOpen] = useState<boolean>(false);
   const [isTutorialModalOpen, setIsTutorialModalOpen] = useState<boolean>(false);
-  const [isStandalone, setIsStandalone] = useState<boolean>(false);
   const [systemModeChecked, setSystemModeChecked] = useState<boolean>(false);
   const [envKeyStatus, setEnvKeyStatus] = useState<EnvKeyStatus | null>(null);
   const [activeWorkspace, setActiveWorkspace] = useState<"studio" | "chat">("studio");
@@ -166,7 +162,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
 
   const updateProviderConfig = (newConfig: Partial<ActiveProviderConfig>) => {
-    setActiveProviderConfigState(prev => {
+    setActiveProviderConfigState((prev) => {
       const merged = { ...prev, ...newConfig };
       try {
         localStorage.setItem("script_automation_active_provider_config", JSON.stringify(merged));
@@ -179,42 +175,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const res = await fetch("/api/system/mode");
       const data = await res.json();
-      if (data && data.standalone) {
-        setIsStandalone(true);
-        setLoading(false);
-        if (data.envKeys) {
-          setEnvKeyStatus(data.envKeys);
-          try {
-            const hasSavedConfig = Boolean(localStorage.getItem("script_automation_active_provider_config"));
-            if (!hasSavedConfig && data.envKeys.aiProvider) {
-              setActiveProviderConfigState((prev) => ({
-                ...prev,
-                provider: data.envKeys.aiProvider,
-                baseUrl: data.envKeys.local?.url || prev.baseUrl,
-                model:
-                  data.envKeys.aiProvider === "local"
-                    ? data.envKeys.local?.model || prev.model
-                    : prev.model,
-              }));
-            }
-          } catch {}
-        }
-      } else {
-        setIsStandalone(false);
-        setEnvKeyStatus(null);
-        setActiveProviderConfigState(prev => {
-          if (prev.provider === "local") {
-            const reset = { ...prev, provider: "gemini" as const, model: "gemini-3.1-flash-lite" };
-            try {
-              localStorage.setItem("script_automation_active_provider_config", JSON.stringify(reset));
-            } catch {}
-            return reset;
+      if (data?.envKeys) {
+        setEnvKeyStatus(data.envKeys);
+        try {
+          const hasSavedConfig = Boolean(localStorage.getItem("script_automation_active_provider_config"));
+          if (!hasSavedConfig && data.envKeys.aiProvider) {
+            setActiveProviderConfigState((prev) => ({
+              ...prev,
+              provider: data.envKeys.aiProvider,
+              baseUrl: data.envKeys.local?.url || prev.baseUrl,
+              model:
+                data.envKeys.aiProvider === "local"
+                  ? data.envKeys.local?.model || prev.model
+                  : prev.model,
+            }));
           }
-          return prev;
-        });
+        } catch {}
       }
     } catch {
-      // ignore transient errors
+      // ignore transient startup errors
     } finally {
       setSystemModeChecked(true);
     }
@@ -223,6 +202,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     void refreshSystemMode();
   }, []);
+
   const [currentTheme, setCurrentThemeState] = useState<string>(() => {
     try {
       const saved = localStorage.getItem("script_automation_app_theme");
@@ -282,7 +262,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch {}
   };
 
-
   const [modelSettings, setModelSettings] = useState<FeatureModelConfig>(() => {
     try {
       const saved = localStorage.getItem("script_automation_model_settings");
@@ -294,6 +273,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     return DEFAULT_FEATURE_MODELS;
   });
+
   const [availableModels, setAvailableModels] = useState<AvailableModelOption[]>([
     { id: "gemini-3.6-flash", displayName: "Gemini 3.6 Flash (Fast & Capable)", providerType: "gemini" },
     { id: "gemini-3.1-pro-preview", displayName: "Gemini 3.1 Pro (Reasoning & Quality)", providerType: "gemini" },
@@ -305,18 +285,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [availableLocalModels, setAvailableLocalModels] = useState<AvailableModelOption[]>([]);
 
   const fetchAvailableModels = async () => {
-    if (!systemModeChecked) return;
-    if (!isStandalone && !idToken) return;
     try {
       const headers: Record<string, string> = {
-        "x-standalone-mode": isStandalone ? "true" : "false",
-        "x-provider-type": !isStandalone && activeProviderConfig.provider === "local"
-          ? "gemini"
-          : activeProviderConfig.provider,
+        "x-provider-type": activeProviderConfig.provider,
       };
-      if (!isStandalone && idToken) {
-        headers.Authorization = `Bearer ${idToken}`;
-      }
       if (activeProviderConfig.baseUrl) {
         headers["x-provider-baseurl"] = activeProviderConfig.baseUrl;
       }
@@ -327,17 +299,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         headers["x-provider-key"] = activeProviderConfig.apiKey.trim();
       }
 
-      const url = `/api/user/available-models${isStandalone ? "?includeLocal=true" : ""}`;
-      const res = await fetch(url, { headers });
+      const res = await fetch("/api/user/available-models?includeLocal=true", { headers });
       if (res.ok) {
         const data = await res.json();
         if (data.models && Array.isArray(data.models) && data.models.length > 0) {
           setAvailableModels(data.models);
         }
-        if (isStandalone && Array.isArray(data.localModels)) {
+        if (Array.isArray(data.localModels)) {
           setAvailableLocalModels(data.localModels);
-        } else if (!isStandalone) {
-          setAvailableLocalModels([]);
         }
       }
     } catch (e) {
@@ -347,7 +316,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     void fetchAvailableModels();
-  }, [systemModeChecked, isStandalone, idToken, activeProviderConfig.provider, activeProviderConfig.baseUrl]);
+  }, [systemModeChecked, activeProviderConfig.provider, activeProviderConfig.baseUrl]);
 
   const updateModelSettings = async (newSettings: Partial<FeatureModelConfig>) => {
     const merged = { ...modelSettings, ...newSettings };
@@ -358,282 +327,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error("Error saving model settings to localStorage:", e);
     }
 
-    if (idToken) {
-      try {
-        await fetch("/api/user/model-settings", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${idToken}`,
-          },
-          body: JSON.stringify({ modelSettings: merged }),
-        });
-      } catch (e) {
-        console.error("Error saving model settings to server:", e);
-      }
-    }
-  };
-
-  const syncDirectoryWithServer = async (token: string, resolvedProfile: UserProfile) => {
     try {
-      await fetch("/api/user/sync-directory", {
+      await fetch("/api/user/model-settings", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          name: resolvedProfile.name,
-          provider: resolvedProfile.provider,
-          hasApiKey: resolvedProfile.hasApiKey,
-          apiKeyMasked: resolvedProfile.apiKeyMasked,
-          createdAt: resolvedProfile.createdAt,
-          updatedAt: resolvedProfile.updatedAt,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ modelSettings: merged }),
       });
     } catch {
-      // non-blocking directory sync
-    }
-  };
-
-  const fetchProfile = async (currentUser: User, token?: string) => {
-    let serverStatus: {
-      hasApiKey?: boolean;
-      apiKeyMasked?: string | null;
-      activeProvider?: "gemini" | "openai" | "claude" | "local";
-      activeModel?: string;
-      baseUrl?: string;
-      modelSettings?: Partial<FeatureModelConfig> | null;
-    } | null = null;
-
-    if (token) {
-      try {
-        const statusRes = await fetch("/api/user/profile-status", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (statusRes.ok) {
-          serverStatus = await statusRes.json();
-        }
-      } catch {
-        // non-blocking server status check
-      }
-    }
-
-    const applyServerStatus = (base: UserProfile): UserProfile => {
-      if (!serverStatus) return base;
-      const resolvedHasKey = Boolean(base.hasApiKey || serverStatus.hasApiKey);
-      const resolvedMasked = base.apiKeyMasked || serverStatus.apiKeyMasked || null;
-      const rawProv = serverStatus.activeProvider || base.activeProvider || "gemini";
-      const effectiveProv = !isStandalone && rawProv === "local" ? "gemini" : rawProv;
-      const resolvedModel = serverStatus.activeModel || base.activeModel || "gemini-3.1-flash-lite";
-      const resolvedBaseUrl = serverStatus.baseUrl || base.baseUrl || "http://127.0.0.1:1279/v1";
-
-      if (serverStatus.modelSettings) {
-        setModelSettings((prev) => ({ ...prev, ...serverStatus!.modelSettings! }));
-      }
-      if (serverStatus.activeProvider || serverStatus.activeModel) {
-        setActiveProviderConfigState((prev) => ({
-          ...prev,
-          provider: effectiveProv,
-          model: resolvedModel || prev.model,
-          baseUrl: resolvedBaseUrl || prev.baseUrl,
-        }));
-      }
-
-      return {
-        ...base,
-        hasApiKey: resolvedHasKey,
-        apiKeyMasked: resolvedMasked,
-        activeProvider: effectiveProv,
-        activeModel: resolvedModel,
-        baseUrl: resolvedBaseUrl,
-      };
-    };
-
-    try {
-      const userDoc = await getDoc(doc(db, "users", currentUser.uid));
-      let resolved: UserProfile;
-      if (userDoc.exists()) {
-        const data = userDoc.data();
-        const userEmail = (currentUser.email || data.email || "").toLowerCase();
-        const isSoleAdmin = userEmail === "tahsinirshad7370@gmail.com";
-
-        if (data.modelSettings) {
-          setModelSettings(prev => ({ ...prev, ...data.modelSettings }));
-        }
-
-        const effectiveProvider = !isStandalone && data.activeProvider === "local"
-          ? "gemini"
-          : (data.activeProvider || "gemini");
-
-        if (data.activeProvider) {
-          setActiveProviderConfigState(prev => ({
-            ...prev,
-            provider: effectiveProvider,
-            model: data.activeModel || prev.model,
-            baseUrl: data.baseUrl || prev.baseUrl,
-          }));
-        }
-
-        resolved = applyServerStatus({
-          userId: currentUser.uid,
-          name: data.name || currentUser.displayName || currentUser.email?.split("@")[0] || "User",
-          email: data.email || currentUser.email || "",
-          profilePhoto: data.profilePhoto || currentUser.photoURL || `https://api.dicebear.com/7.x/bottts/svg?seed=${currentUser.uid}`,
-          provider: data.provider || "password",
-          role: isSoleAdmin ? "admin" : "user",
-          isAdmin: isSoleAdmin,
-          apiKeyMasked: data.apiKeyMasked || null,
-          hasApiKey: Boolean(data.encryptedApiKey || data.apiKeyMasked),
-          activeProvider: effectiveProvider,
-          activeModel: data.activeModel || "gemini-3.1-flash-lite",
-          baseUrl: data.baseUrl || "http://127.0.0.1:1279/v1",
-          createdAt: data.createdAt || new Date().toISOString(),
-          updatedAt: data.updatedAt || new Date().toISOString(),
-        });
-        setProfile(resolved);
-      } else {
-        resolved = applyServerStatus(await syncUserProfile(currentUser));
-        setProfile(resolved);
-      }
-      if (token) {
-        void syncDirectoryWithServer(token, resolved);
-      }
-    } catch (err) {
-      console.warn("Firestore profile sync skipped, using authenticated profile status:", err);
-      let fallbackBase: UserProfile;
-      try {
-        fallbackBase = await syncUserProfile(currentUser);
-      } catch {
-        const rawEmail = (currentUser.email || "").trim();
-        const isSoleAdmin = rawEmail.toLowerCase() === "tahsinirshad7370@gmail.com";
-        fallbackBase = {
-          userId: currentUser.uid,
-          name: currentUser.displayName || rawEmail.split("@")[0] || "User",
-          email: rawEmail,
-          profilePhoto:
-            currentUser.photoURL ||
-            `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(currentUser.uid)}`,
-          provider: currentUser.providerData?.[0]?.providerId || "password",
-          role: isSoleAdmin ? "admin" : "user",
-          isAdmin: isSoleAdmin,
-          apiKeyMasked: null,
-          hasApiKey: false,
-          activeProvider: "gemini",
-          activeModel: "gemini-3.1-flash-lite",
-          baseUrl: "http://127.0.0.1:1279/v1",
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
-      }
-      const resolved = applyServerStatus(fallbackBase);
-      setProfile(resolved);
-      if (token) {
-        void syncDirectoryWithServer(token, resolved);
-      }
-    }
-  };
-
-  useEffect(() => {
-    if (!systemModeChecked) return;
-    if (isStandalone) {
-      setUser(null);
-      setProfile(null);
-      setIdToken(null);
-      setLoading(false);
-      return;
-    }
-
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      setUser(currentUser);
-      if (currentUser) {
-        const fallbackEmail = currentUser.email || "";
-        const isSoleAdmin = fallbackEmail.toLowerCase() === "tahsinirshad7370@gmail.com";
-        setProfile((prev) =>
-          prev && prev.userId === currentUser.uid
-            ? { ...prev, email: prev.email || fallbackEmail }
-            : {
-                userId: currentUser.uid,
-                name: currentUser.displayName || fallbackEmail.split("@")[0] || "User",
-                email: fallbackEmail,
-                profilePhoto:
-                  currentUser.photoURL ||
-                  `https://api.dicebear.com/7.x/bottts/svg?seed=${currentUser.uid}`,
-                provider: currentUser.providerData?.[0]?.providerId || "password",
-                role: isSoleAdmin ? "admin" : "user",
-                isAdmin: isSoleAdmin,
-                apiKeyMasked: null,
-                hasApiKey: false,
-                activeProvider: "gemini",
-                activeModel: "gemini-3.1-flash-lite",
-                baseUrl: "http://127.0.0.1:1279/v1",
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-              }
-        );
-        try {
-          const token = await currentUser.getIdToken(true);
-          setIdToken(token);
-          await fetchProfile(currentUser, token);
-        } catch (e) {
-          console.error("Error getting ID token:", e);
-        }
-      } else {
-        setProfile(null);
-        setIdToken(null);
-      }
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, [systemModeChecked, isStandalone]);
-
-  const handleSetIsAuthModalOpen = (open: boolean) => {
-    if (isStandalone && open) return;
-    setIsAuthModalOpen(open);
-  };
-
-  const refreshProfile = async () => {
-    if (isStandalone) {
-      await refreshSystemMode();
-      return;
-    }
-    if (user) {
-      try {
-        const token = await user.getIdToken(true);
-        setIdToken(token);
-        await fetchProfile(user, token);
-      } catch (e) {
-        console.error("Error refreshing profile:", e);
-      }
+      // localStorage already updated
     }
   };
 
   const removeApiKey = async (): Promise<boolean> => {
     try {
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      let activeToken = idToken;
-      if (!isStandalone && user && !activeToken) {
-        activeToken = await user.getIdToken(true);
-      }
-      if (!isStandalone && activeToken) {
-        headers.Authorization = `Bearer ${activeToken}`;
-      }
       const res = await fetch("/api/user/remove-key", {
         method: "POST",
-        headers,
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ provider: "all" }),
       });
       if (!res.ok) return false;
       updateProviderConfig({ apiKey: "" });
-      if (isStandalone) {
-        await refreshSystemMode();
-      } else {
-        setProfile((prev) =>
-          prev ? { ...prev, hasApiKey: false, apiKeyMasked: null } : prev
-        );
-        await refreshProfile();
-      }
+      await refreshSystemMode();
       return true;
     } catch (err) {
       console.error("Error removing API key:", err);
@@ -641,66 +355,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const logout = async () => {
-    if (isStandalone) return;
-    await signOut(auth);
-    setUser(null);
-    setProfile(null);
-    setIdToken(null);
-  };
-
-  const deleteAccount = async () => {
-    if (isStandalone) return;
-    if (user && idToken) {
-      try {
-        await fetch("/api/user/delete-account", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${idToken}`,
-          },
-        });
-      } catch (err) {
-        console.error("Failed to delete account on backend:", err);
-      }
-      try {
-        localStorage.removeItem("sas_chat_sessions_v1");
-        localStorage.removeItem("sas_chat_projects_v1");
-        localStorage.removeItem("sas_desktop_chat_sessions_v1");
-        localStorage.removeItem("sas_desktop_chat_projects_v1");
-      } catch {}
-      await deleteUser(user);
-      setUser(null);
-      setProfile(null);
-      setIdToken(null);
-    }
-  };
-
   return (
     <AuthContext.Provider
       value={{
-        user,
-        profile,
-        loading,
-        idToken,
-        isStandalone,
+        user: null,
+        profile: null,
+        loading: false,
+        idToken: null,
+        isStandalone: true,
         systemModeChecked,
         envKeyStatus,
         refreshSystemMode,
         activeProviderConfig,
         updateProviderConfig,
-        refreshProfile,
+        refreshProfile: refreshSystemMode,
         removeApiKey,
-        logout,
-        deleteAccount,
-        isAuthModalOpen: isStandalone ? false : isAuthModalOpen,
-        setIsAuthModalOpen: handleSetIsAuthModalOpen,
+        logout: async () => {},
+        deleteAccount: async () => {},
+        isAuthModalOpen: false,
+        setIsAuthModalOpen: () => {},
         isApiKeyModalOpen,
         setIsApiKeyModalOpen,
         isSettingsModalOpen,
         setIsSettingsModalOpen,
-        isAdminModalOpen: isStandalone ? false : isAdminModalOpen,
-        setIsAdminModalOpen,
+        isAdminModalOpen: false,
+        setIsAdminModalOpen: () => {},
         isImageStudioOpen: false,
         setIsImageStudioOpen: () => {},
         isTutorialModalOpen,

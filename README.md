@@ -3,10 +3,9 @@
 
 > An all-in-one AI production suite engineered for content creators, YouTubers, social media growth managers, documentary filmmakers, and educators. Transforms raw ideas, rough notes, or unformatted video transcripts into 100% original, viral-retention voiceover scripts, shot-by-shot cinematic storyboard prompts, YouTube CTR metadata packages, and thumb-stopping visual concepts.
 
-🌐 **Launch the Live Web App**: [https://script-automation-studio.ai.studio/](https://script-automation-studio.ai.studio/)  
 👑 **Created by**: Muhammad Tehseen Irshad  
 🏷️ **Brand**: Moni Visual Pro  
-⚡ **Access**: Instant Web App & PWA — or run locally in 1 click via `run-app.bat` (Windows) / `run-app.sh` (Linux & macOS) with zero Firebase setup.  
+💻 **Platforms**: **100% Pure Desktop App** for **Windows**, **Linux**, and **macOS** — zero Firebase, zero Firestore, and zero online accounts required. Run in 1 click via `run-app.bat` (Windows) or `./run-app.sh` (Linux & macOS).  
 📄 **License**: [MIT License](./LICENSE.md)
 
 ---
@@ -14,9 +13,9 @@
 ## 📑 Table of Contents
 
 1. [Overview & Why Script Automation Studio?](#1-overview--why-script-automation-studio)
-2. [Instant Access & Web App Installation (PWA)](#2-instant-access--web-app-installation-pwa)
-3. [Local Standalone Mode, Launcher Scripts & Multi-Provider LLM](#3-local-standalone-mode-launcher-scripts--multi-provider-llm)
-   - [Security Model for Local Clones](#security-model-for-local-clones)
+2. [100% Pure Desktop Architecture (Windows, Linux & macOS)](#2-100-pure-desktop-architecture-windows-linux--macos)
+3. [Launcher Scripts, Security Model & Multi-Provider LLM](#3-launcher-scripts-security-model--multi-provider-llm)
+   - [Security Model for Local Desktop](#security-model-for-local-desktop)
    - [Quick Start: Windows (`run-app.bat` & `build.bat`)](#quick-start-windows-run-appbat--buildbat)
    - [Quick Start: Linux & macOS (`run-app.sh` & `build.sh`)](#quick-start-linux--macos-run-appsh--buildsh)
    - [OS-Specific Notes (Windows, macOS & Linux)](#os-specific-notes-windows-macos--linux)
@@ -72,26 +71,23 @@ Content creators face three major bottlenecks:
 
 ---
 
-## 2. Instant Access & Web App Installation (PWA)
+## 2. 100% Pure Desktop Architecture (Windows, Linux & macOS)
 
-Use the live cloud web application immediately without installing anything, **or** clone the repository from GitHub to run 100% locally using the automated launcher scripts (Section 3):
-
-### 👉 **[https://script-automation-studio.ai.studio/](https://script-automation-studio.ai.studio/)**
-
-### 📱 1-Click Desktop & Mobile App (PWA)
-- **Windows / macOS / Linux**: Open the link in Google Chrome, Microsoft Edge, or Brave. Click the **Install App** icon in the address bar to add **Script Automation Studio** as a dedicated desktop application with native windowing and offline caching.
-- **Android / iOS**: Open the link in Chrome or Safari. Tap **Share / Options** ➔ **Add to Home Screen** to run it as a full-screen mobile app with microphone permissions.
+**Script Automation Studio** runs 100% locally on your computer with **no online database, no sign-in walls, no message caps, and no cloud hosting required**:
+- **Local Workspace Persistence**: Unlimited chats, projects, direct image attachments, and installed skills/agents are saved directly to your disk in `local-engine/chat-workspace.json`.
+- **Offline Built-In AI + Optional Cloud Keys**: Run local GGUF models completely offline using the Built-In `llama.cpp` Engine, connect LM Studio / Ollama, or optionally plug in your own Gemini, OpenAI, or Claude API key saved privately in `.env`.
+- **Cross-Platform Support**: Built natively for **Windows 10/11**, **Linux** (Ubuntu, Debian, Fedora, Arch), and **macOS** (Apple Silicon & Intel).
 
 ---
 
-## 3. Local Standalone Mode, Launcher Scripts & Multi-Provider LLM
+## 3. Launcher Scripts, Security Model & Multi-Provider LLM
 
-When you clone this repository from GitHub, **no Firebase project, authentication, or cloud account is required**. The app automatically detects local standalone mode and runs directly against your `.env` configuration or in-app Settings.
+No external database, cloud login, or online configuration is required. Everything runs directly on your desktop against your local `.env` and `.studio-data/` directory.
 
-### Security Model for Local Clones
+### Security Model for Local Desktop
 The provided launcher scripts (`run-app.bat` / `run-app.sh`) and build scripts (`build.bat` / `build.sh`) enforce strict security defaults:
-- **Zero-Secret Repository**: `.gitignore` ignores all `.env*` files (except `.env.example`) and `firebase-applet-config.json`, ensuring your personal API keys are never committed to Git.
-- **Auto-Generated CSPRNG Secret**: On first run, the launcher copies `.env.example` to `.env` and automatically writes a cryptographically random 256-bit `ENCRYPTION_SECRET` (generated via Node `crypto.randomBytes(32)`) without printing it to the terminal.
+- **Zero-Secret Repository**: `.gitignore` ignores all `.env*` files (except `.env.example`), `local-engine/`, and `.studio-data/`, ensuring your personal API keys and local workspace never leak into Git.
+- **Auto-Generated CSPRNG Secret**: On first run, the launcher or backend automatically creates a cryptographically random 256-bit `ENCRYPTION_SECRET` (generated via Node `crypto.randomBytes(32)`) without printing it to the terminal.
 - **Owner-Only File Permissions (Linux/macOS)**: `run-app.sh` enforces `chmod 600 .env` so only your local user account can read your API keys.
 - **Pre-Flight Safety Checks**: Scripts verify **Node.js v18+**, block unsafe working-directory edge cases, and check whether port `3000` is already in use before starting the server.
 
@@ -177,11 +173,11 @@ The provided launcher scripts (`run-app.bat` / `run-app.sh`) and build scripts (
 ---
 
 ### Multi-Provider LLM Engine & Built-In Local Engine
-- **Online Published Web App**: Supports **Google Gemini**, **OpenAI**, and **Anthropic Claude** (API keys encrypted per user).
-- **Local GitHub Clone (`STANDALONE_MODE=true`)**: Supports all 3 cloud APIs **plus** two offline local options in **Configure AI Provider -> Local Engine**:
+- **Optional Cloud Providers**: Use your own **Google Gemini**, **OpenAI**, or **Anthropic Claude** API keys saved privately in your local `.env`.
+- **100% Offline Desktop Options** in **Providers & Local Engine**:
   1. **Built-In Engine (`local-engine/` — Recommended, Zero External Apps Needed)**:
      - **Step 1 (`local-engine/bin/`)**: Download **`llama-b12202-bin-win-vulkan-x64.zip`** (Windows Vulkan GPU + CPU) or your macOS/Linux release from [llama.cpp Releases](https://github.com/ggml-org/llama.cpp/releases) and extract its files inside **`local-engine/bin/`** (`llama-server.exe` or `llama-server`).
-     - **Step 2 (`local-engine/models/`)**: Download any **Qwen `.gguf`** model (e.g., `Qwen2.5-7B-Instruct-Q4_K_M.gguf` or `Qwen3-8B-Q4_K_M.gguf`) with 1 click inside the **Configure AI Provider** modal (or copy `.gguf` files manually into **`local-engine/models/`**).
+     - **Step 2 (`local-engine/models/`)**: Download any **Qwen `.gguf`** model (e.g., `Qwen2.5-7B-Instruct-Q4_K_M.gguf` or `Qwen3-8B-Q4_K_M.gguf`) with 1 click inside **Providers & Local Engine** (or copy `.gguf` files manually into **`local-engine/models/`**).
      - **Step 3 (GPU / CPU Mode)**: Choose **GPU + CPU (Vulkan Offload)** or **CPU Only Mode** and click **Start & Activate Built-In Engine** (`http://127.0.0.1:1279/v1`).
   2. **External Local Server (LM Studio / Ollama / Bionic LLM Studio)**:
      - Set `LOCAL_LLM_URL=http://127.0.0.1:1234/v1` (LM Studio) or `http://127.0.0.1:11434/v1` (Ollama) and `LOCAL_LLM_MODEL=your-model-name`.
@@ -527,6 +523,6 @@ Thumbnails account for over 80% of click-through rate decisions. This studio dir
 - **Software Name**: Script Automation Studio
 - **Brand**: Moni Visual Pro
 - **Architect & Author**: Muhammad Tehseen Irshad
-- **Live Web App**: [https://script-automation-studio.ai.studio/](https://script-automation-studio.ai.studio/)
+- **Platforms**: Windows, Linux & macOS (100% Desktop App)
 - **License**: MIT License (see [LICENSE.md](./LICENSE.md))
 

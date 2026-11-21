@@ -6,11 +6,10 @@ coverage/
 *.log
 .env*
 !.env.example
-firebase-applet-config.json
+.studio-data/
 local-engine/bin/*
 !local-engine/bin/.gitkeep
 local-engine/models/*
 !local-engine/models/.gitkeep
 local-engine/config.json
 local-engine/chat-workspace.json
-.aistudio/
