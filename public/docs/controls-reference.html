@@ -7,9 +7,6 @@
     <title>Buttons & Controls Reference Dictionary | Script Automation Studio</title>
     <meta name="description" content="Complete itemized reference dictionary of all UI controls, toggles, parameters, and action triggers in Script Automation Studio." />
     <meta name="author" content="Muhammad Tehseen Irshad" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <style>
       :root {
         --accent: #ff073a;
@@ -342,18 +339,18 @@
   <body data-brand="red" data-theme="night">
     <header class="site-header">
       <div class="header-inner">
-        <a href="/" class="brand-link">
+        <a href="/" data-studio-link class="brand-link">
           <div class="brand-icon font-mono">UI</div>
           <div>
             <div class="brand-title font-mono">Script Automation Studio</div>
-            <div class="brand-subtitle font-mono">Controls &amp; Buttons Dictionary</div>
+            <div class="brand-subtitle font-mono">100% Local Desktop &bull; Controls Dictionary</div>
           </div>
         </a>
 
         <nav class="doc-tabs font-mono" aria-label="Documentation Pages">
-          <a href="/docs/complete-user-guide.html" class="doc-tab" data-doc-link>User Guide</a>
-          <a href="/docs/controls-reference.html" class="doc-tab active" data-doc-link>Controls Reference</a>
-          <a href="/docs/prompt-masterclass.html" class="doc-tab" data-doc-link>Prompt Masterclass</a>
+          <a href="./complete-user-guide.html" class="doc-tab" data-doc-link>User Guide</a>
+          <a href="./controls-reference.html" class="doc-tab active" data-doc-link>Controls Reference</a>
+          <a href="./prompt-masterclass.html" class="doc-tab" data-doc-link>Prompt Masterclass</a>
         </nav>
 
         <div class="header-controls font-mono">
@@ -365,21 +362,21 @@
             <span id="themeIcon">☀️</span>
             <span id="themeLabel">Day</span>
           </button>
-          <a href="/" class="btn-primary">Open Studio &rarr;</a>
+          <a href="/" data-studio-link class="btn-primary">Back to Studio &rarr;</a>
         </div>
       </div>
     </header>
 
     <main class="container">
       <section class="glass-card">
-        <span class="hero-pill font-mono">UI Reference Manual</span>
+        <span class="hero-pill font-mono">100% Offline Desktop UI Reference</span>
         <h1>Buttons &amp; UI Controls — Complete Dictionary</h1>
         <p class="lead">
-          Detailed purpose, location, and optimal settings for every control, input field, multi-provider setting, and trigger inside the platform.
+          Detailed purpose, location, and optimal settings for every control, input field, local GGUF / multi-provider setting, and trigger inside the desktop studio.
         </p>
         <div class="action-row font-mono">
-          <a href="/docs/BUTTONS_AND_CONTROLS_REFERENCE.txt" download class="btn-primary">Download .TXT</a>
-          <a href="/docs/BUTTONS_AND_CONTROLS_REFERENCE.txt" target="_blank" class="btn-secondary">View Plain Text</a>
+          <a href="./BUTTONS_AND_CONTROLS_REFERENCE.txt" download="BUTTONS_AND_CONTROLS_REFERENCE.txt" class="btn-primary">Download .TXT</a>
+          <a href="./BUTTONS_AND_CONTROLS_REFERENCE.txt" class="btn-secondary">View Plain Text</a>
         </div>
       </section>
 
@@ -504,6 +501,15 @@
         } catch (e) {}
         setBrand(brand || 'red');
         applyTheme(theme || 'night');
+
+        if (window.self !== window.top) {
+          document.querySelectorAll('[data-studio-link]').forEach(function (el) {
+            el.addEventListener('click', function (e) {
+              e.preventDefault();
+              window.parent.postMessage({ type: 'CLOSE_TUTORIAL_MODAL' }, '*');
+            });
+          });
+        }
       })();
     </script>
   </body>

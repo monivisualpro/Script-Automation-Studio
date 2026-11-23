@@ -117,8 +117,8 @@ ACTION BUTTONS & GENERATION
 
 [ BUTTON: GENERATE POLISHED SCRIPT ]
 • Location: Bottom center / Primary CTA button.
-• Action: Sends prompt configuration to Google Gemini AI and streams back the 
-  finished, production-ready script with visual/audio directions.
+• Action: Sends prompt configuration to your active AI Engine (Built-In Local GGUF Engine,
+  LM Studio / Ollama, Google Gemini, OpenAI, or Claude) and streams back the finished script.
 
 [ BUTTON: SHOTS CALCULATOR (SCENE SPLITTER) ]
 • Location: Tool section.
