@@ -1,0 +1,65 @@
+name: Build Desktop Installers & Portable Archives (.exe, .dmg, .deb, .tar.gz, .tar.xz)
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    name: Build ${{ matrix.platform_name }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform_name: Windows (.exe & Portable)
+            dist_cmd: npm run dist:win
+          - os: macos-latest
+            platform_name: macOS (.dmg & Portable tar.gz)
+            dist_cmd: npm run dist:mac
+          - os: ubuntu-latest
+            platform_name: Linux (.deb & Portable tar.xz)
+            dist_cmd: npm run dist:linux
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Linux XZ Builder Tools
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y xz-utils
+
+      - name: Prepare Clean OS Lockfile
+        run: node -e "try{require('fs').unlinkSync('package-lock.json')}catch{}"
+
+      - name: Install Dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Type Check
+        run: npm run lint
+
+      - name: Build Native Desktop Installers & Portable Archives
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+        run: ${{ matrix.dist_cmd }}
+
+      - name: Upload Desktop Installers & Portable Archives
+        uses: actions/upload-artifact@v4
+        with:
+          name: script-automation-studio-${{ runner.os }}
+          if-no-files-found: error
+          path: |
+            release/*.exe
+            release/*.dmg
+            release/*.deb
+            release/*.tar.gz
+            release/*.tar.xz

@@ -1,0 +1,17 @@
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+.studio-data/
+local-engine/bin/*
+!local-engine/bin/.gitkeep
+local-engine/models/*
+!local-engine/models/.gitkeep
+local-engine/config.json
+local-engine/chat-workspace.json
+package-lock.json
+release/

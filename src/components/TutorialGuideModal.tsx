@@ -1,0 +1,887 @@
+import React, { useState } from "react";
+import { useAuth } from "../context/AuthContext";
+import { getThemeConfig } from "../lib/themeConfig";
+import {
+  X,
+  BookOpen,
+  Download,
+  Search,
+  FileText,
+  Sliders,
+  Sparkles,
+  CheckCircle2,
+  Copy,
+  ExternalLink,
+  Terminal,
+  Zap,
+  Video
+} from "lucide-react";
+import { useEscapeToClose } from "../lib/a11y";
+
+export const TutorialGuideModal: React.FC = () => {
+  const { isTutorialModalOpen, setIsTutorialModalOpen, currentTheme, currentBrand } = useAuth();
+  const theme = getThemeConfig(currentTheme, currentBrand);
+
+  const [activeTab, setActiveTab] = useState<"download" | "html" | "dictionary" | "prompts" | "matrix">("download");
+  const [activeHtmlDocIndex, setActiveHtmlDocIndex] = useState(0);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [previewHtmlDoc, setPreviewHtmlDoc] = useState<{ title: string; htmlPath: string; rawPath: string } | null>(null);
+
+  const docThemeParam = theme.isLight ? "day" : "night";
+  const docBrandParam = currentBrand === "blue" ? "blue" : "red";
+  const withDocParams = (url: string) => `${url}?theme=${docThemeParam}&brand=${docBrandParam}`;
+
+  const htmlPages = [
+    {
+      title: "Complete User Guide",
+      subtitle: "Full platform tutorial, architecture, 50+ tones, prompting & matrix",
+      htmlPath: "/docs/complete-user-guide.html",
+      rawPath: "/docs/COMPLETE_USER_GUIDE_TUTORIAL.txt",
+    },
+    {
+      title: "Controls Reference",
+      subtitle: "Itemized dictionary of all header, sidebar, storyboard & metadata controls",
+      htmlPath: "/docs/controls-reference.html",
+      rawPath: "/docs/BUTTONS_AND_CONTROLS_REFERENCE.txt",
+    },
+    {
+      title: "Prompt Masterclass",
+      subtitle: "4-pillar script anatomy & copy-and-paste blueprints",
+      htmlPath: "/docs/prompt-masterclass.html",
+      rawPath: "/docs/PROMPT_ENGINEERING_MASTERCLASS.txt",
+    },
+  ];
+
+  useEscapeToClose(isTutorialModalOpen, () => setIsTutorialModalOpen(false));
+
+  if (!isTutorialModalOpen) return null;
+
+  const downloadableFiles = [
+    {
+      name: "COMPLETE_USER_GUIDE_TUTORIAL.txt",
+      path: "/docs/COMPLETE_USER_GUIDE_TUTORIAL.txt",
+      htmlPath: "/docs/complete-user-guide.html",
+      size: "8 KB",
+      format: "Plain Text (.txt) + Formatted HTML",
+      description: "Exhaustive user guide explaining every single button, control, dropdown, field, and workflow in the studio."
+    },
+    {
+      name: "PROMPT_ENGINEERING_MASTERCLASS.txt",
+      path: "/docs/PROMPT_ENGINEERING_MASTERCLASS.txt",
+      htmlPath: "/docs/prompt-masterclass.html",
+      size: "5 KB",
+      format: "Plain Text (.txt) + Formatted HTML",
+      description: "Step-by-step masterclass on writing prompts, commands, raw ideas, and high-retention script structures."
+    },
+    {
+      name: "BUTTONS_AND_CONTROLS_REFERENCE.txt",
+      path: "/docs/BUTTONS_AND_CONTROLS_REFERENCE.txt",
+      htmlPath: "/docs/controls-reference.html",
+      size: "6 KB",
+      format: "Plain Text (.txt) + Formatted HTML",
+      description: "Complete itemized reference dictionary of all UI controls, toggles, parameters, and action triggers."
+    },
+    {
+      name: "COMPLETE_USER_GUIDE.md",
+      path: "/docs/COMPLETE_USER_GUIDE.md",
+      htmlPath: "/docs/complete-user-guide.html",
+      size: "7 KB",
+      format: "Markdown (.md) + Formatted HTML",
+      description: "Markdown version of the complete user manual with formatted headings, code blocks, and cheat sheets."
+    }
+  ];
+
+  const controlsList = [
+    {
+      category: "Main Input Controls",
+      name: "Raw Script / Idea Box",
+      purpose: "Primary input field for pasting raw thoughts, rough notes, article text, or YouTube video transcripts.",
+      bestSetting: "Paste bullet points or raw outlines; the AI expands and structures them automatically.",
+      action: "Type or Paste text into the box."
+    },
+    {
+      category: "Main Input Controls",
+      name: "Clear Input Button",
+      purpose: "Instantly flushes the raw text box clean to start a new project.",
+      bestSetting: "Click when switching to a completely new script topic.",
+      action: "Empties text area."
+    },
+    {
+      category: "Main Input Controls",
+      name: "Paste From Clipboard",
+      purpose: "One-click shortcut to paste clipboard contents straight into the generator.",
+      bestSetting: "Use after copying text from browser or notes app.",
+      action: "Appends copied text."
+    },
+    {
+      category: "Main Input Controls",
+      name: "Load Sample Preset",
+      purpose: "Populates a high-performing example script to quickly test AI transformation modes.",
+      bestSetting: "Great for first-time users or testing speed.",
+      action: "Fills sample text."
+    },
+    {
+      category: "Configuration Dropdowns",
+      name: "Domain Selector (50+ Topics)",
+      purpose: "Applies domain-specific context, technical jargon, and background knowledge.",
+      bestSetting: "Match exact video niche (e.g., AI, Civil Engineering, Finance, Islamic, Gaming).",
+      action: "Click to filter or select domain."
+    },
+    {
+      category: "Configuration Dropdowns",
+      name: "Tutorial & Literature Tool Tone (50+ Tones)",
+      purpose: "Sets the emotional frequency, rhythm, and literary style of the voiceover speaker.",
+      bestSetting: "Use 'Fast Paced Explainer' for Shorts, 'Dramatic Narrative' for documentaries, or 'Warm Friendly' for vlogs.",
+      action: "Click to filter or select tone."
+    },
+    {
+      category: "Configuration Dropdowns",
+      name: "Script Transformation Mode",
+      purpose: "Defines output format and primary language (English, Urdu, Roman Urdu, Dual Language, Shorts, Documentary).",
+      bestSetting: "Select 'Shorts/Reels (60s)' for vertical video or 'Roman Urdu' for South Asian audiences.",
+      action: "Selects transformation engine."
+    },
+    {
+      category: "Configuration Dropdowns",
+      name: "Voice Persona",
+      purpose: "Adjusts tone of voice, pacing, and delivery style for voiceover synthesis.",
+      bestSetting: "'Deep Documentary Narrator' for mystery/crime, 'Energetic Hype' for tech/gaming.",
+      action: "Sets speaker persona."
+    },
+    {
+      category: "Output & Length Settings",
+      name: "Word Count / Length Target",
+      purpose: "Target word count or duration calculation (100 words ~ 45s, 300 words ~ 2 min, 600 words ~ 4 min).",
+      bestSetting: "120-150 words for 60-second vertical reels; 600+ words for long YouTube videos.",
+      action: "Slide or type number."
+    },
+    {
+      category: "Output & Length Settings",
+      name: "Greetings Prefix",
+      purpose: "Pre-populates opening greeting line.",
+      bestSetting: "'Assalamualaikum' for Islamic/Pakistani content, 'Hello Guys' for general YouTube.",
+      action: "Selects greeting."
+    },
+    {
+      category: "Output & Length Settings",
+      name: "Hooks, Body & Conclusion Toggle",
+      purpose: "Forces 3-part retention structure: Hook (0-5s), Core Body, Call-To-Action (CTA).",
+      bestSetting: "Always keep ON for viral retention on YouTube and social media.",
+      action: "Toggle ON/OFF."
+    },
+    {
+      category: "Output & Length Settings",
+      name: "Fast Lite Mode Toggle",
+      purpose: "Bypasses B-Roll visual notes for ultra-fast generation of clean voiceover text.",
+      bestSetting: "Turn ON if you only need the voice text quickly without visual scene cues.",
+      action: "Toggle ON/OFF."
+    },
+    {
+      category: "Configuration Dropdowns",
+      name: "Target Audience (8-Tier Demographic Engine)",
+      purpose: "Adapts script vocabulary, sentence pacing, hooks, and cultural honorifics to the selected age bracket (All Ages, Kids up to 10, Teens up to 20, Young up to 30, Adults up to 40, Men up to 50, Senior Men up to 60, Elders up to 80).",
+      bestSetting: "Use 'All Ages' for family channels, 'Teens/Young' for high-retention Shorts, or 'Men 50–80' for dignified health & wisdom videos.",
+      action: "Click dropdown to select demographic tier."
+    },
+    {
+      category: "Output & Length Settings",
+      name: "Target Country Audience",
+      purpose: "Adapts cultural slang, local currency, and geographic relevance.",
+      bestSetting: "Select Pakistan, India, USA, UK, or UAE depending on primary viewers.",
+      action: "Select country."
+    },
+    {
+      category: "Action Buttons",
+      name: "Generate Polished Script",
+      purpose: "Sends prompt and configuration to your configured AI provider (Google Gemini, OpenAI, Anthropic Claude, or Local LLM) to construct the final script.",
+      bestSetting: "Click when all parameters are selected.",
+      action: "Executes generation pipeline."
+    },
+    {
+      category: "Action Buttons",
+      name: "Shots Calculator (Scene Splitter)",
+      purpose: "Calculates video duration, total camera shots, and splits script into B-roll scenes with visual prompts.",
+      bestSetting: "Use after generating script to get complete video editing scene breakdown.",
+      action: "Opens B-Roll Scene Splitter."
+    }
+  ];
+
+  const promptExamples = [
+    {
+      title: "Viral Tech Shorts Prompt",
+      rawInput: "Explain why Quantum Computers will replace regular computers in 2026. Keep it exciting for teenagers.",
+      recommendedSettings: "Shorts / Reels (60s) | Exciting Tech Enthusiast | Energetic Hype Persona | Hooks ON | 140 Words",
+      outputStructure: "Hook: 'What if your phone could solve 10,000 years of math in 3 seconds?' -> Body: Explains qubit superposition simply -> CTA: 'Subscribe for daily tech mind-blows!'"
+    },
+    {
+      title: "History / Crime Documentary Script",
+      rawInput: "The mystery of DB Cooper skyjacking in 1971. How he jumped out of a plane with $200k and vanished.",
+      recommendedSettings: "Documentary Style | Dramatic Narrative | Deep Documentary Narrator | History | 800 Words",
+      outputStructure: "Visual Cues: [B-Roll: Rain-slicked runway in 1971, flickering cabin lights] -> Suspenseful narrative breakdown -> Unresolved theories."
+    },
+    {
+      title: "Islamic Spiritual Reminder (Roman Urdu)",
+      rawInput: "Patience (Sabr) in hard times and why Allah tests the people He loves.",
+      recommendedSettings: "Roman Urdu / Hindi | Islamic / Religious Tone | Warm Storyteller | Greetings: Assalamualaikum",
+      outputStructure: "Opening: 'Assalamualaikum Dosto, jab zindagi mushkil ho jaye...' -> Quranic context -> Comforting conclusion."
+    }
+  ];
+
+  const downloadTextFile = (content: string, filename: string) => {
+    const element = document.createElement("a");
+    const file = new Blob([content], { type: "text/plain;charset=utf-8" });
+    element.href = URL.createObjectURL(file);
+    element.download = filename;
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+  };
+
+  const downloadAllInOneFile = () => {
+    const combinedContent = `================================================================================
+SCRIPT AUTOMATION STUDIO - COMPLETE DOCUMENTATION BUNDLE
+================================================================================
+
+1. USER MANUAL & CONTROLS DICTIONARY
+${controlsList.map(c => `
+[${c.name}] (${c.category})
+• Purpose: ${c.purpose}
+• Best Setting: ${c.bestSetting}
+• Action: ${c.action}
+`).join("")}
+
+================================================================================
+2. PROMPT ENGINEERING & COMMAND MASTERCLASS
+${promptExamples.map(p => `
+[${p.title}]
+• Input Prompt: "${p.rawInput}"
+• Recommended Configuration: ${p.recommendedSettings}
+• Output Structure: ${p.outputStructure}
+`).join("")}
+
+================================================================================
+Generated by Script Automation Studio.
+================================================================================`;
+
+    downloadTextFile(combinedContent, "SCRIPT_AUTOMATION_STUDIO_COMPLETE_DOCUMENTATION.txt");
+  };
+
+  const filteredControls = controlsList.filter(
+    item =>
+      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.purpose.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.category.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  return (
+    <div role="dialog" aria-modal="true" aria-label="Tutorial guide" className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-md animate-fade-in">
+      <div
+        className={`w-full max-w-5xl max-h-[92vh] rounded-3xl shadow-2xl flex flex-col border overflow-hidden transition-all duration-300 ${
+          theme.isLight ? "bg-[#FFFFFF] border-[#E5E5E5] text-[#000000]" : "bg-[#141414] border-[#2A2A2A] text-white"
+        }`}
+      >
+        {/* Modal Header */}
+        <div
+          className={`px-6 py-4 border-b flex items-center justify-between gap-4 ${
+            theme.isLight ? "bg-[#F7F7F7] border-[#E5E5E5]" : "bg-[#1A1A1A] border-[#2A2A2A]"
+          }`}
+        >
+          <div className="flex items-center gap-3">
+            <div
+              className="p-2.5 rounded-2xl shadow-md border"
+              style={{ backgroundColor: `${theme.accentColor}20`, borderColor: theme.accentColor }}
+            >
+              <BookOpen className="h-5 w-5" style={{ color: theme.accentColor }} />
+            </div>
+            <div>
+              <h2 className="text-base sm:text-lg font-extrabold font-mono tracking-tight flex items-center gap-2">
+                <span>Tutorials & User Manual Center</span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full font-bold shadow-sm" style={{ backgroundColor: theme.accentColor, color: "#ffffff" }}>
+                  HTML &amp; Text Guides
+                </span>
+              </h2>
+              <p className={`text-xs font-mono ${theme.isLight ? "text-[#555555]" : "text-[#BDBDBD]"}`}>
+                Exhaustive guide to every button, setting, prompt command, and best selection option
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <a
+              href={withDocParams("/docs/complete-user-guide.html")}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-3.5 py-2 rounded-2xl font-mono text-xs font-bold text-white shadow-lg flex items-center gap-1.5 transition-all cursor-pointer border"
+              style={{ backgroundColor: theme.accentColor, borderColor: theme.accentColor }}
+              title="Open full interactive HTML user guide"
+            >
+              <ExternalLink className="h-4 w-4" />
+              <span className="hidden sm:inline">Open HTML Manual</span>
+            </a>
+            <button
+              onClick={downloadAllInOneFile}
+              className={`px-3 py-2 rounded-2xl font-mono text-xs font-bold border transition-all cursor-pointer flex items-center gap-1.5 ${
+                theme.isLight ? "bg-[#F5F5F5] hover:bg-[#EAEAEA] border-[#E0E0E0] text-black" : "bg-[#1F1F1F] hover:bg-[#282828] border-[#333333] text-white"
+              }`}
+              title="Download Complete Text Documentation Bundle"
+            >
+              <Download className="h-4 w-4" />
+              <span className="hidden sm:inline">Download (.TXT)</span>
+            </button>
+            <button
+              onClick={() => setIsTutorialModalOpen(false)}
+              aria-label="Close tutorial"
+              className={`p-2 rounded-2xl border transition-colors cursor-pointer ${
+                theme.isLight ? "hover:bg-[#EAEAEA] border-[#E5E5E5]" : "hover:bg-[#252525] border-[#2A2A2A]"
+              }`}
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Navigation Tabs */}
+        <div
+          className={`px-6 py-2 border-b flex items-center gap-2 overflow-x-auto scrollbar-none ${
+            theme.isLight ? "bg-[#FAFAFA] border-[#E5E5E5]" : "bg-[#111111] border-[#2A2A2A]"
+          }`}
+        >
+          <button
+            onClick={() => setActiveTab("download")}
+            className={`px-4 py-2 rounded-xl text-xs font-mono font-bold transition-all flex items-center gap-2 cursor-pointer border shrink-0 whitespace-nowrap ${
+              activeTab === "download"
+                ? "shadow-md text-white border-transparent"
+                : (theme.isLight ? "border-transparent text-[#444444] hover:text-[#000000]" : "border-transparent text-[#AAAAAA] hover:text-white")
+            }`}
+            style={activeTab === "download" ? { backgroundColor: theme.accentColor } : {}}
+          >
+            <Download className="h-3.5 w-3.5" />
+            <span>Downloadable Text Files</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("html")}
+            className={`px-4 py-2 rounded-xl text-xs font-mono font-bold transition-all flex items-center gap-2 cursor-pointer border shrink-0 whitespace-nowrap ${
+              activeTab === "html"
+                ? "shadow-md text-white border-transparent"
+                : (theme.isLight ? "border-transparent text-[#444444] hover:text-[#000000]" : "border-transparent text-[#AAAAAA] hover:text-white")
+            }`}
+            style={activeTab === "html" ? { backgroundColor: theme.accentColor } : {}}
+          >
+            <BookOpen className="h-3.5 w-3.5" />
+            <span>Interactive HTML Pages</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("dictionary")}
+            className={`px-4 py-2 rounded-xl text-xs font-mono font-bold transition-all flex items-center gap-2 cursor-pointer border shrink-0 whitespace-nowrap ${
+              activeTab === "dictionary"
+                ? "shadow-md text-white border-transparent"
+                : (theme.isLight ? "border-transparent text-[#444444] hover:text-[#000000]" : "border-transparent text-[#AAAAAA] hover:text-white")
+            }`}
+            style={activeTab === "dictionary" ? { backgroundColor: theme.accentColor } : {}}
+          >
+            <Sliders className="h-3.5 w-3.5" />
+            <span>Buttons & Controls Dictionary</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("prompts")}
+            className={`px-4 py-2 rounded-xl text-xs font-mono font-bold transition-all flex items-center gap-2 cursor-pointer border shrink-0 whitespace-nowrap ${
+              activeTab === "prompts"
+                ? "shadow-md text-white border-transparent"
+                : (theme.isLight ? "border-transparent text-[#444444] hover:text-[#000000]" : "border-transparent text-[#AAAAAA] hover:text-white")
+            }`}
+            style={activeTab === "prompts" ? { backgroundColor: theme.accentColor } : {}}
+          >
+            <Terminal className="h-3.5 w-3.5" />
+            <span>Prompting & Command Masterclass</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("matrix")}
+            className={`px-4 py-2 rounded-xl text-xs font-mono font-bold transition-all flex items-center gap-2 cursor-pointer border shrink-0 whitespace-nowrap ${
+              activeTab === "matrix"
+                ? "shadow-md text-white border-transparent"
+                : (theme.isLight ? "border-transparent text-[#444444] hover:text-[#000000]" : "border-transparent text-[#AAAAAA] hover:text-white")
+            }`}
+            style={activeTab === "matrix" ? { backgroundColor: theme.accentColor } : {}}
+          >
+            <Zap className="h-3.5 w-3.5" />
+            <span>Best Selection Matrix</span>
+          </button>
+        </div>
+
+        {/* Modal Body Content */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-thin">
+          {/* TAB 1: DOWNLOADABLE FILES */}
+          {activeTab === "download" && (
+            <div className="space-y-6">
+              <div
+                className="p-4 rounded-2xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+                style={{ backgroundColor: `${theme.accentColor}10`, borderColor: `${theme.accentColor}40` }}
+              >
+                <div className="space-y-1">
+                  <h3 className="text-sm font-bold font-mono flex items-center gap-2" style={{ color: theme.textColorCode }}>
+                    <Download className="h-4 w-4" style={{ color: theme.accentColor }} />
+                    <span>Downloadable Tutorial Text Files Available</span>
+                  </h3>
+                  <p className={`text-xs font-mono ${theme.isLight ? "text-[#444444]" : "text-[#CCCCCC]"}`}>
+                    You can download these standalone text (.txt) and markdown (.md) guide files directly to your device or view their contents below.
+                  </p>
+                </div>
+                <button
+                  onClick={downloadAllInOneFile}
+                  className="px-4 py-2.5 rounded-xl text-xs font-mono font-bold text-white shadow-lg shrink-0 flex items-center gap-2 transition-transform hover:scale-105 cursor-pointer"
+                  style={{ backgroundColor: theme.accentColor }}
+                >
+                  <Download className="h-4 w-4" />
+                  <span>Download All (.TXT Bundle)</span>
+                </button>
+              </div>
+
+              {/* Grid of Downloadable Files */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {downloadableFiles.map((file, idx) => (
+                  <div
+                    key={file.name}
+                    className={`p-5 rounded-2xl border space-y-3 transition-all hover:shadow-lg ${
+                      theme.isLight ? "bg-[#F9F9F9] border-[#E5E5E5]" : "bg-[#1A1A1A] border-[#2E2E2E]"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className="p-2 rounded-xl bg-black/10 border border-white/10">
+                          <FileText className="h-5 w-5" style={{ color: theme.accentColor }} />
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-extrabold font-mono truncate max-w-[220px]">{file.name}</h4>
+                          <span className={`text-[10px] font-mono ${theme.isLight ? "text-[#666666]" : "text-[#AAAAAA]"}`}>
+                            Format: {file.format} • Size: {file.size}
+                          </span>
+                        </div>
+                      </div>
+                      <a
+                        href={file.path}
+                        download={file.name}
+                        className="px-3 py-1.5 rounded-xl font-mono text-xs font-bold text-white shadow flex items-center gap-1.5 transition-all cursor-pointer border"
+                        style={{ backgroundColor: theme.accentColor, borderColor: theme.accentColor }}
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                        <span>Download</span>
+                      </a>
+                    </div>
+                    <p className={`text-xs font-mono leading-relaxed ${theme.isLight ? "text-[#444444]" : "text-[#CCCCCC]"}`}>
+                      {file.description}
+                    </p>
+                    <div className="pt-2 border-t flex flex-wrap items-center justify-between gap-2 text-[10px] font-mono" style={{ borderColor: theme.isLight ? "#E5E5E5" : "#2E2E2E" }}>
+                      <div className="flex items-center gap-2">
+                        {file.htmlPath && (
+                          <button
+                            type="button"
+                            onClick={() => setPreviewHtmlDoc({ title: file.name, htmlPath: withDocParams(file.htmlPath), rawPath: file.path })}
+                            className="px-2.5 py-1 rounded-lg font-bold flex items-center gap-1 transition-all cursor-pointer border"
+                            style={{
+                              backgroundColor: `${theme.accentColor}18`,
+                              borderColor: `${theme.accentColor}40`,
+                              color: theme.textColorCode
+                            }}
+                          >
+                            <span>🌐 View HTML Page</span>
+                          </button>
+                        )}
+                        {file.htmlPath && (
+                          <a
+                            href={withDocParams(file.htmlPath)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="hover:underline flex items-center gap-1 opacity-80 hover:opacity-100"
+                            style={{ color: theme.textColorCode }}
+                            title="Open HTML guide in a new tab"
+                          >
+                            <span>Open Tab</span>
+                            <ExternalLink className="h-3 w-3" />
+                          </a>
+                        )}
+                      </div>
+
+                      <a href={file.path} target="_blank" rel="noopener noreferrer" className="hover:underline flex items-center gap-1 opacity-70 hover:opacity-100" style={{ color: theme.textColorCode }}>
+                        <span>View Raw .txt</span>
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 2: INTERACTIVE HTML PAGES */}
+          {activeTab === "html" && (
+            <div className="space-y-4 flex flex-col h-full">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  {htmlPages.map((doc, idx) => (
+                    <button
+                      key={doc.htmlPath}
+                      type="button"
+                      onClick={() => setActiveHtmlDocIndex(idx)}
+                      className={`px-3.5 py-2 rounded-xl text-xs font-mono font-bold border transition-all cursor-pointer ${
+                        activeHtmlDocIndex === idx ? "text-white shadow" : ""
+                      }`}
+                      style={
+                        activeHtmlDocIndex === idx
+                          ? { backgroundColor: theme.accentColor, borderColor: theme.accentColor }
+                          : {
+                              backgroundColor: theme.isLight ? "#F5F5F5" : "#1A1A1A",
+                              borderColor: theme.isLight ? "#E5E5E5" : "#2E2E2E",
+                              color: theme.textColorCode,
+                            }
+                      }
+                    >
+                      {doc.title}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <a
+                    href={withDocParams(htmlPages[activeHtmlDocIndex].htmlPath)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1.5 rounded-xl font-mono text-xs font-bold text-white shadow flex items-center gap-1.5 border"
+                    style={{ backgroundColor: theme.accentColor, borderColor: theme.accentColor }}
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    <span>Open in New Tab</span>
+                  </a>
+                  <a
+                    href={htmlPages[activeHtmlDocIndex].rawPath}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`px-3 py-1.5 rounded-xl font-mono text-xs font-bold border ${
+                      theme.isLight ? "bg-[#F5F5F5] border-[#E5E5E5]" : "bg-[#1F1F1F] border-[#2E2E2E]"
+                    }`}
+                    style={{ color: theme.textColorCode }}
+                  >
+                    Raw .TXT
+                  </a>
+                </div>
+              </div>
+
+              <p className={`text-xs font-mono ${theme.isLight ? "text-[#444444]" : "text-[#BDBDBD]"}`}>
+                {htmlPages[activeHtmlDocIndex].subtitle}
+              </p>
+
+              <div
+                className={`w-full h-[54vh] min-h-[380px] rounded-2xl overflow-hidden border ${
+                  theme.isLight ? "bg-[#FAFAFA] border-[#E5E5E5]" : "bg-[#0d0e12] border-[#2E2E2E]"
+                }`}
+              >
+                <iframe
+                  key={`${htmlPages[activeHtmlDocIndex].htmlPath}-${docThemeParam}-${docBrandParam}`}
+                  src={withDocParams(htmlPages[activeHtmlDocIndex].htmlPath)}
+                  title={htmlPages[activeHtmlDocIndex].title}
+                  className="w-full h-full border-0"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* TAB 2: BUTTONS & CONTROLS DICTIONARY */}
+          {activeTab === "dictionary" && (
+            <div className="space-y-4">
+              {/* Search Bar */}
+              <div className="relative">
+                <Search className="absolute left-3.5 top-3 h-4 w-4" style={{ color: theme.accentColor }} />
+                <input
+                  type="text"
+                  placeholder="Search any button, dropdown, input box, or control setting..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className={`w-full rounded-2xl py-2.5 pl-10 pr-10 text-xs font-mono border focus:outline-none transition-all ${
+                    theme.isLight ? "bg-[#F5F5F5] border-[#E5E5E5] text-[#000000]" : "bg-[#1A1A1A] border-[#2E2E2E] text-white"
+                  }`}
+                  style={{ borderColor: searchQuery ? theme.accentColor : undefined }}
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-3 top-2.5 text-xs font-mono font-bold cursor-pointer"
+                    style={{ color: theme.textColorCode }}
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+
+              {/* Controls Dictionary List */}
+              <div className="space-y-3">
+                {filteredControls.map((control, idx) => (
+                  <div
+                    key={idx}
+                    className={`p-4 rounded-2xl border space-y-2 transition-all hover:border-white/40 ${
+                      theme.isLight ? "bg-[#F9F9F9] border-[#E5E5E5]" : "bg-[#181818] border-[#2A2A2A]"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold font-mono px-2.5 py-0.5 rounded-full border shadow-sm" style={{ backgroundColor: `${theme.accentColor}20`, color: theme.textColorCode, borderColor: `${theme.accentColor}50` }}>
+                          {control.category}
+                        </span>
+                        <h4 className="text-xs font-extrabold font-mono">{control.name}</h4>
+                      </div>
+                      <span className={`text-[10px] font-mono ${theme.isLight ? "text-[#666666]" : "text-[#AAAAAA]"}`}>
+                        {control.action}
+                      </span>
+                    </div>
+
+                    <p className={`text-xs font-mono leading-relaxed ${theme.isLight ? "text-[#333333]" : "text-[#DDDDDD]"}`}>
+                      <strong>Purpose:</strong> {control.purpose}
+                    </p>
+
+                    <p className={`text-xs font-mono leading-relaxed ${theme.isLight ? "text-[#555555]" : "text-[#BBBBBB]"}`}>
+                      <strong style={{ color: theme.textColorCode }}>Best Setting / Selection:</strong> {control.bestSetting}
+                    </p>
+                  </div>
+                ))}
+                {filteredControls.length === 0 && (
+                  <div className="text-center py-8 font-mono text-xs opacity-60">
+                    No controls match your search "{searchQuery}"
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 3: PROMPTING & COMMAND MASTERCLASS */}
+          {activeTab === "prompts" && (
+            <div className="space-y-6">
+              <div className={`p-4 rounded-2xl border space-y-2 ${theme.isLight ? "bg-[#F5F5F5] border-[#E5E5E5]" : "bg-[#1A1A1A] border-[#2E2E2E]"}`}>
+                <h3 className="text-sm font-bold font-mono flex items-center gap-2" style={{ color: theme.textColorCode }}>
+                  <Terminal className="h-4 w-4" style={{ color: theme.accentColor }} />
+                  <span>How to Write Prompts & Commands for 10/10 Script Results</span>
+                </h3>
+                <p className={`text-xs font-mono leading-relaxed ${theme.isLight ? "text-[#444444]" : "text-[#CCCCCC]"}`}>
+                  You do NOT need perfect grammar or formal formatting in the raw script input box. What matters most is <strong>Context</strong>, <strong>Angle</strong>, and <strong>Target Audience</strong>.
+                </p>
+              </div>
+
+              {/* Examples Cards */}
+              <div className="space-y-4">
+                {promptExamples.map((item, index) => (
+                  <div
+                    key={index}
+                    className={`p-5 rounded-2xl border space-y-3 ${
+                      theme.isLight ? "bg-[#F9F9F9] border-[#E5E5E5]" : "bg-[#181818] border-[#2A2A2A]"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-extrabold font-mono flex items-center gap-2" style={{ color: theme.textColorCode }}>
+                        <Sparkles className="h-4 w-4" style={{ color: theme.accentColor }} />
+                        <span>{item.title}</span>
+                      </h4>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(item.rawInput);
+                          setCopiedIndex(index);
+                          setTimeout(() => setCopiedIndex(null), 2000);
+                        }}
+                        className={`px-2.5 py-1 rounded-xl text-[10px] font-mono font-bold border transition-all cursor-pointer flex items-center gap-1 ${
+                          copiedIndex === index
+                            ? "bg-green-600 text-white border-green-600"
+                            : (theme.isLight ? "bg-white border-[#E5E5E5]" : "bg-[#222222] border-[#333333]")
+                        }`}
+                      >
+                        {copiedIndex === index ? (
+                          <>
+                            <CheckCircle2 className="h-3 w-3" />
+                            <span>Copied Prompt</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="h-3 w-3" />
+                            <span>Copy Input Prompt</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    <div className={`p-3 rounded-xl border text-xs font-mono font-bold ${theme.isLight ? "bg-white border-[#E5E5E5] text-[#111111]" : "bg-[#111111] border-[#2E2E2E] text-white"}`}>
+                      "{item.rawInput}"
+                    </div>
+
+                    <div className="text-xs font-mono space-y-1">
+                      <p><strong style={{ color: theme.textColorCode }}>Recommended Configuration:</strong> {item.recommendedSettings}</p>
+                      <p className={`opacity-80 ${theme.isLight ? "text-[#444444]" : "text-[#CCCCCC]"}`}><strong>Output Structure:</strong> {item.outputStructure}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4: BEST SELECTION MATRIX */}
+          {activeTab === "matrix" && (
+            <div className="space-y-4">
+              <div className={`p-4 rounded-2xl border space-y-2 ${theme.isLight ? "bg-[#F5F5F5] border-[#E5E5E5]" : "bg-[#1A1A1A] border-[#2E2E2E]"}`}>
+                <h3 className="text-sm font-bold font-mono flex items-center gap-2" style={{ color: theme.textColorCode }}>
+                  <Zap className="h-4 w-4" style={{ color: theme.accentColor }} />
+                  <span>Platform Selection Cheat Sheet</span>
+                </h3>
+                <p className={`text-xs font-mono leading-relaxed ${theme.isLight ? "text-[#444444]" : "text-[#CCCCCC]"}`}>
+                  Use these optimal preset selections for your target video platform:
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className={`p-5 rounded-2xl border space-y-2 ${theme.isLight ? "bg-[#F9F9F9] border-[#E5E5E5]" : "bg-[#181818] border-[#2A2A2A]"}`}>
+                  <h4 className="text-xs font-bold font-mono flex items-center gap-2" style={{ color: theme.textColorCode }}>
+                    <Video className="h-4 w-4" style={{ color: theme.accentColor }} />
+                    <span>YouTube Shorts / TikTok / Reels</span>
+                  </h4>
+                  <ul className="text-xs font-mono space-y-1.5 opacity-90 leading-relaxed">
+                    <li>• <strong>Transformation:</strong> Shorts / Reels Script (60s)</li>
+                    <li>• <strong>Word Count:</strong> 120 - 150 words</li>
+                    <li>• <strong>Tone:</strong> Fast Paced Explainer</li>
+                    <li>• <strong>Voice Persona:</strong> Energetic Hype Creator</li>
+                    <li>• <strong>Hooks & CTA:</strong> Always Enabled (ON)</li>
+                  </ul>
+                </div>
+
+                <div className={`p-5 rounded-2xl border space-y-2 ${theme.isLight ? "bg-[#F9F9F9] border-[#E5E5E5]" : "bg-[#181818] border-[#2A2A2A]"}`}>
+                  <h4 className="text-xs font-bold font-mono flex items-center gap-2" style={{ color: theme.textColorCode }}>
+                    <Video className="h-4 w-4" style={{ color: theme.secondaryAccentColor }} />
+                    <span>Long-Form YouTube Explainer (5-10 Min)</span>
+                  </h4>
+                  <ul className="text-xs font-mono space-y-1.5 opacity-90 leading-relaxed">
+                    <li>• <strong>Transformation:</strong> Explainer Video (2-3 Min) / Polisher</li>
+                    <li>• <strong>Word Count:</strong> 600 - 1200 words</li>
+                    <li>• <strong>Tone:</strong> Science-Based / Professional Clear</li>
+                    <li>• <strong>Voice Persona:</strong> Professional Male/Female</li>
+                    <li>• <strong>Fast Lite Mode:</strong> Disabled (Keep Visual B-Roll Notes)</li>
+                  </ul>
+                </div>
+
+                <div className={`p-5 rounded-2xl border space-y-2 ${theme.isLight ? "bg-[#F9F9F9] border-[#E5E5E5]" : "bg-[#181818] border-[#2A2A2A]"}`}>
+                  <h4 className="text-xs font-bold font-mono flex items-center gap-2" style={{ color: theme.textColorCode }}>
+                    <Video className="h-4 w-4" style={{ color: theme.accentColor }} />
+                    <span>Urdu / Hindi Cultural Vlogs</span>
+                  </h4>
+                  <ul className="text-xs font-mono space-y-1.5 opacity-90 leading-relaxed">
+                    <li>• <strong>Transformation:</strong> Roman Urdu / Hindi Creator</li>
+                    <li>• <strong>Tone:</strong> Warm Friendly Conversational or Food Blogger</li>
+                    <li>• <strong>Greeting:</strong> Assalamualaikum / Hey Everyone</li>
+                    <li>• <strong>Audience:</strong> Pakistan / India</li>
+                  </ul>
+                </div>
+
+                <div className={`p-5 rounded-2xl border space-y-2 ${theme.isLight ? "bg-[#F9F9F9] border-[#E5E5E5]" : "bg-[#181818] border-[#2A2A2A]"}`}>
+                  <h4 className="text-xs font-bold font-mono flex items-center gap-2" style={{ color: theme.textColorCode }}>
+                    <Video className="h-4 w-4" style={{ color: theme.secondaryAccentColor }} />
+                    <span>Crime & History Documentaries</span>
+                  </h4>
+                  <ul className="text-xs font-mono space-y-1.5 opacity-90 leading-relaxed">
+                    <li>• <strong>Transformation:</strong> Documentary Style</li>
+                    <li>• <strong>Word Count:</strong> 800 - 1500 words</li>
+                    <li>• <strong>Tone:</strong> Dramatic Narrative</li>
+                    <li>• <strong>Voice Persona:</strong> Deep Documentary Narrator</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Modal Footer */}
+        <div
+          className={`px-6 py-3 border-t flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-mono ${
+            theme.isLight ? "bg-[#F7F7F7] border-[#E5E5E5]" : "bg-[#1A1A1A] border-[#2A2A2A]"
+          }`}
+        >
+          <span className="opacity-80">
+            Need help? Click <strong>Download All (.TXT Bundle)</strong> to get complete offline text manuals.
+          </span>
+          <button
+            onClick={downloadAllInOneFile}
+            className="px-4 py-2 rounded-xl font-bold text-white shadow flex items-center gap-1.5 cursor-pointer border shrink-0"
+            style={{ backgroundColor: theme.accentColor, borderColor: theme.accentColor }}
+          >
+            <Download className="h-4 w-4" />
+            <span>Download All Text Manuals</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Formatted HTML Document Fullscreen Preview Modal */}
+      {previewHtmlDoc && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-fade-in">
+          <div
+            className={`w-full max-w-6xl h-[92vh] rounded-3xl shadow-2xl flex flex-col border overflow-hidden ${
+              theme.isLight ? "bg-[#FFFFFF] border-[#E5E5E5]" : "bg-[#141414] border-[#2A2A2A]"
+            }`}
+          >
+            {/* Header */}
+            <div
+              className={`px-5 py-3 border-b flex items-center justify-between gap-3 ${
+                theme.isLight ? "bg-[#F5F5F5] border-[#E5E5E5]" : "bg-[#1A1A1A] border-[#2E2E2E]"
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <span className="text-xs px-2 py-0.5 rounded-full font-bold uppercase font-mono text-white shadow" style={{ backgroundColor: theme.accentColor }}>
+                  HTML Page Preview
+                </span>
+                <h3 className="text-xs sm:text-sm font-bold font-mono truncate max-w-md" style={{ color: theme.textColorCode }}>
+                  {previewHtmlDoc.title}
+                </h3>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <a
+                  href={previewHtmlDoc.htmlPath}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1.5 rounded-xl font-mono text-xs font-bold text-white shadow flex items-center gap-1.5 cursor-pointer border"
+                  style={{ backgroundColor: theme.accentColor, borderColor: theme.accentColor }}
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Open in New Tab</span>
+                </a>
+                <a
+                  href={previewHtmlDoc.rawPath}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`px-3 py-1.5 rounded-xl font-mono text-xs font-bold border transition-colors ${
+                    theme.isLight ? "border-gray-300 text-gray-700 hover:bg-gray-100" : "border-white/10 text-gray-300 hover:bg-white/5"
+                  }`}
+                >
+                  View Raw .txt
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setPreviewHtmlDoc(null)}
+                  className={`p-1.5 rounded-xl border transition-colors cursor-pointer ${
+                    theme.isLight ? "border-gray-300 text-gray-600 hover:bg-gray-200" : "border-white/10 text-gray-400 hover:bg-white/10"
+                  }`}
+                  title="Close preview"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Iframe View */}
+            <div className={`flex-1 w-full h-full ${theme.isLight ? "bg-[#FAFAFA]" : "bg-[#0d0e12]"}`}>
+              <iframe
+                src={previewHtmlDoc.htmlPath}
+                title={previewHtmlDoc.title}
+                className="w-full h-full border-0"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};

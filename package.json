@@ -1,0 +1,149 @@
+{
+  "name": "script-automation-studio",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Cross-platform desktop AI script rephrasing, storyboard prompt & production suite",
+  "author": "Muhammad Tehseen Irshad <support@monivisualpro.local>",
+  "homepage": "https://github.com/monivisualpro/Script-Automation-Studio",
+  "main": "electron/main.cjs",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx server.ts",
+    "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
+    "start": "node dist/server.cjs",
+    "clean": "rm -rf dist release server.js",
+    "lint": "tsc --noEmit",
+    "electron:start": "npm run build && electron .",
+    "dist:win": "npm run build && electron-builder --win --publish never",
+    "dist:mac": "npm run build && electron-builder --mac --publish never",
+    "dist:linux": "npm run build && electron-builder --linux --publish never",
+    "test": "tsx --test tests/*.test.ts"
+  },
+  "dependencies": {
+    "@google/genai": "^2.4.0",
+    "dotenv": "^17.2.3",
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.14",
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.14.0",
+    "@vitejs/plugin-react": "^5.0.4",
+    "autoprefixer": "^10.4.21",
+    "electron": "^45.4.1",
+    "electron-builder": "^26.18.0",
+    "esbuild": "^0.25.0",
+    "lucide-react": "^0.546.0",
+    "motion": "^12.23.24",
+    "react": "^19.0.1",
+    "react-dom": "^19.0.1",
+    "tailwindcss": "^4.1.14",
+    "tsx": "^4.21.0",
+    "typescript": "~5.8.2",
+    "vite": "^6.2.3"
+  },
+  "build": {
+    "appId": "com.monivisualpro.scriptautomationstudio",
+    "productName": "Script Automation Studio",
+    "asar": true,
+    "directories": {
+      "output": "release",
+      "buildResources": "build-resources"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json",
+      ".env.example",
+      "!dist/**/*.map",
+      "build-resources/icon.png"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build-resources/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "artifactName": "Script-Automation-Studio-Setup-${version}-win-${arch}.${ext}"
+    },
+    "portable": {
+      "artifactName": "Script-Automation-Studio-Portable-${version}-win-${arch}.${ext}"
+    },
+    "mac": {
+      "category": "public.app-category.video",
+      "icon": "build-resources/icon.icns",
+      "identity": null,
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        },
+        {
+          "target": "tar.gz",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "Script-Automation-Studio-${version}-mac-${arch}.${ext}"
+    },
+    "dmg": {
+      "sign": false
+    },
+    "linux": {
+      "category": "AudioVideo",
+      "maintainer": "Muhammad Tehseen Irshad <support@monivisualpro.local>",
+      "icon": "build-resources/icon.png",
+      "syncDesktopName": true,
+      "target": [
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "tar.xz",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "desktop": {
+        "entry": {
+          "Name": "Script Automation Studio",
+          "Comment": "Desktop AI Script Rephrasing & Storyboard Studio",
+          "Categories": "AudioVideo;Video;Utility;",
+          "StartupWMClass": "script-automation-studio"
+        }
+      },
+      "artifactName": "Script-Automation-Studio-${version}-linux-${arch}.${ext}"
+    }
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

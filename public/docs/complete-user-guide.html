@@ -1,0 +1,812 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>Complete User Guide & Tutorial | Script Automation Studio</title>
+    <meta name="description" content="Official User Manual and Complete Tutorial for Script Automation Studio. Comprehensive guide to every button, setting, prompt structure, and selection matrix." />
+    <meta name="author" content="Muhammad Tehseen Irshad" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Noto+Nastaliq+Urdu:wght@400;700&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --accent: #ff073a;
+        --secondary-accent: #2774fc;
+        --bg-page: #0d0e12;
+        --bg-header: rgba(13, 14, 18, 0.92);
+        --bg-card: rgba(22, 24, 33, 0.88);
+        --bg-subtle: rgba(255, 255, 255, 0.04);
+        --bg-code: rgba(0, 0, 0, 0.45);
+        --border-color: rgba(255, 255, 255, 0.1);
+        --text-primary: #ffffff;
+        --text-secondary: #d1d5db;
+        --text-muted: #9ca3af;
+        --shadow-card: 0 12px 32px rgba(0, 0, 0, 0.35);
+      }
+
+      [data-brand="blue"] {
+        --accent: #2774fc;
+        --secondary-accent: #ff073a;
+      }
+
+      [data-brand="red"] {
+        --accent: #ff073a;
+        --secondary-accent: #2774fc;
+      }
+
+      [data-theme="day"] {
+        --bg-page: #fafafa;
+        --bg-header: rgba(255, 255, 255, 0.94);
+        --bg-card: #ffffff;
+        --bg-subtle: #f4f4f5;
+        --bg-code: #f1f5f9;
+        --border-color: #e5e7eb;
+        --text-primary: #000000;
+        --text-secondary: #1f2937;
+        --text-muted: #4b5563;
+        --shadow-card: 0 8px 24px rgba(0, 0, 0, 0.06);
+      }
+
+      *, *::before, *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        min-height: 100vh;
+        font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
+        background-color: var(--bg-page);
+        color: var(--text-primary);
+        line-height: 1.65;
+        transition: background-color 0.2s ease, color 0.2s ease;
+      }
+
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      .font-mono {
+        font-family: 'Fira Code', ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+
+      .site-header {
+        position: sticky;
+        top: 0;
+        z-index: 50;
+        background: var(--bg-header);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border-bottom: 1px solid var(--border-color);
+      }
+
+      .header-inner {
+        max-width: 1280px;
+        margin: 0 auto;
+        padding: 12px 20px;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .brand-link {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .brand-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 12px;
+        background-color: var(--accent);
+        color: #ffffff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+        flex-shrink: 0;
+      }
+
+      .brand-title {
+        font-size: 13px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--text-primary);
+      }
+
+      .badge-accent {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background-color: var(--accent);
+        color: #ffffff;
+        font-size: 10px;
+        font-weight: 700;
+      }
+
+      .brand-subtitle {
+        font-size: 11px;
+        color: var(--text-muted);
+      }
+
+      .doc-tabs {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+
+      .doc-tab {
+        padding: 7px 12px;
+        border-radius: 10px;
+        font-size: 11px;
+        font-weight: 700;
+        border: 1px solid var(--border-color);
+        background: var(--bg-subtle);
+        color: var(--text-primary);
+        transition: all 0.2s ease;
+        white-space: nowrap;
+      }
+
+      .doc-tab:hover {
+        border-color: var(--accent);
+      }
+
+      .doc-tab.active {
+        background-color: var(--accent);
+        border-color: var(--accent);
+        color: #ffffff;
+      }
+
+      .header-controls {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .switcher-group {
+        display: flex;
+        align-items: center;
+        padding: 3px;
+        border-radius: 12px;
+        border: 1px solid var(--border-color);
+        background: var(--bg-subtle);
+        gap: 4px;
+      }
+
+      .ctrl-btn {
+        border: 1px solid transparent;
+        background: transparent;
+        color: var(--text-muted);
+        padding: 5px 9px;
+        border-radius: 8px;
+        font-size: 11px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.15s ease;
+      }
+
+      .ctrl-btn.active-red {
+        background: #ff073a;
+        color: #ffffff;
+      }
+
+      .ctrl-btn.active-blue {
+        background: #2774fc;
+        color: #ffffff;
+      }
+
+      .theme-toggle {
+        padding: 6px 11px;
+        border-radius: 12px;
+        border: 1px solid var(--border-color);
+        background: var(--bg-subtle);
+        color: var(--text-primary);
+        font-size: 11px;
+        font-weight: 700;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .btn-primary {
+        padding: 8px 14px;
+        border-radius: 12px;
+        background-color: var(--accent);
+        color: #ffffff;
+        font-size: 12px;
+        font-weight: 700;
+        border: 1px solid var(--accent);
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        cursor: pointer;
+        transition: opacity 0.2s ease;
+      }
+
+      .btn-primary:hover {
+        opacity: 0.9;
+      }
+
+      .btn-secondary {
+        padding: 8px 14px;
+        border-radius: 12px;
+        background-color: var(--bg-subtle);
+        color: var(--text-primary);
+        font-size: 12px;
+        font-weight: 700;
+        border: 1px solid var(--border-color);
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        cursor: pointer;
+      }
+
+      .btn-secondary:hover {
+        border-color: var(--accent);
+      }
+
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 28px 20px 48px;
+        display: flex;
+        flex-direction: column;
+        gap: 28px;
+      }
+
+      .glass-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 24px;
+        padding: 28px;
+        box-shadow: var(--shadow-card);
+      }
+
+      .hero-card {
+        position: relative;
+        overflow: hidden;
+      }
+
+      .hero-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 5px 12px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 700;
+        border: 1px solid var(--border-color);
+        background: var(--bg-subtle);
+        color: var(--text-primary);
+        margin-bottom: 14px;
+      }
+
+      .pulse-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background-color: var(--accent);
+      }
+
+      h1 {
+        font-size: clamp(1.6rem, 3vw, 2.35rem);
+        font-weight: 800;
+        line-height: 1.2;
+        margin-bottom: 12px;
+        color: var(--text-primary);
+      }
+
+      .lead {
+        font-size: 15px;
+        color: var(--text-secondary);
+        max-width: 760px;
+        margin-bottom: 20px;
+      }
+
+      .action-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .toc-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 10px;
+        margin-top: 12px;
+      }
+
+      .toc-link {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 12px;
+        border-radius: 12px;
+        background: var(--bg-subtle);
+        border: 1px solid transparent;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-primary);
+        transition: border-color 0.15s ease;
+      }
+
+      .toc-link:hover {
+        border-color: var(--accent);
+      }
+
+      .section-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding-bottom: 16px;
+        margin-bottom: 18px;
+        border-bottom: 1px solid var(--border-color);
+      }
+
+      .section-num {
+        width: 34px;
+        height: 34px;
+        border-radius: 10px;
+        background-color: var(--accent);
+        color: #ffffff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        font-weight: 800;
+        flex-shrink: 0;
+      }
+
+      .section-title {
+        font-size: 20px;
+        font-weight: 800;
+        color: var(--text-primary);
+      }
+
+      .section-sub {
+        font-size: 12px;
+        color: var(--text-muted);
+      }
+
+      .grid-3 {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 14px;
+        margin-top: 16px;
+      }
+
+      .grid-2 {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+        gap: 14px;
+      }
+
+      .sub-card {
+        padding: 16px;
+        border-radius: 16px;
+        background: var(--bg-subtle);
+        border: 1px solid var(--border-color);
+      }
+
+      .sub-card h3, .sub-card h4 {
+        font-size: 13px;
+        font-weight: 800;
+        color: var(--text-primary);
+        margin-bottom: 6px;
+      }
+
+      .sub-card p, .sub-card li {
+        font-size: 12.5px;
+        color: var(--text-secondary);
+      }
+
+      .item-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 8px;
+      }
+
+      .tag-badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 6px;
+        background-color: var(--accent);
+        color: #ffffff;
+        font-size: 10px;
+        font-weight: 700;
+        margin-right: 6px;
+      }
+
+      .code-block {
+        padding: 12px 14px;
+        border-radius: 12px;
+        background: var(--bg-code);
+        border: 1px solid var(--border-color);
+        font-size: 12px;
+        color: var(--text-primary);
+        margin: 10px 0;
+        white-space: pre-wrap;
+      }
+
+      .table-wrap {
+        overflow-x: auto;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+      }
+
+      th, td {
+        text-align: left;
+        padding: 12px;
+        border-bottom: 1px solid var(--border-color);
+      }
+
+      th {
+        color: var(--text-muted);
+        font-weight: 700;
+        text-transform: uppercase;
+        font-size: 11px;
+      }
+
+      td {
+        color: var(--text-secondary);
+      }
+
+      td.strong-cell {
+        color: var(--text-primary);
+        font-weight: 700;
+      }
+
+      footer {
+        border-top: 1px solid var(--border-color);
+        padding: 24px 20px;
+        text-align: center;
+        font-size: 12px;
+        color: var(--text-muted);
+      }
+
+      @media print {
+        .site-header, .action-row { display: none; }
+        body { background: #ffffff; color: #000000; }
+      }
+    </style>
+  </head>
+  <body data-brand="red" data-theme="night">
+    <header class="site-header">
+      <div class="header-inner">
+        <a href="/" class="brand-link">
+          <div class="brand-icon">
+            <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+          </div>
+          <div>
+            <div class="brand-title font-mono">
+              <span>Script Automation Studio</span>
+              <span class="badge-accent">Docs</span>
+            </div>
+            <div class="brand-subtitle font-mono">By Muhammad Tehseen Irshad</div>
+          </div>
+        </a>
+
+        <nav class="doc-tabs font-mono" aria-label="Documentation Pages">
+          <a href="/docs/complete-user-guide.html" class="doc-tab active" data-doc-link>User Guide</a>
+          <a href="/docs/controls-reference.html" class="doc-tab" data-doc-link>Controls Reference</a>
+          <a href="/docs/prompt-masterclass.html" class="doc-tab" data-doc-link>Prompt Masterclass</a>
+        </nav>
+
+        <div class="header-controls font-mono">
+          <div class="switcher-group">
+            <button id="btnBrandRed" type="button" onclick="setBrand('red')" class="ctrl-btn active-red">Red</button>
+            <button id="btnBrandBlue" type="button" onclick="setBrand('blue')" class="ctrl-btn">Blue</button>
+          </div>
+          <button id="btnThemeToggle" type="button" onclick="toggleTheme()" class="theme-toggle">
+            <span id="themeIcon">☀️</span>
+            <span id="themeLabel">Day</span>
+          </button>
+          <a href="/" class="btn-primary">Open Studio &rarr;</a>
+        </div>
+      </div>
+    </header>
+
+    <main class="container">
+      <section class="glass-card hero-card">
+        <div class="hero-pill font-mono">
+          <span>User Manual &amp; Tutorial Center</span>
+        </div>
+        <h1>Script Automation Studio — Complete User Guide &amp; Master Tutorial</h1>
+        <p class="lead">
+          Comprehensive manual explaining every button, input box, configuration dropdown, tone setting, multi-provider AI setup, prompting command, and selection matrix inside the studio.
+        </p>
+        <div class="action-row font-mono">
+          <a href="/docs/COMPLETE_USER_GUIDE_TUTORIAL.txt" download="COMPLETE_USER_GUIDE_TUTORIAL.txt" class="btn-primary">Download Raw .TXT File</a>
+          <a href="/docs/COMPLETE_USER_GUIDE_TUTORIAL.txt" target="_blank" class="btn-secondary">View Plain Text</a>
+          <button type="button" onclick="window.print()" class="btn-secondary">Print / Save PDF</button>
+        </div>
+      </section>
+
+      <nav class="glass-card">
+        <h3 class="font-mono" style="font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-muted);">
+          Table of Contents
+        </h3>
+        <div class="toc-grid font-mono">
+          <a href="#overview" class="toc-link"><span>01.</span> Platform Overview &amp; Multi-Provider AI</a>
+          <a href="#controls" class="toc-link"><span>02.</span> Core Controls &amp; Input Box Dictionary</a>
+          <a href="#transformations" class="toc-link"><span>03.</span> Transformation Modes &amp; Languages</a>
+          <a href="#tones" class="toc-link"><span>04.</span> 50+ Tones &amp; Literature Styles</a>
+          <a href="#prompting" class="toc-link"><span>05.</span> Prompting &amp; Command Masterclass</a>
+          <a href="#matrix" class="toc-link"><span>06.</span> Best Selection Matrix by Platform</a>
+        </div>
+      </nav>
+
+      <section id="overview" class="glass-card">
+        <div class="section-header">
+          <span class="section-num font-mono">01</span>
+          <div>
+            <h2 class="section-title">Platform Overview &amp; Multi-Provider Architecture</h2>
+            <p class="section-sub font-mono">Engineered for video creators, educators, editors, and digital marketers</p>
+          </div>
+        </div>
+        <p style="font-size:14px; color:var(--text-secondary);">
+          <strong>Script Automation Studio</strong> transforms raw ideas, fragmented thoughts, voice transcripts, or YouTube URLs into polished, high-retention video scripts. It supports <strong>Google Gemini, OpenAI, Anthropic Claude, and Local LLMs (LM Studio / Ollama / Bionic LLM Studio)</strong>, alongside scene B-roll direction, high-CTR YouTube metadata, and thumbnail prompt generation.
+        </p>
+        <div class="grid-3">
+          <div class="sub-card">
+            <h3 class="font-mono">Retention First</h3>
+            <p>Strict opening hook triggers, pattern interrupts, and concise narrative pacing tailored to your chosen age bracket.</p>
+          </div>
+          <div class="sub-card">
+            <h3 class="font-mono">Production Ready</h3>
+            <p>Generates scene-by-scene camera prompts, duration-based shot calculations, and high-CTR YouTube metadata suites.</p>
+          </div>
+          <div class="sub-card">
+            <h3 class="font-mono">40+ Languages &amp; Voices</h3>
+            <p>Native Urdu Nastaliq, Roman Urdu, Hindi (Urdu Accent), Arabic, Spanish, French, German, English, and more.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="controls" class="glass-card">
+        <div class="section-header">
+          <span class="section-num font-mono">02</span>
+          <div>
+            <h2 class="section-title">Core Controls &amp; Input Box Dictionary</h2>
+            <p class="section-sub font-mono">Detailed breakdown of every input, button, and parameter</p>
+          </div>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:12px;">
+          <div class="sub-card">
+            <div class="item-row font-mono">
+              <h4><span class="tag-badge">BOX</span> Raw Source Script / Topic / Video URL</h4>
+              <span style="font-size:11px; color:var(--text-muted);">Top Workspace</span>
+            </div>
+            <p>Enter a topic prompt, extract a YouTube video transcript via URL, upload a `.txt` / `.pdf` file, or dictate directly with Voice Input. Rough bullet points or stream-of-consciousness drafts work great.</p>
+          </div>
+          <div class="sub-card">
+            <div class="item-row font-mono">
+              <h4><span class="tag-badge">KEY</span> Personal AI Provider &amp; Key Status</h4>
+              <span style="font-size:11px; color:var(--text-muted);">Top Navigation Header</span>
+            </div>
+            <p>Choose your preferred AI backend (Google Gemini, OpenAI, Anthropic Claude, Built-In Local Engine, or LM Studio / Ollama). Keys are stored locally on your machine in `.env` or local desktop settings.</p>
+          </div>
+          <div class="sub-card">
+            <div class="item-row font-mono">
+              <h4><span class="tag-badge">SIDEBAR</span> Domain, Target Audience &amp; Regions</h4>
+              <span style="font-size:11px; color:var(--text-muted);">Left Sidebar</span>
+            </div>
+            <p>Grounds the script in 50+ SEO niches, adapts vocabulary across 8 age brackets (All Ages through Elders 80), and localizes cultural idioms and currencies for your chosen target countries.</p>
+          </div>
+          <div class="sub-card">
+            <div class="item-row font-mono">
+              <h4><span class="tag-badge">TOGGLE</span> Hooks, Body &amp; Conclusion + Fast Lite Mood</h4>
+              <span style="font-size:11px; color:var(--text-muted);">Generation Console</span>
+            </div>
+            <p>Enforces the 3-part retention structure (0–5s Hook, Core Body, Call-To-Action) and lets you toggle Fast Lite Mood for streamlined voiceover-only output.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="transformations" class="glass-card">
+        <div class="section-header">
+          <span class="section-num font-mono">03</span>
+          <div>
+            <h2 class="section-title">Transformation Modes &amp; Languages</h2>
+            <p class="section-sub font-mono">Instant multi-language rephrasing and cultural voiceover adaptation</p>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="sub-card">
+            <h4>Single-Language Output</h4>
+            <p>Generates your polished script strictly in the single language selected via <strong>Transformation Option</strong> (including <strong>Hindi (Urdu Wording/Accent)</strong>, <strong>Urdu Roman</strong>, <strong>Urdu Nastaliq (RTL)</strong>, and <strong>English</strong>), keeping generation fast and token-efficient.</p>
+          </div>
+          <div class="sub-card">
+            <h4>40+ Global Languages</h4>
+            <p>Use the searchable Transformation Option dropdown in the sidebar for Arabic, Farsi, Turkish, Spanish, French, German, Japanese, Korean, Portuguese, and regional languages.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="tones" class="glass-card">
+        <div class="section-header">
+          <span class="section-num font-mono">04</span>
+          <div>
+            <h2 class="section-title">50+ Tones &amp; Literature Styles</h2>
+            <p class="section-sub font-mono">Shape emotional pacing, authority, and storytelling rhythm</p>
+          </div>
+        </div>
+        <div class="grid-3">
+          <div class="sub-card">
+            <h4>Explainer &amp; Educational</h4>
+            <p>Fast Paced Explainer, Science-Based Clear, Academic Lecture, Step-by-Step Tutorial, Simplifier for Beginners.</p>
+          </div>
+          <div class="sub-card">
+            <h4>Documentary &amp; Dramatic</h4>
+            <p>Dramatic Narrative, True Crime Suspense, Historical Chronicle, Investigative Journalist, Cinematic Monologue.</p>
+          </div>
+          <div class="sub-card">
+            <h4>Conversational &amp; Cultural</h4>
+            <p>Warm Friendly Vlog, Islamic Spiritual Reminder, High-Energy Tech Reviewer, Motivational Mentor, Storytelling Podcast.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="prompting" class="glass-card">
+        <div class="section-header">
+          <span class="section-num font-mono">05</span>
+          <div>
+            <h2 class="section-title">Prompting &amp; Command Masterclass</h2>
+            <p class="section-sub font-mono">How to write inputs that generate 10/10 viral outputs</p>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="sub-card">
+            <h4 class="font-mono">Template A: Tech Shorts / Reels</h4>
+            <div class="code-block font-mono">"Topic: Why Quantum Computers will make regular encryption obsolete in 2026.
+Tone: Fast Paced Explainer
+Target: 140 words, high curiosity hook."</div>
+            <p><strong>Expected Output:</strong> High-energy opening, simple qubit metaphor, visual cues, subscribe CTA.</p>
+          </div>
+          <div class="sub-card">
+            <h4 class="font-mono">Template B: Mystery / Documentary</h4>
+            <div class="code-block font-mono">"Topic: The mystery of flight MH370 radar anomaly.
+Tone: Dramatic Narrative
+Voice Persona: Male / Deep Documentary
+Length: 800 words."</div>
+            <p><strong>Expected Output:</strong> Atmospheric pacing, suspense pauses, radar timestamps, cinematic storyboard readiness.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="matrix" class="glass-card">
+        <div class="section-header">
+          <span class="section-num font-mono">06</span>
+          <div>
+            <h2 class="section-title">Best Selection Matrix by Platform</h2>
+            <p class="section-sub font-mono">Recommended settings for maximum CTR &amp; audience retention</p>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="font-mono">
+            <thead>
+              <tr>
+                <th>Platform / Goal</th>
+                <th>Transformation</th>
+                <th>Tone Setting</th>
+                <th>Word Count</th>
+                <th>Voice Persona</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="strong-cell">YouTube Shorts / Reels</td>
+                <td>Shorts (60s)</td>
+                <td>Fast Paced Explainer</td>
+                <td>120 - 180 words</td>
+                <td>Female / Male Energetic</td>
+              </tr>
+              <tr>
+                <td class="strong-cell">YouTube Long Explainer</td>
+                <td>English / Target Lang</td>
+                <td>Science-Based / Clear</td>
+                <td>600 - 1200 words</td>
+                <td>Professional Speaker</td>
+              </tr>
+              <tr>
+                <td class="strong-cell">Documentary / Story</td>
+                <td>Documentary Style</td>
+                <td>Dramatic Narrative</td>
+                <td>800 - 1500 words</td>
+                <td>Deep Narrator</td>
+              </tr>
+              <tr>
+                <td class="strong-cell">Urdu / Hindi Vlogs</td>
+                <td>Urdu Roman / Hindi</td>
+                <td>Warm Friendly / Vlogger</td>
+                <td>300 - 700 words</td>
+                <td>Warm Storyteller</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <footer class="font-mono">
+      <p>Script Automation Studio &bull; Created by Muhammad Tehseen Irshad</p>
+    </footer>
+
+    <script>
+      function updateDocLinks(theme, brand) {
+        var links = document.querySelectorAll('[data-doc-link]');
+        links.forEach(function (a) {
+          var base = a.getAttribute('href').split('?')[0];
+          a.setAttribute('href', base + '?theme=' + theme + '&brand=' + brand);
+        });
+      }
+
+      function setBrand(brand) {
+        var normalized = brand === 'blue' ? 'blue' : 'red';
+        document.body.setAttribute('data-brand', normalized);
+        var btnRed = document.getElementById('btnBrandRed');
+        var btnBlue = document.getElementById('btnBrandBlue');
+        if (btnRed && btnBlue) {
+          btnRed.className = normalized === 'red' ? 'ctrl-btn active-red' : 'ctrl-btn';
+          btnBlue.className = normalized === 'blue' ? 'ctrl-btn active-blue' : 'ctrl-btn';
+        }
+        try { localStorage.setItem('doc_brand', normalized); } catch (e) {}
+        updateDocLinks(document.body.getAttribute('data-theme') || 'night', normalized);
+      }
+
+      function applyTheme(theme) {
+        var normalized = theme === 'day' ? 'day' : 'night';
+        document.body.setAttribute('data-theme', normalized);
+        var icon = document.getElementById('themeIcon');
+        var label = document.getElementById('themeLabel');
+        if (icon) icon.textContent = normalized === 'day' ? '🌙' : '☀️';
+        if (label) label.textContent = normalized === 'day' ? 'Night' : 'Day';
+        try { localStorage.setItem('doc_theme', normalized); } catch (e) {}
+        updateDocLinks(normalized, document.body.getAttribute('data-brand') || 'red');
+      }
+
+      function toggleTheme() {
+        var current = document.body.getAttribute('data-theme') || 'night';
+        applyTheme(current === 'night' ? 'day' : 'night');
+      }
+
+      (function init() {
+        var params = new URLSearchParams(window.location.search);
+        var brand = params.get('brand');
+        var theme = params.get('theme');
+        try {
+          if (!brand) brand = localStorage.getItem('doc_brand');
+          if (!theme) theme = localStorage.getItem('doc_theme');
+        } catch (e) {}
+        setBrand(brand || 'red');
+        applyTheme(theme || 'night');
+      })();
+    </script>
+  </body>
+</html>
