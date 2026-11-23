@@ -1,4 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
+import { readOpenAICompatStream } from "./sseStream.js";
 import { startLocalEngine, getLocalEngineStatus, listDetectedModels } from "./localEngine.js";
 
 export type AIProviderType = "gemini" | "openai" | "claude" | "local";
@@ -888,45 +889,14 @@ async function executeOpenAIChatStream(
     return await executeOpenAIChat(options, config);
   }
 
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  let fullText = "";
-  let finishReason: string | undefined;
-
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split("\n");
-    buffer = lines.pop() || "";
-
-    for (const rawLine of lines) {
-      const line = rawLine.trim();
-      if (!line.startsWith("data:")) continue;
-      const payload = line.slice(5).trim();
-      if (payload === "[DONE]") continue;
-      try {
-        const parsed = JSON.parse(payload);
-        const delta = parsed?.choices?.[0]?.delta?.content;
-        if (typeof delta === "string" && delta.length > 0) {
-          fullText += delta;
-          callbacks.onDelta(delta);
-        }
-        const fr = parsed?.choices?.[0]?.finish_reason;
-        if (fr) finishReason = fr;
-      } catch {
-        // Ignore partial JSON lines
-      }
-    }
-  }
+  const streamed = await readOpenAICompatStream(res.body, callbacks, options.signal);
 
   return {
-    text: fullText.trim(),
+    text: streamed.text.trim(),
     providerUsed: "openai",
     modelUsed: modelToUse,
-    finishReason,
-    truncated: finishReason === "length",
+    finishReason: streamed.finishReason,
+    truncated: streamed.finishReason === "length",
   };
 }
 
@@ -1098,31 +1068,39 @@ async function executeClaudeChatStream(
   let fullText = "";
   let stopReason: string | undefined;
 
+  const handleLine = (rawLine: string) => {
+    const line = rawLine.trim();
+    if (!line.startsWith("data:")) return;
+    const jsonStr = line.slice(5).trim();
+    if (!jsonStr || jsonStr === "[DONE]") return;
+    let parsed: any;
+    try {
+      parsed = JSON.parse(jsonStr);
+    } catch {
+      return; // partial chunk
+    }
+    if (parsed.type === "error") {
+      // e.g. overloaded_error / rate_limit_error arriving AFTER the 200 response started
+      throw new Error(parsed?.error?.message || "Anthropic Claude stream error.");
+    }
+    if (parsed.type === "content_block_delta" && typeof parsed?.delta?.text === "string") {
+      fullText += parsed.delta.text;
+      callbacks.onDelta(parsed.delta.text);
+    } else if (parsed.type === "message_delta" && parsed?.delta?.stop_reason) {
+      stopReason = parsed.delta.stop_reason;
+    }
+  };
+
   while (true) {
+    if (options.signal?.aborted) break;
     const { value, done } = await reader.read();
     if (done) break;
     buffer += decoder.decode(value, { stream: true });
     const lines = buffer.split("\n");
     buffer = lines.pop() || "";
-
-    for (const rawLine of lines) {
-      const line = rawLine.trim();
-      if (!line.startsWith("data:")) continue;
-      const jsonStr = line.slice(5).trim();
-      if (!jsonStr || jsonStr === "[DONE]") continue;
-      try {
-        const parsed = JSON.parse(jsonStr);
-        if (parsed.type === "content_block_delta" && typeof parsed?.delta?.text === "string") {
-          fullText += parsed.delta.text;
-          callbacks.onDelta(parsed.delta.text);
-        } else if (parsed.type === "message_delta" && parsed?.delta?.stop_reason) {
-          stopReason = parsed.delta.stop_reason;
-        }
-      } catch {
-        // Ignore partial chunk
-      }
-    }
+    for (const l of lines) handleLine(l);
   }
+  if (buffer.trim()) handleLine(buffer);
 
   return {
     text: fullText.trim(),
@@ -1259,6 +1237,8 @@ async function executeLocalLLMChat(
             truncated: finishReason === "length",
           };
         }
+        const retryErrText = await retryRes.text().catch(() => "");
+        throw new Error(`Local LLM server returned error ${retryRes.status}: ${retryErrText.slice(0, 220)}`);
       } catch (autoErr: any) {
         throw new Error(
           `Could not connect to Local LLM at "${baseUrl}" and auto-start failed: ${autoErr?.message || err.message}`
@@ -1268,6 +1248,7 @@ async function executeLocalLLMChat(
     throw err;
   }
 }
+
 
 async function executeLocalLLMChatStream(
   options: ChatRequestOptions,
@@ -1296,45 +1277,19 @@ async function executeLocalLLMChatStream(
       return await executeLocalLLMChat(options, config);
     }
 
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-    let fullText = "";
-    let finishReason: string | undefined;
-
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop() || "";
-
-      for (const rawLine of lines) {
-        const line = rawLine.trim();
-        if (!line.startsWith("data:")) continue;
-        const payload = line.slice(5).trim();
-        if (payload === "[DONE]") continue;
-        try {
-          const parsed = JSON.parse(payload);
-          const delta = parsed?.choices?.[0]?.delta?.content;
-          if (typeof delta === "string" && delta.length > 0) {
-            fullText += delta;
-            callbacks.onDelta(delta);
-          }
-          const fr = parsed?.choices?.[0]?.finish_reason;
-          if (fr) finishReason = fr;
-        } catch {
-          // Ignore partial SSE chunk
-        }
-      }
+    const streamed = await readOpenAICompatStream(res.body, callbacks, options.signal);
+    if (!streamed.text.trim() && streamed.reasoningChars > 0) {
+      throw new Error(
+        "The local model only produced hidden reasoning and no answer (its token limit was used up while thinking). " +
+          "Use a non-reasoning model or a shorter prompt."
+      );
     }
-
     return {
-      text: fullText.trim(),
+      text: streamed.text.trim(),
       providerUsed: "local",
       modelUsed: modelToUse,
-      finishReason,
-      truncated: finishReason === "length",
+      finishReason: streamed.finishReason,
+      truncated: streamed.finishReason === "length",
     };
   } catch (err: any) {
     if (err.message && (err.message.includes("fetch failed") || err.message.includes("ECONNREFUSED"))) {
@@ -1350,45 +1305,17 @@ async function executeLocalLLMChatStream(
           signal: options.signal,
         });
         if (retryRes.ok && retryRes.body) {
-          const reader = retryRes.body.getReader();
-          const decoder = new TextDecoder();
-          let buffer = "";
-          let fullText = "";
-          let finishReason: string | undefined;
-
-          while (true) {
-            const { value, done } = await reader.read();
-            if (done) break;
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split("\n");
-            buffer = lines.pop() || "";
-
-            for (const rawLine of lines) {
-              const line = rawLine.trim();
-              if (!line.startsWith("data:")) continue;
-              const payload = line.slice(5).trim();
-              if (payload === "[DONE]") continue;
-              try {
-                const parsed = JSON.parse(payload);
-                const delta = parsed?.choices?.[0]?.delta?.content;
-                if (typeof delta === "string" && delta.length > 0) {
-                  fullText += delta;
-                  callbacks.onDelta(delta);
-                }
-                const fr = parsed?.choices?.[0]?.finish_reason;
-                if (fr) finishReason = fr;
-              } catch {}
-            }
-          }
-
+          const streamed = await readOpenAICompatStream(retryRes.body, callbacks, options.signal);
           return {
-            text: fullText.trim(),
+            text: streamed.text.trim(),
             providerUsed: "local",
             modelUsed: modelToUse,
-            finishReason,
-            truncated: finishReason === "length",
+            finishReason: streamed.finishReason,
+            truncated: streamed.finishReason === "length",
           };
         }
+        const retryErr = await retryRes.text().catch(() => "");
+        throw new Error(`Local LLM server returned error ${retryRes.status}: ${retryErr.slice(0, 220)}`);
       } catch (autoErr: any) {
         throw new Error(
           `Could not connect to Local LLM at "${baseUrl}" and auto-start failed: ${autoErr?.message || err.message}`

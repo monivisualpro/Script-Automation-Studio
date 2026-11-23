@@ -2469,6 +2469,12 @@ app.post("/api/chat", aiBurstLimiter, verifyUserAuth as express.RequestHandler, 
       fallbackApiKey: req.userApiKey,
     });
 
+    if (!result.text.trim()) {
+      return res.status(502).json({
+        error: "The model returned an empty response. Check the selected model, then try again.",
+      });
+    }
+
     return res.json({
       reply: result.text,
       providerUsed: result.providerUsed,
@@ -2489,7 +2495,9 @@ app.post("/api/chat", aiBurstLimiter, verifyUserAuth as express.RequestHandler, 
 // Streaming Multi-turn AI Chat Endpoint (SSE live token-by-token like ChatGPT / Claude / Gemini)
 app.post("/api/chat/stream", aiBurstLimiter, verifyUserAuth as express.RequestHandler, async (req: AuthenticatedRequest, res) => {
   const abortController = new AbortController();
-  req.on("close", () => {
+  // NOTE: must be res.on("close"), not req.on("close"). Since Node 16 the request emits "close" as soon as its
+  // body has been fully read, which aborted every generation before the model produced a single token.
+  res.on("close", () => {
     if (!res.writableEnded) {
       abortController.abort();
     }
@@ -2530,6 +2538,18 @@ app.post("/api/chat/stream", aiBurstLimiter, verifyUserAuth as express.RequestHa
       }
     );
 
+    if (!result.text.trim()) {
+      sendEvent({
+        type: "error",
+        error:
+          result.finishReason === "length" || result.finishReason === "MAX_TOKENS"
+            ? "The model used its whole token budget without producing visible text (common with reasoning models). Try a shorter prompt, a larger context, or a non-reasoning model."
+            : "The model returned an empty response. Check the selected model, then try again.",
+      });
+      res.end();
+      return;
+    }
+
     sendEvent({
       type: "done",
       reply: result.text,
@@ -2569,7 +2589,16 @@ app.get("/api/chat/storage", async (_req, res) => {
       try {
         savedData = JSON.parse(fs.readFileSync(LOCAL_CHAT_WORKSPACE_FILE, "utf-8"));
       } catch {
-        savedData = {};
+        // Corrupt file (e.g. crash mid-write). Preserve it for manual recovery, then fall back to the
+        // rolling backup instead of silently starting empty and overwriting the user's chats.
+        try {
+          fs.copyFileSync(LOCAL_CHAT_WORKSPACE_FILE, `${LOCAL_CHAT_WORKSPACE_FILE}.corrupt-${Date.now()}`);
+        } catch {}
+        try {
+          savedData = JSON.parse(fs.readFileSync(`${LOCAL_CHAT_WORKSPACE_FILE}.bak`, "utf-8"));
+        } catch {
+          savedData = {};
+        }
       }
     }
     return res.json({
@@ -2607,7 +2636,24 @@ app.post("/api/chat/storage", writeRateLimiter, async (req, res) => {
       activeAgentId,
       updatedAt: new Date().toISOString(),
     };
-    fs.writeFileSync(LOCAL_CHAT_WORKSPACE_FILE, JSON.stringify(payload, null, 2), "utf8");
+    // Atomic write (temp file + rename) so a crash or power loss can never leave a half-written JSON file.
+    try {
+      if (fs.existsSync(LOCAL_CHAT_WORKSPACE_FILE)) {
+        const ageMs = Date.now() - fs.statSync(LOCAL_CHAT_WORKSPACE_FILE).mtimeMs;
+        const existing = JSON.parse(fs.readFileSync(LOCAL_CHAT_WORKSPACE_FILE, "utf-8"));
+        const hadChats = Array.isArray(existing?.sessions) && existing.sessions.length > 0;
+        // Rolling backup (at most once a minute) and a permanent safety copy before chats get wiped.
+        if (ageMs > 60_000) fs.copyFileSync(LOCAL_CHAT_WORKSPACE_FILE, `${LOCAL_CHAT_WORKSPACE_FILE}.bak`);
+        if (hadChats && rawSessions.length === 0) {
+          fs.copyFileSync(LOCAL_CHAT_WORKSPACE_FILE, `${LOCAL_CHAT_WORKSPACE_FILE}.before-empty.bak`);
+        }
+      }
+    } catch {
+      // backup is best-effort
+    }
+    const tmpPath = `${LOCAL_CHAT_WORKSPACE_FILE}.tmp`;
+    fs.writeFileSync(tmpPath, JSON.stringify(payload, null, 2), "utf8");
+    fs.renameSync(tmpPath, LOCAL_CHAT_WORKSPACE_FILE);
     return res.json({
       success: true,
       storageMode: "local-disk",

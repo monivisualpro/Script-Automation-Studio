@@ -52,6 +52,7 @@ import {
   mergeWithBuiltInSkills,
 } from "../lib/agentSkills";
 import { SkillsAgentsModal } from "./SkillsAgentsModal";
+import { readApiError } from "../lib/api";
 
 export type StudioTransferTarget = "script" | "scenes" | "ctr" | "thumbnail";
 
@@ -645,7 +646,8 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
           headers: { "x-standalone-mode": "true" },
         });
         if (!res.ok || cancelled) {
-          storageHydratedRef.current = true;
+          // Do NOT enable auto-save after a failed load: it would overwrite the saved chats on disk
+          // with whatever (empty) state is in memory. Chats stay mirrored in localStorage meanwhile.
           return;
         }
         const data = await res.json();
@@ -704,13 +706,12 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
         if (data.activeAgentId !== undefined) {
           setActiveAgentId(data.activeAgentId || null);
         }
-      } catch {
-        setStorageMode("browser-local");
-        setStorageLocation("Browser Storage");
-      } finally {
         if (!cancelled) {
           storageHydratedRef.current = true;
         }
+      } catch {
+        setStorageMode("browser-local");
+        setStorageLocation("Browser Storage");
       }
     };
 
@@ -1276,10 +1277,10 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
         }),
       });
 
-      const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || "Failed to optimize prompt.");
+        throw new Error(await readApiError(res, "Failed to optimize prompt."));
       }
+      const data = await res.json();
 
       if (data.reply?.trim()) {
         setPromptInput(data.reply.trim());
@@ -1387,12 +1388,14 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
 
       const contentType = (res.headers.get("content-type") || "").toLowerCase();
       if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || "Failed to generate AI response.");
+        throw new Error(await readApiError(res, "Failed to generate AI response."));
       }
 
       if (!contentType.includes("text/event-stream") || !res.body) {
         const data = await res.json();
+        if (!String(data.reply || "").trim()) {
+          throw new Error("The model returned an empty response. Check the selected model and try again.");
+        }
         updateStreamingMessage((m) => ({
           ...m,
           content: data.reply || "",
@@ -1409,6 +1412,7 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
       let buffer = "";
       let accumulated = "";
       let finalMeta: { modelUsed?: string; providerUsed?: string; truncated?: boolean } = {};
+      let sawDone = false;
 
       while (true) {
         const { value, done } = await reader.read();
@@ -1439,6 +1443,7 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
                 content: currentText,
               }));
             } else if (parsed.type === "done") {
+              sawDone = true;
               finalMeta = {
                 modelUsed: parsed.modelUsed,
                 providerUsed: parsed.providerUsed,
@@ -1454,12 +1459,22 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
         }
       }
 
+      // The stream closed without any text: never leave a silent empty bubble behind.
+      if (!accumulated.trim()) {
+        throw new Error(
+          sawDone
+            ? "The model returned an empty response. Check the selected model and try again."
+            : "The connection closed before any text arrived. Make sure the AI provider is reachable and try again."
+        );
+      }
+
       updateStreamingMessage((m) => ({
         ...m,
         content: accumulated.trim(),
         modelUsed: finalMeta.modelUsed || m.modelUsed,
         providerUsed: finalMeta.providerUsed || m.providerUsed,
-        truncated: Boolean(finalMeta.truncated),
+        // no "done" event = the connection dropped mid-answer; flag it so "Continue" is offered
+        truncated: Boolean(finalMeta.truncated) || !sawDone,
         isStreaming: false,
       }));
     } catch (err: any) {
@@ -1713,7 +1728,7 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
                   className="p-1.5 rounded-lg hover:bg-black/10 dark:hover:bg-white/10 cursor-pointer"
                   title="Collapse sidebar"
                   style={{ color: mutedText }}
-                >
+                 aria-label="Collapse sidebar">
                   <PanelLeftClose className="h-4 w-4" />
                 </button>
                 <span className="font-sans font-bold text-sm truncate" style={{ color: primaryText }}>
@@ -1726,7 +1741,7 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
                 className="p-1.5 rounded-lg hover:bg-black/10 dark:hover:bg-white/10 cursor-pointer"
                 title="New Chat"
                 style={{ color: primaryText }}
-              >
+               aria-label="New Chat">
                 <SquarePen className="h-4 w-4" />
               </button>
             </div>
@@ -1860,7 +1875,7 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
                           }}
                           className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-black/15 cursor-pointer shrink-0"
                           title="Delete project"
-                        >
+                         aria-label="Delete project">
                           <Trash2 className="h-3 w-3" />
                         </button>
                       </div>
@@ -1964,7 +1979,7 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
                           }}
                           className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-black/15 cursor-pointer"
                           title="Delete chat"
-                        >
+                         aria-label="Delete chat">
                           <Trash2 className="h-3 w-3" />
                         </button>
                       </div>
@@ -2029,7 +2044,7 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
                 className="p-1.5 rounded-lg hover:bg-black/10 dark:hover:bg-white/10 cursor-pointer shrink-0"
                 title="Expand sidebar"
                 style={{ color: mutedText }}
-              >
+               aria-label="Expand sidebar">
                 <PanelLeftOpen className="h-4 w-4" />
               </button>
             )}
@@ -2087,7 +2102,7 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
                 className="px-2.5 py-1.5 rounded-xl border text-[11px] font-semibold flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0"
                 style={{ borderColor: borderCol, color: primaryText }}
                 title="Download conversation as Markdown"
-              >
+               aria-label="Download conversation as Markdown">
                 <Download className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">Export</span>
               </button>
@@ -2420,7 +2435,7 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
                                   color: needsContinueHighlight ? theme.accentColor : primaryText,
                                 }}
                                 title="Continue seamlessly from where this response stopped (ideal for long scripts & 50+ scene batches)"
-                              >
+                               aria-label="Continue seamlessly from where this response stopped (ideal for long scripts & 50+ scene batches)">
                                 <FastForward className="h-3 w-3" />
                                 <span>Continue</span>
                               </button>
@@ -2436,7 +2451,7 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
                               className="px-2.5 py-1 rounded-lg border flex items-center gap-1 font-semibold cursor-pointer"
                               style={{ borderColor: borderCol, color: primaryText }}
                               title="Load into Source Script Input & switch to Automation Studio"
-                            >
+                             aria-label="Load into Source Script Input & switch to Automation Studio">
                               <PenLine className="h-3 w-3" style={{ color: theme.accentColor }} />
                               <span>Use in Script</span>
                             </button>
@@ -2446,7 +2461,7 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
                               className="px-2.5 py-1 rounded-lg border flex items-center gap-1 font-semibold cursor-pointer"
                               style={{ borderColor: borderCol, color: primaryText }}
                               title="Load into Scene Script Input & switch to Automation Studio"
-                            >
+                             aria-label="Load into Scene Script Input & switch to Automation Studio">
                               <Clapperboard className="h-3 w-3" style={{ color: theme.secondaryAccentColor }} />
                               <span>Use in Scenes</span>
                             </button>
@@ -2456,7 +2471,7 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
                               className="px-2.5 py-1 rounded-lg border flex items-center gap-1 font-semibold cursor-pointer"
                               style={{ borderColor: borderCol, color: primaryText }}
                               title="Load into Video Script Input for CTR & SEO metadata"
-                            >
+                             aria-label="Load into Video Script Input for CTR & SEO metadata">
                               <TrendingUp className="h-3 w-3" style={{ color: theme.accentColor }} />
                               <span>Use in CTR</span>
                             </button>
@@ -2466,7 +2481,7 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
                               className="px-2.5 py-1 rounded-lg border flex items-center gap-1 font-semibold cursor-pointer"
                               style={{ borderColor: borderCol, color: primaryText }}
                               title="Load into Thumbnail Brief Input"
-                            >
+                             aria-label="Load into Thumbnail Brief Input">
                               <ImageIcon className="h-3 w-3" style={{ color: theme.secondaryAccentColor }} />
                               <span>Thumbnail</span>
                             </button>
@@ -2653,7 +2668,7 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
               className="h-8 w-8 rounded-full border flex items-center justify-center cursor-pointer transition-colors hover:opacity-90"
               style={{ borderColor: borderCol, color: primaryText }}
               title="Attach .txt, .md, .pdf, or image"
-            >
+             aria-label="Attach .txt, .md, .pdf, or image">
               <Plus className="h-4 w-4" />
             </button>
 
@@ -2742,7 +2757,7 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
                       color: primaryText,
                     }}
                     title="Expand your draft into a deeply detailed ChatGPT, Claude & Gemini grade prompt"
-                  >
+                   aria-label="Expand your draft into a deeply detailed ChatGPT, Claude & Gemini grade prompt">
                     <div className="flex items-center gap-2 min-w-0">
                       {isOptimizing ? (
                         <Loader2
@@ -3046,7 +3061,7 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
                 className="h-8 w-8 rounded-full flex items-center justify-center text-white cursor-pointer transition-transform active:scale-95"
                 style={{ backgroundColor: theme.accentColor }}
                 title="Stop generating"
-              >
+               aria-label="Stop generating">
                 <Square className="h-3.5 w-3.5 fill-current" />
               </button>
             ) : (
@@ -3060,7 +3075,7 @@ export const DesktopAIChatWorkspace: React.FC<DesktopAIChatWorkspaceProps> = ({
                 className="h-8 w-8 rounded-full flex items-center justify-center text-white cursor-pointer disabled:opacity-40 transition-transform active:scale-95"
                 style={{ backgroundColor: theme.secondaryAccentColor }}
                 title="Send message"
-              >
+               aria-label="Send message">
                 <ArrowUp className="h-4 w-4" />
               </button>
             )}

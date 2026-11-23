@@ -410,7 +410,7 @@ export const SkillsAgentsModal: React.FC<SkillsAgentsModalProps> = ({
                             className="p-1.5 rounded-xl border cursor-pointer hover:opacity-80"
                             style={{ borderColor: borderCol, color: mutedText }}
                             title="Uninstall"
-                          >
+                           aria-label="Uninstall">
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
                         )}
@@ -498,7 +498,7 @@ export const SkillsAgentsModal: React.FC<SkillsAgentsModalProps> = ({
                       className="px-2.5 py-1.5 rounded-xl border font-bold flex items-center gap-1.5 cursor-pointer shrink-0 disabled:opacity-50"
                       style={{ borderColor: borderCol, color: primaryText }}
                       title="Re-scan all linked folders for new or edited skill files"
-                    >
+                     aria-label="Re-scan all linked folders for new or edited skill files">
                       <RefreshCw className={`h-3.5 w-3.5 ${isLinkingFolder ? "animate-spin" : ""}`} />
                       <span>Rescan ({linkedSkillCount})</span>
                     </button>
@@ -630,7 +630,7 @@ export const SkillsAgentsModal: React.FC<SkillsAgentsModalProps> = ({
                           className="px-2.5 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1 cursor-pointer hover:opacity-80 shrink-0"
                           style={{ borderColor: borderCol, color: mutedText }}
                           title="Unlink folder"
-                        >
+                         aria-label="Unlink folder">
                           <Unlink className="h-3.5 w-3.5" />
                           <span>Unlink</span>
                         </button>

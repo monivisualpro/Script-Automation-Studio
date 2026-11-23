@@ -3155,7 +3155,7 @@ export default function App() {
                               onClick={stopSpeechToText}
                               className={`glass-button p-1 rounded-lg bg-red-950/40 border border-red-900/40 hover:bg-red-900 hover:text-white transition-all cursor-pointer ${theme.isLight ? "text-[#000000]" : "text-white"}`}
                               title="Stop listening"
-                            >
+                             aria-label="Stop listening">
                               <MicOff className="h-3.5 w-3.5 animate-pulse" />
                             </button>
                           ) : (
@@ -3169,7 +3169,7 @@ export default function App() {
                                 color: theme.textColorCode
                               }}
                               title="Speech to Text"
-                            >
+                             aria-label="Speech to Text">
                               <Mic className="h-3.5 w-3.5" />
                             </button>
                           )}
@@ -3481,7 +3481,7 @@ export default function App() {
                         onClick={stopSpeechToText}
                         className="glass-button p-2.5 rounded-full bg-red-950/80 text-white border border-red-800/80 hover:bg-red-900 transition-all cursor-pointer shadow-lg flex items-center justify-center"
                         title="Stop speech-to-text"
-                      >
+                       aria-label="Stop speech-to-text">
                         <MicOff className="h-4 w-4 animate-bounce text-white" />
                       </button>
                     ) : (
@@ -3495,7 +3495,7 @@ export default function App() {
                           color: theme.textColorCode
                         }}
                         title="Speak to enter script"
-                      >
+                       aria-label="Speak to enter script">
                         <Mic className="h-4 w-4" />
                       </button>
                     )}
@@ -3506,7 +3506,7 @@ export default function App() {
                         onClick={() => setRawScript("")}
                         className={`glass-button p-2 rounded-xl bg-red-950/30 border border-red-900/40 hover:bg-red-900 hover:text-white transition-all duration-300 cursor-pointer hover:scale-105 active:scale-95 ${theme.isLight ? "text-[#000000]" : "text-white"}`}
                         title="Clear text"
-                      >
+                       aria-label="Clear text">
                         <Trash2 className="h-4 w-4" />
                       </button>
                     )}
@@ -3777,7 +3777,7 @@ export default function App() {
                         opacity: 0.4
                       }}
                       title="Insert the polished voice over script"
-                    >
+                     aria-label="Insert the polished voice over script">
                       <Plus className="h-3 w-3" /> INSERT
                     </button>
 
@@ -3838,7 +3838,7 @@ export default function App() {
                         backgroundColor: showShotsCalculator ? theme.accentColor : "transparent"
                       }}
                       title="Open Shots Calculator (duration-based)"
-                    >
+                     aria-label="Open Shots Calculator (duration-based)">
                       <Calculator className="h-3 w-3" />
                       <span className="hidden sm:inline">Calc</span>
                     </button>
@@ -3906,7 +3906,7 @@ export default function App() {
                                 borderColor: `${theme.secondaryAccentColor}50`,
                               }}
                               title="Load Video Duration from left studio slider"
-                            >
+                             aria-label="Load Video Duration from left studio slider">
                               Sync Video ({videoDuration}m)
                             </button>
                             <button
@@ -4063,7 +4063,7 @@ export default function App() {
                         onClick={stopSpeechToText}
                         className="glass-button p-2.5 rounded-full bg-red-950/80 text-white border border-red-800/80 hover:bg-red-900 transition-all cursor-pointer shadow-lg flex items-center justify-center"
                         title="Stop speech-to-text"
-                      >
+                       aria-label="Stop speech-to-text">
                         <MicOff className="h-4 w-4 animate-bounce text-white" />
                       </button>
                     ) : (
@@ -4077,7 +4077,7 @@ export default function App() {
                           color: theme.textColorCode
                         }}
                         title="Speak to enter transcript / explain scene"
-                      >
+                       aria-label="Speak to enter transcript / explain scene">
                         <Mic className="h-4 w-4" />
                       </button>
                     )}
@@ -4168,7 +4168,7 @@ export default function App() {
                           className="glass-button p-1.5 rounded-xl border transition-all text-[10px] font-mono flex items-center gap-1 cursor-pointer"
                           style={{ backgroundColor: `${theme.accentColor}15`, borderColor: theme.accentColor, color: theme.textColorCode }}
                           title="Copy All"
-                        >
+                         aria-label="Copy All">
                           <Copy className="h-3 w-3" /> COPY ALL
                         </button>
                         <button
@@ -4176,7 +4176,7 @@ export default function App() {
                           className="glass-button p-1.5 rounded-xl border transition-all text-[10px] font-mono flex items-center gap-1 cursor-pointer"
                           style={{ backgroundColor: `${theme.accentColor}15`, borderColor: theme.accentColor, color: theme.textColorCode }}
                           title="Download Text"
-                        >
+                         aria-label="Download Text">
                           <Download className="h-3 w-3" /> .TXT
                         </button>
                         <button
@@ -4184,14 +4184,14 @@ export default function App() {
                           className="glass-button p-1.5 rounded-xl border transition-all text-[10px] font-mono flex items-center gap-1 cursor-pointer"
                           style={{ backgroundColor: `${theme.accentColor}15`, borderColor: theme.accentColor, color: theme.textColorCode }}
                           title="Download Word Document"
-                        >
+                         aria-label="Download Word Document">
                           <Download className="h-3 w-3" /> .DOCX
                         </button>
                         <button
                           onClick={handleClearAllScenes}
                           className={`glass-button p-1.5 rounded-xl bg-red-950/20 hover:bg-red-900 hover:text-white ${theme.isLight ? "text-[#000000]" : "text-white"} border border-red-900/40 transition-all text-[10px] font-mono flex items-center gap-1 cursor-pointer`}
                           title="Clear storyboard"
-                        >
+                         aria-label="Clear storyboard">
                           <Trash2 className="h-3 w-3" /> CLEAR
                         </button>
                       </div>
@@ -4350,7 +4350,7 @@ export default function App() {
                             cursor: "not-allowed"
                           }}
                           title="Insert from Polished Script"
-                        >
+                         aria-label="Insert from Polished Script">
                           <Plus className="h-3 w-3" /> INSERT POLISHED VO
                         </button>
                         <label
@@ -4397,7 +4397,7 @@ export default function App() {
                               borderColor: "rgba(220, 38, 38, 0.4)"
                             }}
                             title="Stop speech-to-text"
-                          >
+                           aria-label="Stop speech-to-text">
                             <MicOff className="h-4 w-4 animate-bounce" style={{ color: theme.accentColor }} />
                           </button>
                         ) : (
@@ -4411,7 +4411,7 @@ export default function App() {
                               color: theme.textColorCode
                             }}
                             title="Speak to enter video transcript"
-                          >
+                           aria-label="Speak to enter video transcript">
                             <Mic className="h-4 w-4" />
                           </button>
                         )}
@@ -4426,7 +4426,7 @@ export default function App() {
                               color: theme.textColorCode
                             }}
                             title="Clear transcript input"
-                          >
+                           aria-label="Clear transcript input">
                             <Trash2 className="h-4 w-4" />
                           </button>
                         )}
@@ -4517,7 +4517,7 @@ export default function App() {
                                 color: theme.textColorCode
                               }}
                               title="Copy All output text"
-                            >
+                             aria-label="Copy All output text">
                               <Copy className="h-3 w-3" /> COPY ALL
                             </button>
                             <button
@@ -4529,14 +4529,14 @@ export default function App() {
                                 color: theme.textColorCode
                               }}
                               title="Download All as .txt"
-                            >
+                             aria-label="Download All as .txt">
                               <Download className="h-3 w-3" /> .TXT
                             </button>
                             <button
                               onClick={() => setCtrOutput(null)}
                               className={`glass-button p-1 rounded-xl bg-red-950/25 hover:bg-red-900 hover:text-white ${theme.isLight ? "text-[#000000]" : "text-white"} border border-red-900/40 text-[9px] font-mono flex items-center gap-1 cursor-pointer transition-all duration-300 hover:scale-110 active:scale-90`}
                               title="Clear outputs"
-                            >
+                             aria-label="Clear outputs">
                               <Trash2 className="h-3 w-3" /> CLEAR
                             </button>
                           </>
@@ -4795,7 +4795,7 @@ export default function App() {
                             cursor: "not-allowed"
                           }}
                           title="Insert from Polished Script"
-                        >
+                         aria-label="Insert from Polished Script">
                           <Plus className="h-3 w-3" /> INSERT POLISHED VO
                         </button>
                         <label
@@ -4850,7 +4850,7 @@ export default function App() {
                                 onClick={handleClearCharacterImage}
                                 className={`p-1 ${theme.isLight ? "text-[#000000]" : "text-white"} hover:bg-red-950/40 hover:text-white rounded transition-colors cursor-pointer ml-1`}
                                 title="Remove character photo"
-                              >
+                               aria-label="Remove character photo">
                                 <Trash2 className="h-3 w-3" />
                               </button>
                             </div>
@@ -4883,7 +4883,7 @@ export default function App() {
                               onClick={stopSpeechToText}
                               className="p-2 rounded-xl bg-red-950/80 text-white border border-red-800/80 hover:bg-red-900 transition-all cursor-pointer flex items-center justify-center shadow"
                               title="Stop speech-to-text"
-                            >
+                             aria-label="Stop speech-to-text">
                               <MicOff className="h-3.5 w-3.5 animate-bounce" style={{ color: theme.accentColor }} />
                             </button>
                           ) : (
@@ -4897,7 +4897,7 @@ export default function App() {
                                 color: theme.textColorCode
                               }}
                               title="Speak to enter thumbnail details"
-                            >
+                             aria-label="Speak to enter thumbnail details">
                               <Mic className="h-3.5 w-3.5" />
                             </button>
                           )}
@@ -4912,7 +4912,7 @@ export default function App() {
                                 color: theme.textColorCode
                               }}
                               title="Clear transcript input"
-                            >
+                             aria-label="Clear transcript input">
                               <Trash2 className="h-3.5 w-3.5" />
                             </button>
                           )}
@@ -5018,7 +5018,7 @@ export default function App() {
                                 color: theme.textColorCode
                               }}
                               title="Copy prompt output"
-                            >
+                             aria-label="Copy prompt output">
                               <Copy className="h-3 w-3" /> COPY ALL
                             </button>
                             <button
@@ -5030,14 +5030,14 @@ export default function App() {
                                 color: theme.textColorCode
                               }}
                               title="Download Prompt text"
-                            >
+                             aria-label="Download Prompt text">
                               <Download className="h-3 w-3" /> .TXT
                             </button>
                             <button
                               onClick={() => setThumbnailOutput(null)}
                               className={`glass-button p-1 rounded-xl bg-red-950/25 hover:bg-red-900 hover:text-white ${theme.isLight ? "text-[#000000]" : "text-white"} border border-red-900/40 text-[9px] font-mono flex items-center gap-1 cursor-pointer transition-all duration-300 hover:scale-110 active:scale-90`}
                               title="Clear prompts"
-                            >
+                             aria-label="Clear prompts">
                               <Trash2 className="h-3 w-3" /> CLEAR
                             </button>
                           </>

@@ -987,7 +987,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose }) => 
                             className="px-2.5 py-1 rounded-xl border text-[11px] font-bold flex items-center gap-1 cursor-pointer"
                             style={{ borderColor: borderCol, color: theme.textColorCode }}
                             title="Rescan local-engine folders"
-                          >
+                           aria-label="Rescan local-engine folders">
                             <RefreshCw className={`h-3 w-3 ${scanningEngine ? "animate-spin" : ""}`} />
                             <span>Scan</span>
                           </button>
@@ -1106,7 +1106,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose }) => 
                               className="px-2.5 py-1.5 rounded-xl font-bold text-[11px] border cursor-pointer disabled:opacity-45 shrink-0"
                               style={{ borderColor: borderCol, color: theme.textColorCode }}
                               title="Switch back to project local-engine/models folder"
-                            >
+                             aria-label="Switch back to project local-engine/models folder">
                               Reset Default
                             </button>
                           )}

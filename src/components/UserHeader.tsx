@@ -126,7 +126,7 @@ export const UserHeader: React.FC = () => {
                 : "text-[#BDBDBD] hover:text-white"
             }`}
             title="Red Brand (#FF073A Primary, #2774FC Secondary)"
-          >
+           aria-label="Red Brand (#FF073A Primary, #2774FC Secondary)">
             <span>🔴</span>
             <span className="hidden md:inline">Red</span>
           </button>
@@ -141,7 +141,7 @@ export const UserHeader: React.FC = () => {
                 : "text-[#BDBDBD] hover:text-white"
             }`}
             title="Blue Brand (#2774FC Primary, #FF073A Secondary)"
-          >
+           aria-label="Blue Brand (#2774FC Primary, #FF073A Secondary)">
             <span>🔵</span>
             <span className="hidden md:inline">Blue</span>
           </button>
@@ -179,7 +179,7 @@ export const UserHeader: React.FC = () => {
               : "bg-[#1A1A1A] text-white border-[#2A2A2A]"
           }`}
           title="Open Tutorials, Controls Dictionary & Downloadable Guides"
-        >
+         aria-label="Open Tutorials, Controls Dictionary & Downloadable Guides">
           <BookOpen className="h-4 w-4" style={{ color: theme.accentColor }} />
           <span className="text-xs font-mono font-bold hidden sm:inline">Tutorials & Guides</span>
         </button>
@@ -193,7 +193,7 @@ export const UserHeader: React.FC = () => {
               : "bg-[#1A1A1A] text-white border-[#2A2A2A]"
           }`}
           title="Open Settings & Model Configuration"
-        >
+         aria-label="Open Settings & Model Configuration">
           <Settings className="h-4 w-4" style={{ color: theme.secondaryAccentColor }} />
           <span className="text-xs font-mono hidden lg:inline">Settings</span>
         </button>
@@ -210,7 +210,7 @@ export const UserHeader: React.FC = () => {
             borderColor: isConfigured ? `${theme.secondaryAccentColor}99` : theme.accentColor,
           }}
           title="Configure AI Provider, Local .env Key, or Built-In Local Engine"
-        >
+         aria-label="Configure AI Provider, Local .env Key, or Built-In Local Engine">
           {isConfigured ? (
             <CheckCircle2 className="h-3.5 w-3.5" style={{ color: theme.secondaryAccentColor }} />
           ) : (
